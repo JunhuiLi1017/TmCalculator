@@ -1,0 +1,67 @@
+# TmCalculator: Melting Temperature of Nucleic Acid Sequences
+:exclamation: This is a read-only mirror of the CRAN R package repository.  TmCalculator — Melting Temperature of Nucleic Acid Sequences
+## 1. Introduction
+
+The melting temperature of nucleic acid sequences can be calculated in three method, (1) the Wallace rule, (2) empirical formulas based on G and C content and (3) nearest neighbor thermodynamics, and it can also be corrected with salt ions and chemical compound.
+
+*the Wallace rule:
+Tm = 4 * no. of GC + 2 * no. of AT
+
+*empirical formulas based on GC:
+Empirical constants coefficient with 8 variant:
+Chester1993: Tm = 69.3 + 0.41(Percentage_GC) - 650/N
+QuikChange: Tm = 81.5 + 0.41(Percentage_GC) - 675/N - Percentage_mismatch
+Schildkraut1965: Tm = 81.5 + 0.41(Percentage_GC) - 675/N + 16.6 x log[Na+]
+Wetmur1991_MELTING: Tm = 81.5 + 0.41(Percentage_GC) - 500/N + 16.6 x log([Na+]/(1.0 + 0.7 x [Na+])) - Percentage_mismatch
+Wetmur1991_RNA: Tm = 78 + 0.7(Percentage_GC) - 500/N + 16.6 x log([Na+]/(1.0 + 0.7 x [Na+])) - Percentage_mismatch
+Wetmur1991_RNA/DNA: Tm = 67 + 0.8(Percentage_GC) - 500/N + 16.6 x log([Na+]/(1.0 + 0.7 x [Na+])) - Percentage_mismatch
+Primer3Plus: Tm = 81.5 + 0.41(Percentage_GC) - 600/N + 16.6 x log[Na+]
+vonAhsen2001: Tm = 77.1 + 0.41(Percentage_GC) - 528/N + 11.7 x log[Na+]
+
+*nearest neighbor thermodynamics:
+DNA_NN1: Breslauer K J (1986) <doi:10.1073/pnas.83.11.3746>
+DNA_NN2: Sugimoto N (1996) <doi:10.1093/nar/24.22.4501>
+DNA_NN3: Allawi H (1998) <doi:10.1093/nar/26.11.2694>
+DNA_NN4: SantaLucia J (2004) <doi:10.1146/annurev.biophys.32.110601.141800>
+RNA_NN1: Freier S (1986) <doi:10.1073/pnas.83.24.9373>
+RNA_NN2: Xia T (1998) <doi:10.1021/bi9809425>
+RNA_NN3: Chen JL (2012) <doi:10.1021/bi3002709>
+R_DNA_NN1: Sugimoto N (1995)<doi:10.1016/S0048-9697(98)00088-6>
+DNA_TMM1: Bommarito S (2000) <doi:10.1093/nar/28.9.1929>
+DNA_IMM1: Peyret N (1999) <doi:10.1021/bi9825091> & Allawi H T (1997) <doi:10.1021/bi962590c> & Santalucia N (2005) <doi:10.1093/nar/gki918>
+DNA_DE1: Bommarito S (2000) <doi:10.1093/nar/28.9.1929>
+RNA_DE1: Turner D H (2010) <doi:10.1093/nar/gkp892>
+
+## 2. Usage and Examples
+	#install.package("TmCalculator")
+	library(TmCalculator)
+	
+	#calculate GC content
+	GC(c("a","t","c","t","g","g","g","c","c","a","g","t","a"))#53.84615
+	GC("GCATSWSYK",ambiguous = TRUE)#55.55556
+	
+	#calculate Tm with wallace rule:
+	ntseq = c('acgtTGCAATGCCGTAWSDBSY')
+	Tm_Wallace(ntseq,ambiguous = TRUE)
+	Tm_Wallace(ntseq,ambiguous = FALSE)
+	
+	#calculate Tm with GC content:
+	ambiguous=TRUE
+	userset=NULL
+	variant="Primer3Plus"
+	Na=50
+	K=0
+	Tris=0
+	Mg=0
+	dNTPs=0
+	saltcorr=0
+	mismatch=TRUE
+	ntseq <- c("ATCGTGCGTAGCAGTACGATCAGTAG")
+	Tm_GC(ntseq,ambiguous,userset,variant,Na, K,Tris, Mg, dNTPs, saltcorr, mismatch)
+	
+	#calculate Tm with nearest neighbor thermodynmamics:
+	ntseq <- c("AAAATTTTTTTCCCCCCCCCCCCCCGGGGGGGGGGGGTGTGCGCTGC")
+	Tm_NN(ntseq, ambiguous = FALSE, comSeq = NULL, shift = 0, nn_table = "DNA_NN4",
+	tmm_table = "DNA_TMM1", imm_table = "DNA_IMM1",de_table = "DNA_DE1", dnac1 = 25,	dnac2 = 25, selfcomp = FALSE, Na = 50, K = 0, Tris = 0, Mg = 0, dNTPs = 0, saltcorr = 5)
+		
+We welcome commits from researchers who wish to improve our software, and good luck to you.
