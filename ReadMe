@@ -4,10 +4,10 @@
 
 The melting temperature of nucleic acid sequences can be calculated in three method, (1) the Wallace rule, (2) empirical formulas based on G and C content and (3) nearest neighbor thermodynamics, and it can also be corrected with salt ions and chemical compound.
 
-*the Wallace rule:
+* the Wallace rule:
 Tm = 4 * no. of GC + 2 * no. of AT
 
-*empirical formulas based on GC:
+* empirical formulas based on GC:
 Empirical constants coefficient with 8 variant:
 Chester1993: Tm = 69.3 + 0.41(Percentage_GC) - 650/N
 QuikChange: Tm = 81.5 + 0.41(Percentage_GC) - 675/N - Percentage_mismatch
@@ -18,7 +18,7 @@ Wetmur1991_RNA/DNA: Tm = 67 + 0.8(Percentage_GC) - 500/N + 16.6 x log([Na+]/(1.0
 Primer3Plus: Tm = 81.5 + 0.41(Percentage_GC) - 600/N + 16.6 x log[Na+]
 vonAhsen2001: Tm = 77.1 + 0.41(Percentage_GC) - 528/N + 11.7 x log[Na+]
 
-*nearest neighbor thermodynamics:
+* nearest neighbor thermodynamics:
 DNA_NN1: Breslauer K J (1986) <doi:10.1073/pnas.83.11.3746>
 DNA_NN2: Sugimoto N (1996) <doi:10.1093/nar/24.22.4501>
 DNA_NN3: Allawi H (1998) <doi:10.1093/nar/26.11.2694>
@@ -62,6 +62,6 @@ RNA_DE1: Turner D H (2010) <doi:10.1093/nar/gkp892>
 	#calculate Tm with nearest neighbor thermodynmamics:
 	ntseq <- c("AAAATTTTTTTCCCCCCCCCCCCCCGGGGGGGGGGGGTGTGCGCTGC")
 	Tm_NN(ntseq, ambiguous = FALSE, comSeq = NULL, shift = 0, nn_table = "DNA_NN4",
-	tmm_table = "DNA_TMM1", imm_table = "DNA_IMM1",de_table = "DNA_DE1", dnac1 = 25,	dnac2 = 25, selfcomp = FALSE, Na = 50, K = 0, Tris = 0, Mg = 0, dNTPs = 0, saltcorr = 5)
+	tmm_table = "DNA_TMM1", imm_table = "DNA_IMM1",de_table = "DNA_DE1", dnac1 = 25,dnac2 = 25, selfcomp = FALSE, Na = 50, K = 0, Tris = 0, Mg = 0, dNTPs = 0, saltcorr = 5)
 		
 We welcome commits from researchers who wish to improve our software, and good luck to you.
