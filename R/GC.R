@@ -18,7 +18,7 @@
 #' @author Junhui Li
 #' 
 #' @export GC
-GC <- function (ntseq, ambiguous = FALSE, totalnt = FALSE){
+GC <- function (ntseq, ambiguous = FALSE, totalnt = TRUE){
   if (length(ntseq) == 1 && is.na(ntseq)){
     return(NA)
   }
