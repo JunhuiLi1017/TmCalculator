@@ -242,7 +242,7 @@ Tm_NN <- function(ntseq,
   rownames(DNA_TMM1) <- c("AA/TA","TA/AA","CA/GA","GA/CA","AC/TC","TC/AC","CC/GC","GC/CC","AG/TG","TG/AG",
                           "CG/GG","GG/CG","AT/TT","TT/AT","CT/GT","GT/CT","AA/TC","AC/TA","CA/GC","CC/GA",
                           "GA/CC","GC/CA","TA/AC","TC/AA","AC/TT","AT/TC","CC/GT","CT/GC","GC/CT","GT/CC",
-                          "TC/AT","TT/AC","AA/TG","AG/TA","CA/GG","CG/GA","GA/CG"," GG/CA","TA/AG","TG/AA",
+                          "TC/AT","TT/AC","AA/TG","AG/TA","CA/GG","CG/GA","GA/CG","GG/CA","TA/AG","TG/AA",
                           "AG/TT","AT/TG","CG/GT","CT/GG","GG/CT","GT/CG","TG/AT","TT/AG")
   colnames(DNA_TMM1) <- c("left","right")
   DNA_DE1 <- matrix(c(0.2,2.3,-6.3,-17.1,-3.7,-10,-2.9,-7.6,0.6,3.3,-4.4,-12.6,-4,-11.9,-4.1,-13,-1.1,-1.6,
@@ -267,8 +267,8 @@ Tm_NN <- function(ntseq,
                          "AA/.T","CA/.T","GA/.T","TA/.T","AG/.T","CG/.T","GG/.T","TG/.T")
   colnames(RNA_DE1) <- c("left","right")
   #creat list for all table data
-  TableList <- list(DNA_NN1,DNA_NN2,DNA_NN3,DNA_NN4,RNA_NN1,RNA_NN2,RNA_NN3,R_DNA_NN1,DNA_IMM1,DNA_DE1,RNA_DE1)
-  names(TableList) <- c("DNA_NN1","DNA_NN2","DNA_NN3","DNA_NN4","RNA_NN1","RNA_NN2","RNA_NN3","R_DNA_NN1","DNA_IMM1","DNA_DE1","RNA_DE1")
+  TableList <- list(DNA_NN1,DNA_NN2,DNA_NN3,DNA_NN4,RNA_NN1,RNA_NN2,RNA_NN3,R_DNA_NN1,DNA_IMM1,DNA_TMM1,DNA_DE1,RNA_DE1)
+  names(TableList) <- c("DNA_NN1","DNA_NN2","DNA_NN3","DNA_NN4","RNA_NN1","RNA_NN2","RNA_NN3","R_DNA_NN1","DNA_IMM1","DNA_TMM1","DNA_DE1","RNA_DE1")
   
   imm_table_list <- TableList[[imm_table]]
   nn_table_list <- TableList[[nn_table]]
