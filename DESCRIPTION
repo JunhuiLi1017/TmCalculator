@@ -1,7 +1,7 @@
 Package: TmCalculator
 Type: Package
 Title: Melting Temperature of Nucleic Acid Sequences
-Version: 1.0.3
+Version: 1.0.4
 Date: 2024-11-18
 Author: Junhui Li
 Maintainer: Junhui Li <junhuili@cau.edu.cn>
