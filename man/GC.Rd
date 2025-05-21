@@ -4,25 +4,36 @@
 \alias{GC}
 \title{Calculate G and C content of nucleotide sequences}
 \usage{
-GC(ntseq, ambiguous = FALSE, totalnt = FALSE)
+GC(input_seq, ambiguous = FALSE)
 }
 \arguments{
-\item{ntseq}{Sequence (5' to 3') of one strand of the nucleic acid duplex as string or vector of characters.}
+\item{input_seq}{Sequence (5' to 3') of one strand of the nucleic acid duplex. Can be provided as either:
+- A character string (e.g., "ATGCG")
+- A vector of characters (e.g., c("A","T","G","C","G"))}
 
-\item{ambiguous}{Ambiguous bases are taken into account to compute the G and C content when ambiguous is TRUE.}
-
-\item{totalnt}{Sum of 'G' and 'C' bases divided by the length of the sequence when totalnt is TRUE.}
+\item{ambiguous}{Logical. If TRUE, ambiguous bases are taken into account when computing the G and C content.
+The function handles various ambiguous bases (S, W, M, K, R, Y, V, H, D, B) by proportionally
+distributing their contribution to GC content based on their possible nucleotide compositions.
+For example:
+- S (G or C) contributes fully to GC content
+- W (A or T) contributes fully to AT content
+- M (A or C) contributes proportionally based on the ratio of A to C in the sequence
+- And so on for other ambiguous bases}
 }
 \value{
-Content of G and C(range from 0 to 100%)
+Content of G and C as a percentage (range from 0 to 100%)
 }
 \description{
-Calculate G and C content of nucleotide sequences. The number of G and C in sequence is divided by length of sequence(when totalnt is TRUE) or the number of all A,T,C,G and ambiguous base.
+Calculate G and C content of nucleotide sequences. The function calculates the percentage of G and C bases
+relative to the total number of A, T, G, and C bases in the sequence.
 }
 \examples{
 
-GC(c("a","t","c","t","g","g","g","c","c","a","g","t","a"))#53.84615
-GC("GCATSWSYK",ambiguous = TRUE)#55.55556
+# Calculate GC content of a DNA sequence
+GC(c("a","t","c","t","g","g","g","c","c","a","g","t","a"))  # 53.85\%
+
+# Calculate GC content including ambiguous bases
+GC("GCATSWSYK", ambiguous = TRUE)  # 55.56\%
 
 }
 \author{

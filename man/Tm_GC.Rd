@@ -5,7 +5,7 @@
 \title{Calculate the melting temperature using empirical formulas based on GC content}
 \usage{
 Tm_GC(
-  ntseq,
+  input_seq,
   ambiguous = FALSE,
   userset = NULL,
   variant = c("Primer3Plus", "Chester1993", "QuikChange", "Schildkraut1965",
@@ -15,18 +15,17 @@ Tm_GC(
   Tris = 0,
   Mg = 0,
   dNTPs = 0,
-  saltcorr = c("Schildkraut2010", "Wetmur1991", "SantaLucia1996", "SantaLucia1998-1",
+  salt_corr = c("Schildkraut2010", "Wetmur1991", "SantaLucia1996", "SantaLucia1998-1",
     "Owczarzy2004", "Owczarzy2008"),
   mismatch = TRUE,
   DMSO = 0,
-  fmd = 0,
-  DMSOfactor = 0.75,
-  fmdfactor = 0.65,
-  fmdmethod = c("concentration", "molar")
+  formamide_value_unit = list(value = 0, unit = "percent"),
+  dmso_factor = 0.75,
+  formamide_factor = 0.65
 )
 }
 \arguments{
-\item{ntseq}{Sequence (5' to 3') of one strand of the nucleic acid duplex as string or vector of characters.}
+\item{input_seq}{Sequence (5' to 3') of one strand of the nucleic acid duplex as string or vector of characters.}
 
 \item{ambiguous}{Ambiguous bases are taken into account to compute the G and C content when ambiguous is TRUE.}
 
@@ -44,19 +43,19 @@ Tm_GC(
 
 \item{dNTPs}{Millimolar concentration of dNTPs, default is 0}
 
-\item{saltcorr}{Salt correction method should be chosen when provide 'userset'. Options are "Schildkraut2010", "Wetmur1991","SantaLucia1996","SantaLucia1998-1","Owczarzy2004","Owczarzy2008". Note that "SantaLucia1998-2" is not available for this function.}
+\item{salt_corr}{Salt correction method should be chosen when provide 'userset'. Options are "Schildkraut2010", "Wetmur1991","SantaLucia1996","SantaLucia1998-1","Owczarzy2004","Owczarzy2008". Note that "SantaLucia1998-2" is not available for this function.}
 
 \item{mismatch}{If 'True' (default) every 'X' in the sequence is counted as mismatch}
 
-\item{DMSO}{Percent DMSO}
+\item{DMSO}{Percent DMSO concentration in the reaction mixture. Default is 0.}
 
-\item{fmd}{Formamide concentration in percentage (fmdmethod="concentration") or molar (fmdmethod="molar").}
+\item{formamide_value_unit}{A list containing formamide concentration value and unit. The list should have two elements:
+- value: numeric value of formamide concentration
+- unit: character string specifying the unit, either "percent" or "molar"}
 
-\item{DMSOfactor}{Coeffecient of Tm decreases per percent DMSO. Default=0.75 von Ahsen N (2001) <PMID:11673362>. Other published values are 0.5, 0.6 and 0.675.}
+\item{dmso_factor}{Coefficient of Tm decreases per percent DMSO. Default=0.75 von Ahsen N (2001) <PMID:11673362>. Other published values are 0.5, 0.6 and 0.675.}
 
-\item{fmdfactor}{Coeffecient of Tm decrease per percent formamide. Default=0.65. Several papers report factors between 0.6 and 0.72.}
-
-\item{fmdmethod}{"concentration" method for formamide concentration in percentage and "molar" for formamide concentration in molar}
+\item{formamide_factor}{Coefficient of Tm decrease per percent formamide. Default=0.65. Several papers report factors between 0.6 and 0.72.}
 }
 \description{
 Calculate the melting temperature using empirical formulas based on GC content with different options
@@ -82,11 +81,11 @@ vonAhsen2001: Tm = 77.1 + 0.41(Percentage_GC) - 528/N + 11.7 x log[Na+]
 }
 \examples{
 
-ntseq <- c("ATCGTGCGTAGCAGTACGATCAGTAG")
-out <- Tm_GC(ntseq,ambiguous=TRUE,variant="Primer3Plus",Na=50,mismatch=TRUE)
+input_seq <- c("ATCGTGCGTAGCAGTACGATCAGTAG")
+out <- Tm_GC(input_seq, ambiguous = TRUE, variant = "Primer3Plus", Na = 50, mismatch = TRUE)
 out
-out$Tm
-out$Options
+out$tm
+out$options
 
 }
 \references{

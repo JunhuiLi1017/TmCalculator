@@ -2,7 +2,7 @@
 #' 
 #' In general, whitespaces and non-base characters are removed and characters are converted to uppercase in given method.
 #'
-#' @param ntseq Sequence (5' to 3') of one strand of the DNA nucleic acid duplex
+#' @param input_seq Sequence (5' to 3') of one strand of the DNA nucleic acid duplex
 #'   as string or vector of characters
 #'   
 #' @param method 
@@ -23,30 +23,30 @@
 #' 
 #' @examples
 #' 
-#' ntseq <- c("ATCGBDHKMNRVYWSqq")
-#' check_filter(ntseq,method='Tm_Wallace')
-#' check_filter(ntseq,method='Tm_NN')
+#' input_seq <- c("ATCGBDHKMNRVYWSqq")
+#' check_filter(input_seq,method='Tm_Wallace')
+#' check_filter(input_seq,method='Tm_NN')
 #' 
 #' @export check_filter
 
-check_filter <- function(ntseq,method){
-  mySeq <- s2c(ntseq)
-  mySeq <- toupper(mySeq)
+check_filter <- function(input_seq,method){
+  my_seq <- s2c(input_seq)
+  my_seq <- toupper(my_seq)
   if (method == 'Tm_Wallace'){
-    baseset <- c("A","B","C","D","G","H","I","K","M","N","R","S","T","V","W","Y")
+    base_set <- c("A","B","C","D","G","H","I","K","M","N","R","S","T","V","W","Y")
   }else if (method == 'Tm_GC'){
-    baseset <- c("A","B","C","D","G","H","I","K","M","N","R","S","T","V","W","X","Y")
+    base_set <- c("A","B","C","D","G","H","I","K","M","N","R","S","T","V","W","X","Y")
   }else if(method == 'Tm_NN'){
-    baseset = c('A','C','G','T','I')
+    base_set = c('A','C','G','T','I')
   }else{
     stop("Only methods 'Tm_Wallace' or 'Tm_GC' or 'Tm_NN' is allowed")
   }
-  finalSeq <- NULL
+  final_seq <- NULL
   #i='A'
-  for(i in mySeq){
-    if(i %in% baseset){
-      finalSeq <- append(finalSeq,i)
+  for(i in my_seq){
+    if(i %in% base_set){
+      final_seq <- append(final_seq,i)
     }
   }
-  return(finalSeq)
+  return(final_seq)
 }

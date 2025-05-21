@@ -2,7 +2,7 @@
 % Please edit documentation in R/salt_correction.R
 \name{salt_correction}
 \alias{salt_correction}
-\title{Corrections of melting temperature with salt ions}
+\title{Corrections of melting temperature with salt concentration}
 \usage{
 salt_correction(
   Na = 0,
@@ -12,71 +12,77 @@ salt_correction(
   dNTPs = 0,
   method = c("Schildkraut2010", "Wetmur1991", "SantaLucia1996", "SantaLucia1998-1",
     "SantaLucia1998-2", "Owczarzy2004", "Owczarzy2008"),
-  ntseq,
+  input_seq,
   ambiguous = FALSE
 )
 }
 \arguments{
-\item{Na}{Millimolar concentration of Na}
+\item{Na}{Millimolar concentration of sodium ions. Default: 0}
 
-\item{K}{Millimolar concentration of K}
+\item{K}{Millimolar concentration of potassium ions. Default: 0}
 
-\item{Tris}{Millimolar concentration of Tris}
+\item{Tris}{Millimolar concentration of Tris buffer. Default: 0}
 
-\item{Mg}{Millimolar concentration of Mg}
+\item{Mg}{Millimolar concentration of magnesium ions. Default: 0}
 
-\item{dNTPs}{Millimolar concentration of dNTPs}
+\item{dNTPs}{Millimolar concentration of deoxynucleotide triphosphates. Default: 0}
 
-\item{method}{Method to be applied including "Schildkraut2010", "Wetmur1991","SantaLucia1996", "SantaLucia1998-1", "SantaLucia1998-2","Owczarzy2004","Owczarzy2008". First fourth methods correct Tm, fifth method corrects deltaS, sixth and seventh methods correct 1/Tm. See details for the method description.}
+\item{method}{Method for calculating salt concentration corrections to the melting temperature.
+Available options:
+- "Schildkraut2010": Updated salt correction method
+- "Wetmur1991": Classic salt correction method
+- "SantaLucia1996": DNA-specific salt correction
+- "SantaLucia1998-1": Improved DNA salt correction
+- "SantaLucia1998-2": Alternative DNA salt correction (requires input_seq)
+- "Owczarzy2004": Comprehensive salt correction (requires input_seq)
+- "Owczarzy2008": Updated comprehensive salt correction (requires input_seq)
+Note: Setting to NA disables salt correction}
 
-\item{ntseq}{Sequence (5' to 3') of one strand of the nucleic acid duplex as string or vector of characters.}
+\item{input_seq}{Sequence (5' to 3') of one strand of the nucleic acid duplex. Can be provided as either:
+- A character string (e.g., "ATGCG")
+- A vector of characters (e.g., c("A","T","G","C","G"))
+Required for methods: "SantaLucia1998-2", "Owczarzy2004", and "Owczarzy2008"}
 
-\item{ambiguous}{Ambiguous bases are taken into account to compute the G and C content when ambiguous is TRUE.}
+\item{ambiguous}{Logical. If TRUE, ambiguous bases are taken into account when computing the G and C content.
+The function handles various ambiguous bases (S, W, M, K, R, Y, V, H, D, B) by proportionally
+distributing their contribution to GC content based on their possible nucleotide compositions.}
 }
 \description{
-Corrections coefficient of melting temperature or entropy with different operations
+Apply corrections to melting temperature calculations based on salt concentrations.
+Different correction methods are available for various experimental conditions.
 }
 \details{
-The methods are:
-  
-1 Schildkraut C (2010) <doi:10.1002/bip.360030207>
-  
-2 Wetmur J G (1991) <doi:10.3109/10409239109114069>
-  
-3 SantaLucia J (1996) <doi:10.1021/bi951907q>
-  
-4 SantaLucia J (1998) <doi:10.1073/pnas.95.4.1460>
-  
-5 SantaLucia J (1998) <doi:10.1073/pnas.95.4.1460>
-  
-6 Owczarzy R (2004) <doi:10.1021/bi034621r>
-  
-7 Owczarzy R (2008) <doi:10.1021/bi702363u>
+Different correction methods are available for various experimental conditions:
 
-methods 1-4: Tm(new) = Tm(old) + correction
-
-method 5: deltaS(new) = deltaS(old) + correction
-
-methods 6+7: Tm(new) = 1/(1/Tm(old) + correction)
+- Schildkraut2010: Updated salt correction method that accounts for monovalent and divalent cations
+- Wetmur1991: Classic salt correction method for monovalent cations
+- SantaLucia1996: DNA-specific salt correction
+- SantaLucia1998-1: Improved DNA salt correction
+- SantaLucia1998-2: Alternative DNA salt correction (requires sequence information)
+- Owczarzy2004: Comprehensive salt correction including effects of divalent cations (requires sequence information)
+- Owczarzy2008: Updated comprehensive salt correction (requires sequence information)
 }
 \examples{
+# Basic salt correction
+salt_correction(Na = 50, method = "Schildkraut2010")
 
-ntseq <- c("acgtTGCAATGCCGTAWSDBSYXX")
-salt_correction(Na=390, K=20, Tris=0, Mg=10, dNTPs=25, method="Owczarzy2008", ntseq)
+# Complex salt correction with multiple ions (requires sequence)
+salt_correction(Na = 50, Mg = 1.5, method = "Owczarzy2008", 
+               input_seq = "ATGCGATGCG")
 
 }
 \references{
-Schildkraut C . Dependence of the melting temperature of DNA on salt concentration[J]. Biopolymers, 2010, 3(2):195-208.
+Schildkraut C, Lifson S. Dependence of the melting temperature of DNA on salt concentration.
+Biopolymers. 1965;3(2):195-208.
 
-Wetmur J G . DNA Probes: Applications of the Principles of Nucleic Acid Hybridization[J]. CRC Critical Reviews in Biochemistry, 1991, 26(3-4):3
+Wetmur JG. DNA Probes: Applications of the Principles of Nucleic Acid Hybridization.
+Critical Reviews in Biochemistry and Molecular Biology. 1991;26(3-4):227-259.
 
-Santalucia , J , Allawi H T , Seneviratne P A . Improved Nearest-Neighbor Parameters for Predicting DNA Duplex Stability, [J]. Biochemistry, 1996, 35(11):3555-3562.
+SantaLucia J. A unified view of polymer, dumbbell, and oligonucleotide DNA nearest-neighbor
+thermodynamics. Proceedings of the National Academy of Sciences. 1998;95(4):1460-1465.
 
-SantaLucia, J. A unified view of polymer, dumbbell, and oligonucleotide DNA nearest-neighbor thermodynamics[J]. Proceedings of the National Academy of Sciences, 1998, 95(4):1460-1465.
-
-Owczarzy R , You Y , Moreira B G , et al. Effects of Sodium Ions on DNA Duplex Oligomers: Improved Predictions ofMelting Temperatures[J]. Biochemistry, 2004, 43(12):3537-3554.
-
-Owczarzy R , Moreira B G , You Y , et al. Predicting Stability of DNA Duplexes in Solutions Containing Magnesium and Monovalent Cations[J]. Biochemistry, 2008, 47(19):5336-5353.
+Owczarzy R, Moreira BG, Manthey JA, et al. Predicting stability of DNA duplexes in solutions
+containing magnesium and monovalent cations. Biochemistry. 2008;47(19):5336-5353.
 }
 \author{
 Junhui Li

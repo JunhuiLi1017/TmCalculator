@@ -1,68 +1,82 @@
 #' Corrections of melting temperature with chemical substances
 #' 
-#' Corrections coefficient of melting temperature with DMSO and formamide and these corrections are rough approximations.
+#' Apply corrections to melting temperature calculations based on the presence of DMSO and formamide.
+#' These corrections are rough approximations and should be used with caution.
 #' 
-#' @param DMSO Percent DMSO
+#' @param DMSO Percent DMSO concentration in the reaction mixture. Default: 0
+#'   DMSO can lower the melting temperature of nucleic acid duplexes.
 #' 
-#' @param fmd Formamide concentration in percentage (fmdmethod="concentration") or molar (fmdmethod="molar").
+#' @param formamide_value_unit A list containing formamide concentration information:
+#'   - value: numeric value of formamide concentration
+#'   - unit: character string specifying the unit ("percent" or "molar")
+#'   Default: list(value=0, unit="percent")
 #' 
-#' @param DMSOfactor Coefficient of Tm decreases per percent DMSO. Default=0.75 von Ahsen N (2001) <PMID:11673362>. Other published values are 0.5, 0.6 and 0.675.
+#' @param dmso_factor Coefficient of melting temperature (Tm) decrease per percent DMSO.
+#'   Default: 0.75 (von Ahsen N, 2001, PMID:11673362)
+#'   Other published values: 0.5, 0.6, 0.675
 #' 
-#' @param fmdmethod "concentration" method for formamide concentration in percentage and "molar" for formamide concentration in molar
+#' @param formamide_factor Coefficient of melting temperature (Tm) decrease per percent formamide.
+#'   Default: 0.65
+#'   Literature reports values ranging from 0.6 to 0.72
 #' 
-#' @param fmdfactor Coefficient of Tm decrease per percent formamide. Default=0.65. Several papers report factors between 0.6 and 0.72.
-#' 
-#' @param ptGC Percentage of GC(\%).
+#' @param pt_gc Percentage of GC content in the sequence (0-100%)
+#'   This is used in molar formamide corrections.
 #' 
 #' @details 
 #' 
-#' fmdmethod = "concentration"
+#' When formamide_value_unit$unit = "percent":
+#' Correction = - factor * percentage_of_formamide
 #' 
-#' Correction = - factor*percentage_of_formamide
-#' 
-#' fmdmethod = "molar"
-#' 
-#' Correction = (0.453*GC/100 - 2.88) x formamide
+#' When formamide_value_unit$unit = "molar":
+#' Correction = (0.453 * GC/100 - 2.88) * formamide
 #' 
 #' @references 
 #' 
-#' von Ahsen N, Wittwer CT, Schutz E , et al. Oligonucleotide melting temperatures under PCR conditions: deoxynucleotide Triphosphate and Dimethyl sulfoxide concentrations with comparison to alternative empirical formulas. Clin Chem 2001, 47:1956-C1961.
+#' von Ahsen N, Wittwer CT, Schutz E, et al. Oligonucleotide melting temperatures under PCR conditions: 
+#' deoxynucleotide Triphosphate and Dimethyl sulfoxide concentrations with comparison to alternative 
+#' empirical formulas. Clin Chem 2001, 47:1956-1961.
 #' 
 #' @author Junhui Li
 #' 
 #' @examples
-#' chem_correction(DMSO=3)
-#' chem_correction(fmd=1.25, fmdmethod="molar", ptGC=50)
+#' # DMSO correction
+#' chem_correction(DMSO = 3)
+#' 
+#' # Formamide correction (percent)
+#' chem_correction(formamide_value_unit = list(value = 1.25, unit = "percent"), pt_gc = 50)
+#' 
+#' # Formamide correction (molar)
+#' chem_correction(formamide_value_unit = list(value = 1.25, unit = "molar"), pt_gc = 50)
 #' 
 #' @export chem_correction
 
 chem_correction <-function(DMSO=0,
-                           fmd=0, 
-                           DMSOfactor=0.75,
-                           fmdmethod=c("concentration","molar"),
-                           fmdfactor=0.65,
-                           ptGC){
-  #DMSOfactor <- match.arg(DMSOfactor)
-  #fmdfactor <- match.arg(fmdfactor)
-  if(!any(DMSOfactor %in% c(0.75,0.5,0.6,0.65,0.675))){
-    stop("'DMSOfactor' shoule be one of 0.5,0.6,0.65,0.675,0.75")
+                           formamide_value_unit=list(value=0, unit="percent"), 
+                           dmso_factor=0.75,
+                           formamide_factor=0.65,
+                           pt_gc){
+  
+  if(!any(dmso_factor %in% c(0.75,0.5,0.6,0.65,0.675))){
+    stop("'dmso_factor' shoule be one of 0.5,0.6,0.65,0.675,0.75")
   }
-  if(!any(fmdfactor %in% c(0.65,0.6,0.72))){
-    stop("'fmdfactor' shoule be one of 0.6,0.65,0.72")
+  if(!any(formamide_factor %in% c(0.65,0.6,0.72))){
+    stop("'formamide_factor' shoule be one of 0.6,0.65,0.72")
   }
-  fmdmethod <- match.arg(fmdmethod)
+  if(!formamide_value_unit$unit %in% c("percent", "molar")){
+    stop("formamide_value_unit$unit must be either 'percent' or 'molar'")
+  }
 
   corr <- 0
   ## for DMSO correction
-  corr <- corr - DMSOfactor*DMSO
+  corr <- corr - dmso_factor*DMSO
   ## for fmd correction
-  if(fmdmethod == "concentration"){
-    corr <- corr - fmdfactor*fmd
-  }else if(fmdmethod == "molar"){
-    if(is.null(ptGC)){
-      stop("'ptGC' should not be NULL when fmdmethod = molar")
+  if(formamide_value_unit$unit == "percent"){
+    corr <- corr - formamide_factor*formamide_value_unit$value
+  }else if(formamide_value_unit$unit == "molar"){
+    if(is.null(pt_gc)){
+      stop("'pt_gc' should not be NULL when formamide_value_unit$unit = 'molar'")
     }
-    corr <- corr + (0.453*(ptGC/100)-2.88)*fmd
+    corr <- corr + (0.453*(pt_gc/100)-2.88)*formamide_value_unit$value
   }
   return(corr)
 }

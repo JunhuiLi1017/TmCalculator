@@ -2,7 +2,7 @@
 #' 
 #' The Wallace rule is often used as rule of thumb for approximate melting temperature calculations for primers with 14 to 20 nt length.
 #'  
-#' @param ntseq Sequence (5' to 3') of one strand of the DNA nucleic acid duplex
+#' @param input_seq Sequence (5' to 3') of one strand of the DNA nucleic acid duplex
 #' as string or vector of characters (\strong{Note:} Non-DNA characters are ignored
 #' by this method).
 #'    
@@ -21,25 +21,25 @@
 #' 
 #' @examples
 #'
-#' ntseq = c('acgtTGCAATGCCGTAWSDBSY') #for wallace rule
+#' input_seq = c('acgtTGCAATGCCGTAWSDBSY') #for wallace rule
 #'
-#' out <- Tm_Wallace(ntseq,ambiguous = TRUE)
+#' out <- Tm_Wallace(input_seq,ambiguous = TRUE)
 #' out
 #' out$Options
 #' 
 #' @export Tm_Wallace
 
-Tm_Wallace <- function (ntseq, ambiguous = FALSE){
-  mySeq <- check_filter(ntseq, method = "Tm_Wallace")
-  nSeq <- length(mySeq)
-  nGC <- nSeq * GC(mySeq, ambiguous = ambiguous)/100
-  nAT <- nSeq - nGC
-  Tm <- 4 * nGC + 2 * nAT
-  resultList <- vector('list',2L)
-  names(resultList) <- c("Tm","Options")
-  resultList$Tm <- Tm
-  resultList$Options <- list("Sequence"=ntseq,"Ambiguous"=ambiguous,"Check filter"=c2s(mySeq),Method="Thein & Wallace 1986")
-  class(resultList) <- c("TmCalculator","list")
-  attr(resultList, "nonhidden") <- "Tm"
-  return(resultList)
+Tm_Wallace <- function (input_seq, ambiguous = FALSE){
+  my_seq <- check_filter(input_seq, method = "Tm_Wallace")
+  n_seq <- length(my_seq)
+  n_gc <- n_seq * GC(my_seq, ambiguous = ambiguous)/100
+  n_at <- n_seq - n_gc
+  tm <- 4 * n_gc + 2 * n_at
+  result_list <- vector('list',2L)
+  names(result_list) <- c("Tm","Options")
+  result_list$Tm <- tm
+  result_list$Options <- list("Sequence"=input_seq,"Ambiguous"=ambiguous,"Check filter"=c2s(my_seq),Method="Thein & Wallace 1986")
+  class(result_list) <- c("TmCalculator","list")
+  attr(result_list, "nonhidden") <- "Tm"
+  return(result_list)
 }

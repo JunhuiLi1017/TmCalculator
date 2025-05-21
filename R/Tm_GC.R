@@ -2,7 +2,7 @@
 #' 
 #' Calculate the melting temperature using empirical formulas based on GC content with different options
 #' 
-#' @param ntseq Sequence (5' to 3') of one strand of the nucleic acid duplex as string or vector of characters.
+#' @param input_seq Sequence (5' to 3') of one strand of the nucleic acid duplex as string or vector of characters.
 #' 
 #' @param ambiguous Ambiguous bases are taken into account to compute the G and C content when ambiguous is TRUE.
 #'
@@ -20,19 +20,19 @@
 #' 
 #' @param dNTPs Millimolar concentration of dNTPs, default is 0
 #' 
-#' @param saltcorr Salt correction method should be chosen when provide 'userset'. Options are "Schildkraut2010", "Wetmur1991","SantaLucia1996","SantaLucia1998-1","Owczarzy2004","Owczarzy2008". Note that "SantaLucia1998-2" is not available for this function.
+#' @param salt_corr Salt correction method should be chosen when provide 'userset'. Options are "Schildkraut2010", "Wetmur1991","SantaLucia1996","SantaLucia1998-1","Owczarzy2004","Owczarzy2008". Note that "SantaLucia1998-2" is not available for this function.
 #'   
 #' @param mismatch If 'True' (default) every 'X' in the sequence is counted as mismatch
 #' 
-#' @param DMSO Percent DMSO
+#' @param DMSO Percent DMSO concentration in the reaction mixture. Default is 0.
 #' 
-#' @param fmd Formamide concentration in percentage (fmdmethod="concentration") or molar (fmdmethod="molar").
+#' @param formamide_value_unit A list containing formamide concentration value and unit. The list should have two elements:
+#'   - value: numeric value of formamide concentration
+#'   - unit: character string specifying the unit, either "percent" or "molar"
 #' 
-#' @param DMSOfactor Coeffecient of Tm decreases per percent DMSO. Default=0.75 von Ahsen N (2001) <PMID:11673362>. Other published values are 0.5, 0.6 and 0.675.
+#' @param dmso_factor Coefficient of Tm decreases per percent DMSO. Default=0.75 von Ahsen N (2001) <PMID:11673362>. Other published values are 0.5, 0.6 and 0.675.
 #' 
-#' @param fmdfactor Coeffecient of Tm decrease per percent formamide. Default=0.65. Several papers report factors between 0.6 and 0.72.
-#' 
-#' @param fmdmethod "concentration" method for formamide concentration in percentage and "molar" for formamide concentration in molar
+#' @param formamide_factor Coefficient of Tm decrease per percent formamide. Default=0.65. Several papers report factors between 0.6 and 0.72.
 #' 
 #' @details 
 #' 
@@ -70,14 +70,14 @@
 #' 
 #' @examples
 #' 
-#' ntseq <- c("ATCGTGCGTAGCAGTACGATCAGTAG")
-#' out <- Tm_GC(ntseq,ambiguous=TRUE,variant="Primer3Plus",Na=50,mismatch=TRUE)
+#' input_seq <- c("ATCGTGCGTAGCAGTACGATCAGTAG")
+#' out <- Tm_GC(input_seq, ambiguous = TRUE, variant = "Primer3Plus", Na = 50, mismatch = TRUE)
 #' out
-#' out$Tm
-#' out$Options
+#' out$tm
+#' out$options
 #' 
 #' @export Tm_GC
-Tm_GC <- function(ntseq,
+Tm_GC <- function(input_seq,
                   ambiguous=FALSE,
                   userset=NULL,
                   variant=c("Primer3Plus",
@@ -93,7 +93,7 @@ Tm_GC <- function(ntseq,
                   Tris=0,
                   Mg=0, 
                   dNTPs=0,
-                  saltcorr=c("Schildkraut2010",
+                  salt_corr=c("Schildkraut2010",
                              "Wetmur1991",
                              "SantaLucia1996",
                              "SantaLucia1998-1",
@@ -101,55 +101,58 @@ Tm_GC <- function(ntseq,
                              "Owczarzy2008"),
                   mismatch=TRUE,
                   DMSO=0,
-                  fmd=0, 
-                  DMSOfactor=0.75,
-                  fmdfactor=0.65,
-                  fmdmethod=c("concentration","molar")){
+                  formamide_value_unit=list(value=0, unit="percent"),
+                  dmso_factor=0.75,
+                  formamide_factor=0.65){
   variant <- match.arg(variant)
-  saltcorr <- match.arg(saltcorr)
-  mySeq <- check_filter(ntseq,method='Tm_GC')
-  nSeq <- length(mySeq)
-  ptGC <- GC(mySeq,ambiguous=ambiguous)
-  varTab <- data.frame(A=c(69.3,81.5,81.5,81.5,78.0,67.0,81.5,77.1),
+  salt_corr <- match.arg(salt_corr)
+  my_seq <- check_filter(input_seq,method='Tm_GC')
+  n_seq <- length(my_seq)
+  pt_gc <- GC(my_seq,ambiguous=ambiguous)
+  var_table <- data.frame(A=c(69.3,81.5,81.5,81.5,78.0,67.0,81.5,77.1),
                        B=c(0.41,0.41,0.41,0.41,0.70,0.80,0.41,0.41),
                        C=c(650,675,675,500,500,500,600,528),
                        D=rep(1,8),
-                       saltcorr=c(NA,NA,"Schildkraut2010",
+                       salt_corr=c(NA,NA,"Schildkraut2010",
                                   rep("Wetmur1991",3),"Schildkraut2010","SantaLucia1998-1"))
-  rownames(varTab) <- c("Chester1993","QuikChange","Schildkraut1965","Wetmur1991_MELTING","Wetmur1991_RNA","Wetmur1991_RNA/DNA","Primer3Plus","vonAhsen2001")
+  rownames(var_table) <- c("Chester1993","QuikChange","Schildkraut1965","Wetmur1991_MELTING","Wetmur1991_RNA","Wetmur1991_RNA/DNA","Primer3Plus","vonAhsen2001")
   if(is.null(userset)){
-    if(!variant %in% rownames(varTab)){
+    if(!variant %in% rownames(var_table)){
       stop("only Chester1993, QuikChange, Schildkraut1965, Wetmur1991_MELTING, Wetmur1991_RNA, Wetmur1991_RNA/DNA, Primer3Plus and vonAhsen2001 are allowed in variant")
     }else{
-      gcCoef <- varTab[variant,]
-      saltcorr <- varTab[variant,"saltcorr"]
+      gc_coef <- var_table[variant,]
+      salt_corr <- var_table[variant,"salt_corr"]
     }
   }else{
-    gcCoef <- as.numeric(userset)
-    saltcorr <- saltcorr
+    gc_coef <- as.numeric(userset)
+    salt_corr <- salt_corr
   }
 
-  Tm = gcCoef[1]+gcCoef[2]*ptGC-gcCoef[3]/nSeq
-  if(!is.na(saltcorr)){
-    corrSalt <- salt_correction(Na=Na,K=K,Tris=Tris,Mg=Mg,dNTPs=dNTPs,method=saltcorr,ntseq=mySeq,ambiguous = ambiguous)
-    Tm <- Tm+corrSalt
+  tm = gc_coef[1]+gc_coef[2]*pt_gc-gc_coef[3]/n_seq
+  if(!is.na(salt_corr)){
+    corr_salt <- salt_correction(Na=Na,K=K,Tris=Tris,Mg=Mg,dNTPs=dNTPs,method=salt_corr,input_seq=my_seq,ambiguous = ambiguous)
+    tm <- tm+corr_salt
   }
   if(mismatch == TRUE){
-    Tm <- Tm-gcCoef[4]*(sum(mySeq %in% 'X')*100/nSeq)
+    tm <- tm-gc_coef[4]*(sum(my_seq %in% 'X')*100/n_seq)
   }
   
-  corrChem <- chem_correction(DMSO=DMSO,fmd=fmd,DMSOfactor=DMSOfactor,fmdmethod=fmdmethod,fmdfactor=fmdfactor,ptGC=ptGC)
-  Tm <- Tm + corrChem
+  corr_chem <- chem_correction(DMSO=DMSO,formamide_value_unit=formamide_value_unit,dmso_factor=dmso_factor,formamide_factor=formamide_factor,pt_gc=pt_gc)
+  tm <- tm + corr_chem
   
-  resultList <- vector('list',2L)
-  names(resultList) <- c("Tm","Options")
-  resultList$Tm <- as.numeric(Tm)
-  resultList$Options <- list("Sequence"=ntseq,"Check filter"=c2s(mySeq),"Variant"=variant,"Na"=Na,
+  result_list <- vector('list',2L)
+  names(result_list) <- c("Tm","Options")
+  result_list$Tm <- as.numeric(tm)
+  result_list$Options <- list("Sequence"=input_seq,"Check filter"=c2s(my_seq),"Variant"=variant,"Na"=Na,
                             "K"=K,"Tris"=Tris,"Mg"=Mg,"dNTPs"=dNTPs,
-                            "Salt correlation"=saltcorr,"Ambiguous"=ambiguous,
-                            "Mismatch"=mismatch)
-  class(resultList) <- c("TmCalculator","list")
-  attr(resultList, "nonhidden") <- "Tm"
-  return(resultList)
+                            "Salt correlation"=salt_corr,"Ambiguous"=ambiguous,
+                            "Mismatch"=mismatch,"Percent of DMSO"=DMSO,
+                            "Formamide concentration"=formamide_value_unit$value,
+                            "Method for formamide concentration"=formamide_value_unit$unit,
+                            "Coeffecient of Tm decreases per percent DMSO"=dmso_factor,
+                            "Coefficient of Tm decrease per percent formamide"=formamide_factor)
+  class(result_list) <- c("TmCalculator","list")
+  attr(result_list, "nonhidden") <- "Tm"
+  return(result_list)
 }
 

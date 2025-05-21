@@ -4,10 +4,10 @@
 \alias{complement}
 \title{complement and reverse complement base of nucleotide sequences}
 \usage{
-complement(ntseq, reverse = FALSE)
+complement(input_seq, reverse = FALSE)
 }
 \arguments{
-\item{ntseq}{Sequence (5' to 3') of one strand of the nucleic acid duplex
+\item{input_seq}{Sequence (5' to 3') of one strand of the nucleic acid duplex
 as string or vector of characters}
 
 \item{reverse}{Logical value, TRUE is reverse complement sequence, FALSE is not.}

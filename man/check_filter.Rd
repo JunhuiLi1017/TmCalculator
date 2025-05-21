@@ -4,10 +4,10 @@
 \alias{check_filter}
 \title{Check and filter invalid base of nucleotide sequences}
 \usage{
-check_filter(ntseq, method)
+check_filter(input_seq, method)
 }
 \arguments{
-\item{ntseq}{Sequence (5' to 3') of one strand of the DNA nucleic acid duplex
+\item{input_seq}{Sequence (5' to 3') of one strand of the DNA nucleic acid duplex
 as string or vector of characters}
 
 \item{method}{TM_Wallace: check and return "A","B","C","D","G","H","I","K","M","N","R","S","T","V","W" and "Y"
@@ -24,9 +24,9 @@ In general, whitespaces and non-base characters are removed and characters are c
 }
 \examples{
 
-ntseq <- c("ATCGBDHKMNRVYWSqq")
-check_filter(ntseq,method='Tm_Wallace')
-check_filter(ntseq,method='Tm_NN')
+input_seq <- c("ATCGBDHKMNRVYWSqq")
+check_filter(input_seq,method='Tm_Wallace')
+check_filter(input_seq,method='Tm_NN')
 
 }
 \references{

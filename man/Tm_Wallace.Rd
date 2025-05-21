@@ -5,10 +5,10 @@
 \alias{Tm_Wallace}
 \title{Calculate the melting temperature using the 'Wallace rule'}
 \usage{
-Tm_Wallace(ntseq, ambiguous = FALSE)
+Tm_Wallace(input_seq, ambiguous = FALSE)
 }
 \arguments{
-\item{ntseq}{Sequence (5' to 3') of one strand of the DNA nucleic acid duplex
+\item{input_seq}{Sequence (5' to 3') of one strand of the DNA nucleic acid duplex
 as string or vector of characters (\strong{Note:} Non-DNA characters are ignored
 by this method).}
 
@@ -19,9 +19,9 @@ The Wallace rule is often used as rule of thumb for approximate melting temperat
 }
 \examples{
 
-ntseq = c('acgtTGCAATGCCGTAWSDBSY') #for wallace rule
+input_seq = c('acgtTGCAATGCCGTAWSDBSY') #for wallace rule
 
-out <- Tm_Wallace(ntseq,ambiguous = TRUE)
+out <- Tm_Wallace(input_seq,ambiguous = TRUE)
 out
 out$Options
 

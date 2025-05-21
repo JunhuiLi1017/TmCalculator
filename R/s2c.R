@@ -18,9 +18,9 @@
 #' 
 #' @export s2c
 s2c <- function(strings){
-  vecChar <- vector()
+  vec_char <- vector()
   for (i in nchar(strings):1){
-    vecChar <- append(unlist(strsplit(strings,''))[i],vecChar)
+    vec_char <- append(unlist(strsplit(strings,''))[i],vec_char)
   }
-  return(vecChar)
+  return(vec_char)
 }
