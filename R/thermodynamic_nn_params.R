@@ -43,14 +43,14 @@
 #' 
 #' @examples
 #' # Access DNA/DNA nearest neighbor parameters
-#' thermodynamic_tables$DNA_NN_SantaLucia_2004
+#' thermodynamic_nn_params$DNA_NN_SantaLucia_2004
 #' 
 #' # Access RNA/RNA nearest neighbor parameters
-#' thermodynamic_tables$RNA_NN_Chen_2012
+#' thermodynamic_nn_params$RNA_NN_Chen_2012
 #' 
 #' # Access DNA internal mismatch parameters
-#' thermodynamic_tables$DNA_IMM_Peyret_1999
-"thermodynamic_tables"
+#' thermodynamic_nn_params$DNA_IMM_Peyret_1999
+"thermodynamic_nn_params"
 
 # DNA/DNA Nearest Neighbor Parameters
 DNA_NN_Breslauer_1986 <- matrix(c(0,0,0,0,0,0,0,-16.8,0,-20.1,0,0,0,-1.3,-9.1,-24,-8.6,-23.9,-6,-16.9,-5.8,-12.9,
@@ -164,7 +164,7 @@ rownames(RNA_DE_Turner_2010) <- c(".T/AA",".T/CA",".T/GA",".T/TA",".G/AC",".G/CC
 colnames(RNA_DE_Turner_2010) <- c("left","right")
 
 # Create a list of all tables for easy access
-thermodynamic_tables <- list(
+thermodynamic_nn_params <- list(
   DNA_NN_Breslauer_1986 = DNA_NN_Breslauer_1986,
   DNA_NN_Sugimoto_1996 = DNA_NN_Sugimoto_1996,
   DNA_NN_Allawi_1998 = DNA_NN_Allawi_1998,
@@ -180,4 +180,4 @@ thermodynamic_tables <- list(
 )
 
 # Export the tables
-usethis::use_data(thermodynamic_tables, overwrite = TRUE) 
+usethis::use_data(thermodynamic_nn_params, overwrite = TRUE) 

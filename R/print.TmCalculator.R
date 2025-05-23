@@ -8,8 +8,8 @@
 #'
 #' @return The melting temperature value.
 #'
-#' @export print.TmCalculator
 #' @export
+
 print.TmCalculator <- function(x,...){
   nohid <- attr(x, "nonhidden")
   print(x[[nohid]])

@@ -40,21 +40,24 @@
 #' 
 #' @examples
 #' # DMSO correction
-#' chem_correction(DMSO = 3)
+#' chem_correct(DMSO = 3)
 #' 
 #' # Formamide correction (percent)
-#' chem_correction(formamide_value_unit = list(value = 1.25, unit = "percent"), pt_gc = 50)
+#' chem_correct(formamide_value_unit = list(value = 1.25, unit = "percent"), pt_gc = 50)
 #' 
 #' # Formamide correction (molar)
-#' chem_correction(formamide_value_unit = list(value = 1.25, unit = "molar"), pt_gc = 50)
+#' chem_correct(formamide_value_unit = list(value = 1.25, unit = "molar"), pt_gc = 50)
 #' 
-#' @export chem_correction
+#' @export chem_correct
 
-chem_correction <-function(DMSO=0,
-                           formamide_value_unit=list(value=0, unit="percent"), 
-                           dmso_factor=0.75,
-                           formamide_factor=0.65,
-                           pt_gc){
+chem_correct <- function(DMSO = 0,
+                           formamide_value_unit = list(value = 0, unit = "percent"),
+                           dmso_factor = 0.75,
+                           formamide_factor = 0.65,
+                           pt_gc = NULL){
+  if(DMSO < 0 | formamide_value_unit$value < 0){
+    stop("all parameters 'DMSO','formamide_value_unit$value' should not be less than 0")
+  }
   
   if(!any(dmso_factor %in% c(0.75,0.5,0.6,0.65,0.675))){
     stop("'dmso_factor' shoule be one of 0.5,0.6,0.65,0.675,0.75")
@@ -67,16 +70,21 @@ chem_correction <-function(DMSO=0,
   }
 
   corr <- 0
-  ## for DMSO correction
-  corr <- corr - dmso_factor*DMSO
-  ## for fmd correction
-  if(formamide_value_unit$unit == "percent"){
-    corr <- corr - formamide_factor*formamide_value_unit$value
-  }else if(formamide_value_unit$unit == "molar"){
-    if(is.null(pt_gc)){
-      stop("'pt_gc' should not be NULL when formamide_value_unit$unit = 'molar'")
-    }
-    corr <- corr + (0.453*(pt_gc/100)-2.88)*formamide_value_unit$value
+  
+  if(DMSO > 0){
+    corr <- corr - dmso_factor*DMSO
   }
+  
+  if(formamide_value_unit$value > 0){
+    if(formamide_value_unit$unit == "percent"){
+      corr <- corr - formamide_factor*formamide_value_unit$value
+    }else if(formamide_value_unit$unit == "molar"){
+      if(is.null(pt_gc)){
+        stop("'pt_gc' should not be NULL when formamide_value_unit$unit = 'molar'")
+      }
+      corr <- corr + (0.453*(pt_gc/100)-2.88)*formamide_value_unit$value
+    }
+  }
+  
   return(corr)
 }

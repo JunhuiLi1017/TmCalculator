@@ -1,18 +1,22 @@
 #' Calculate melting temperature using nearest neighbor thermodynamics
 #' 
-#' Calculate melting temperature using nearest neighbor thermodynamics
+#' Calculate melting temperature using nearest neighbor thermodynamics. The function checks if all
+#' sequence combinations in the input sequence are present in the thermodynamic parameter tables
+#' before performing calculations.
 #' 
-#' @param input_seq Input sequence in 5' to 3' direction. Can be provided as either:
+#' @param raw_seq Pre-processed sequence(s) in 5' to 3' direction. This should be the output from
+#'   process_seq() function.
+#' 
+#' @param complement_seq Complementary sequence(s) in 3' to 5' direction. If not provided,
+#'   the function will automatically generate it from raw_seq. This is the template/target
+#'   sequence that the input sequence will hybridize with.
 #'   - A character string (e.g., "ATGCG")
-#'   - A vector of characters (e.g., c("A","T","G","C","G"))
+#'   - A path to a FASTA file containing the sequence(s)
+#'   - A NULL value (default)
 #' 
 #' @param ambiguous Logical value controlling how ambiguous bases are handled:
 #'   - TRUE: Ambiguous bases (e.g., N, R, Y) are included in calculations
 #'   - FALSE (default): Ambiguous bases are excluded from calculations
-#' 
-#' @param complement_seq Complementary sequence in 3' to 5' direction. If not provided,
-#'   the function will automatically generate it from input_seq. This is the template/target
-#'   sequence that the input sequence will hybridize with.
 #' 
 #' @param shift Integer value controlling the alignment offset between primer and template sequences.
 #'   Visual representation of different shift values:
@@ -24,7 +28,7 @@
 #'   shift = -1:
 #'   Primer:    5' ATGCG 3'
 #'   Template:  3'  TACGC 5'
-#'              ^
+#'               ^
 #' 
 #'   shift = 1:
 #'   Primer:    5'  ATGCG 3'
@@ -74,7 +78,7 @@
 #'   - TRUE: Sequence can bind to itself, dnac_low is ignored
 #'   - FALSE (default): Sequence binds to a different complementary sequence
 #' 
-#' @param Na Millimolar concentration of sodium ions. Default: 0
+#' @param Na Millimolar concentration of sodium ions. Default: 50
 #' 
 #' @param K Millimolar concentration of potassium ions. Default: 0
 #' 
@@ -84,7 +88,7 @@
 #' 
 #' @param dNTPs Millimolar concentration of deoxynucleotide triphosphates. Default: 0
 #' 
-#' @param salt_correct Method for calculating salt concentration corrections to the melting temperature.
+#' @param salt_corr_method Method for calculating salt concentration corrections to the melting temperature.
 #'   Available options:
 #'   - "Schildkraut2010": Updated salt correction method
 #'   - "Wetmur1991": Classic salt correction method
@@ -169,251 +173,297 @@
 #' 
 #' @examples
 #' 
-#' input_seq <- c("AAAATTTTTTTCCCCCCCCCCCCCCGGGGGGGGGGGGTGTGCGCTGC")
-#' out <- Tm_NN(input_seq, Na=50)
+#' input_seq <- c("AAAATTTTTTTCCCCCCCCCCCCCCGGGGGGGGGGGGTGTGCGCTGC",
+#' "AAAATTTTTTTCCCCCCCCCCCCCCGGGGGGGGGGGGTGTGCGCTGC")
+#' raw_seq <- process_seq(input_seq)
+#' out <- tm_nn(input_seq, Na=50)
 #' out
 #' out$Options
 #' 
-#' @export Tm_NN
-Tm_NN <- function(input_seq,
-                  ambiguous=FALSE,
-                  complement_seq=NULL,
-                  shift=0,
-                  nn_table=c("DNA_NN_SantaLucia_2004",
-                             "DNA_NN_Breslauer_1986",
-                             "DNA_NN_Sugimoto_1996",
-                             "DNA_NN_Allawi_1998",
-                             "RNA_NN_Freier_1986",
-                             "RNA_NN_Xia_1998",
-                             "RNA_NN_Chen_2012",
-                             "RNA_DNA_NN_Sugimoto_1995"),
-                  tmm_table="DNA_TMM_Bommarito_2000",
-                  imm_table="DNA_IMM_Peyret_1999",
-                  de_table=c("DNA_DE_Bommarito_2000",
-                             "RNA_DE_Turner_2010"),
-                  dnac_high=25,
-                  dnac_low=25,
-                  self_comp=FALSE, 
-                  Na=0,
-                  K=0, 
-                  Tris=0, 
-                  Mg=0, 
-                  dNTPs=0, 
-                  salt_correct=c("Schildkraut2010",
-                             "Wetmur1991",
-                             "SantaLucia1996",
-                             "SantaLucia1998-1",
-                             "SantaLucia1998-2",
-                             "Owczarzy2004",
-                             "Owczarzy2008"),
-                  DMSO=0,
-                  formamide_value_unit=list(value=0, unit="percent"),
-                  dmso_factor=0.75,
-                  formamide_factor=0.65){
+#' @export tm_nn
+
+tm_nn <- function(raw_seq,
+                  complement_seq = NULL,
+                  ambiguous = FALSE,
+                  shift = 0,
+                  nn_table = c("DNA_NN_SantaLucia_2004",
+                              "DNA_NN_Breslauer_1986",
+                              "DNA_NN_Sugimoto_1996",
+                              "DNA_NN_Allawi_1998",
+                              "RNA_NN_Freier_1986",
+                              "RNA_NN_Xia_1998",
+                              "RNA_NN_Chen_2012",
+                              "RNA_DNA_NN_Sugimoto_1995"),
+                  tmm_table = "DNA_TMM_Bommarito_2000",
+                  imm_table = "DNA_IMM_Peyret_1999",
+                  de_table = c("DNA_DE_Bommarito_2000",
+                              "RNA_DE_Turner_2010"),
+                  dnac_high = 25,
+                  dnac_low = 25,
+                  self_comp = FALSE,
+                  Na = 50,
+                  K = 0,
+                  Tris = 0,
+                  Mg = 0,
+                  dNTPs = 0,
+                  salt_corr_method = c("Schildkraut2010",
+                                  "Wetmur1991",
+                                  "SantaLucia1996",
+                                  "SantaLucia1998-1",
+                                  "Owczarzy2004",
+                                  "Owczarzy2008"),
+                  DMSO = 0,
+                  formamide_value_unit = list(value = 0, unit = "percent"),
+                  dmso_factor = 0.75,
+                  formamide_factor = 0.65) {
   nn_table <- match.arg(nn_table)
   tmm_table <- match.arg(tmm_table)
   imm_table <- match.arg(imm_table)
   de_table <- match.arg(de_table)
-  salt_correct <- match.arg(salt_correct)
+  salt_corr_method <- match.arg(salt_corr_method)
   
-  # Get tables from the thermodynamic_tables data
-  imm_table_list <- thermodynamic_tables[[imm_table]]
-  nn_table_list <- thermodynamic_tables[[nn_table]]
-  tmm_table_list <- thermodynamic_tables[[tmm_table]]
-  de_table_list <- thermodynamic_tables[[de_table]]
+  # Get thermodynamic parameters
+  nn_table_list <- thermodynamic_nn_params[[nn_table]]
+  tmm_table_list <- thermodynamic_nn_params[[tmm_table]]
+  imm_table_list <- thermodynamic_nn_params[[imm_table]]
+  de_table_list <- thermodynamic_nn_params[[de_table]]
   
-  imm_table_name <- rownames(imm_table_list)
+  # Get table names for lookups
   nn_table_name <- rownames(nn_table_list)
   tmm_table_name <- rownames(tmm_table_list)
+  imm_table_name <- rownames(imm_table_list)
   de_table_name <- rownames(de_table_list)
   
-  my_seq <- check_filter(input_seq,method = "Tm_NN")
-  my_seq_c2s <- c2s(my_seq)
-  pt_gc <- GC(my_seq,ambiguous = ambiguous)
-  if(is.null(complement_seq)){
-    complement_seq <- complement(my_seq_c2s,FALSE)
-  }
-  my_cseq <- check_filter(complement_seq,method = "Tm_NN")
+  # Process sequence
+  seq_checked <- filter_seq(raw_seq, method = "tm_nn")
   
-  tmp_seq <- my_seq
-  tmp_cseq <- my_cseq
-  delta_h <- 0
-  delta_s <- 0
-  d_h <- 1
-  d_s <- 2
-  if(shift!=0 | length(my_seq)!=length(my_cseq)){
-    if(shift>0){
-      tmp_seq <- append(rep('.',shift),my_seq)
-    }else{
-      tmp_cseq <- append(rep('.',abs(shift)),my_cseq)
+  # Process complement sequence(s) if provided
+  if (!is.null(complement_seq)) {
+    raw_comp_seq <- process_seq(complement_seq)
+    comp_seq_checked <- filter_seq(raw_comp_seq, method = "tm_nn")
+    # Merge complement sequence information into seq_checked
+    for (i in seq_along(seq_checked)) {
+      attr(seq_checked[[i]], "complement_seq") <- 
+      as.character(comp_seq_checked[[i]])
+      filtered_seq <- attr(comp_seq_checked[[i]], "filtered_seq")
+      attr(seq_checked[[i]], "filtered_complement_seq") <- 
+        as.character(filtered_seq)
     }
-    if(length(tmp_cseq)>length(tmp_seq)){
-      tmp_seq <- append(tmp_seq,rep('.',length(tmp_cseq)-length(tmp_seq)))
+  } else {
+    # Generate complement sequences if not provided
+    for (i in seq_along(seq_checked)) {
+      seq_filtered <- attr(seq_checked[[i]], "filtered_seq")
+      comp_x <- generate_complement(seq_checked[[i]], reverse = FALSE)
+      comp_x_filtered <- generate_complement(seq_filtered, reverse = FALSE)
+      attr(seq_checked[[i]], "complement_seq") <- as.character(comp_x)
+      attr(seq_checked[[i]], "filtered_complement_seq") <- 
+      as.character(comp_x_filtered)
     }
-    if(length(tmp_cseq)<length(tmp_seq)){
-      tmp_cseq <- append(tmp_cseq,rep('.',length(tmp_seq)-length(tmp_cseq)))
+  }
+  
+  # Calculate Tm for each sequence
+  for (i in seq_along(seq_checked)) {
+    all_seq <- seq_checked[[i]]
+    my_seq <- s2c(attr(all_seq, "filtered_seq"))
+    my_cseq <- s2c(attr(all_seq, "filtered_complement_seq"))
+    
+    tmp_seq <- my_seq
+    tmp_cseq <- my_cseq
+    delta_h <- 0
+    delta_s <- 0
+    d_h <- 1
+    d_s <- 2
+
+    if(shift != 0 || length(my_seq) != length(my_cseq)) {
+      if(shift > 0) {
+        tmp_seq <- append(rep('.',  shift), my_seq)
+      }else{
+        tmp_cseq <- append(rep('.', abs(shift)),my_cseq)
+      }
+      if(length(tmp_cseq)>length(tmp_seq)){
+        tmp_seq <- append(tmp_seq,rep('.', length(tmp_cseq)-length(tmp_seq)))
+      }
+      if(length(tmp_cseq)<length(tmp_seq)){
+        tmp_cseq <- append(tmp_cseq,rep('.', length(tmp_seq)-length(tmp_cseq)))
+      }
+      while(all(tmp_seq[1:2] == ".") || all(tmp_cseq[1:2] == ".")) {
+        tmp_seq <- tmp_seq[-1]
+        tmp_cseq <- tmp_cseq[-1]
+      }
+      while(all(tmp_seq[(length(tmp_seq)-1):length(tmp_seq)] == ".") ||
+            all(tmp_cseq[(length(tmp_cseq)-1):length(tmp_cseq)] == ".")) {
+        tmp_seq <- tmp_seq[-length(tmp_seq)]
+        tmp_cseq <- tmp_cseq[-length(tmp_cseq)]
+      } 
+      if(tmp_seq[1] == "." || tmp_cseq[1] == ".") {
+        left_de <- paste0(c2s(tmp_seq[1:2]), '/',  c2s(tmp_cseq[1:2]), collapse = '')
+        if(left_de %in% de_table_name) {
+          delta_h <- de_table_list[left_de,d_h] + delta_h
+          delta_s <- de_table_list[left_de,d_s] + delta_s
+        }else{
+          warning(paste("Dangling end combination", left_de, "not found in de_table_list, skipping..."))
+        }
+        tmp_seq <- tmp_seq[-1]
+        tmp_cseq <- tmp_cseq[-1]
+      }
+      if (tmp_seq[length(tmp_seq)] == '.' || tmp_cseq[length(tmp_cseq)] == '.') {
+        right_de <- paste0(c2s(tmp_cseq[c(length(tmp_cseq), (length(tmp_cseq)-1))]), '/', 
+                          c2s(tmp_seq[c(length(tmp_seq), (length(tmp_seq)-1))]), collapse = '')
+        if (right_de %in% de_table_name) {
+          delta_h <- de_table_list[right_de, d_h] + delta_h
+          delta_s <- de_table_list[right_de, d_s] + delta_s
+        }else{
+          warning(paste("Dangling end combination", right_de, "not found in de_table_list, skipping..."))
+        }
+        tmp_seq <- tmp_seq[-length(tmp_seq)]
+        tmp_cseq <- tmp_cseq[-length(tmp_cseq)]
+      }
     }
-    while(all(tmp_seq[1:2]==".") | all(tmp_cseq[1:2]==".")){
+    left_tmm <- paste0(c2s(tmp_cseq[c(2,1)]),'/', c2s(tmp_seq[c(2,1)]),collapse='')
+    if(left_tmm %in% tmm_table_name){
+      delta_h <- tmm_table_list[left_tmm,d_h] + delta_h
+      delta_s <- tmm_table_list[left_tmm,d_s] + delta_s
       tmp_seq <- tmp_seq[-1]
       tmp_cseq <- tmp_cseq[-1]
     }
-    while(all(tmp_seq[(length(tmp_seq)-1):length(tmp_seq)]==".") | all(tmp_cseq[(length(tmp_cseq)-1):length(tmp_cseq)]==".")){
-      tmp_seq <- tmp_seq[-length(tmp_seq)]
-      tmp_cseq <- tmp_cseq[-length(tmp_cseq)]
-    } 
-    if(tmp_seq[1]=="." | tmp_cseq[1]=="."){
-      left_de <- paste0(c2s(tmp_seq[1:2]),'/',c2s(tmp_cseq[1:2]),collapse='')
-      if(left_de %in% de_table_name){
-        delta_h <- de_table_list[left_de,d_h]+delta_h
-        delta_s <- de_table_list[left_de,d_s]+delta_s
-      }else{
-        stop("No such combination in de_table_list")
-      }
-      tmp_seq <- tmp_seq[-1]
-      tmp_cseq <- tmp_cseq[-1]
-    }
-    if(tmp_seq[length(tmp_seq)] == '.' | tmp_cseq[length(tmp_cseq)] == '.'){
-      right_de <- paste0(c2s(tmp_cseq[c(length(tmp_cseq),(length(tmp_cseq)-1))]),'/',
-                         c2s(tmp_seq[c(length(tmp_seq),(length(tmp_seq)-1))]),collapse='')
-      if(right_de %in% de_table_name){
-        delta_h <- de_table_list[right_de,d_h]+delta_h
-        delta_s <- de_table_list[right_de,d_s]+delta_s
-      }else{
-        stop("No such combination in de_table_list")
-      }
+    right_tmm <- paste0(c2s(tmp_seq[(length(tmp_seq)-1):length(tmp_seq)]),'/', 
+                        c2s(tmp_cseq[(length(tmp_cseq)-1):length(tmp_cseq)]),collapse='')
+    if(right_tmm %in% tmm_table_name){
+      delta_h <- tmm_table_list[right_tmm,d_h] + delta_h
+      delta_s <- tmm_table_list[right_tmm,d_s] + delta_s
       tmp_seq <- tmp_seq[-length(tmp_seq)]
       tmp_cseq <- tmp_cseq[-length(tmp_cseq)]
     }
-  }
-  left_tmm <- paste0(c2s(tmp_cseq[c(2,1)]),'/',c2s(tmp_seq[c(2,1)]),collapse='')
-  if(left_tmm %in% tmm_table_name){
-    delta_h <- tmm_table_list[left_tmm,d_h]+delta_h
-    delta_s <- tmm_table_list[left_tmm,d_s]+delta_s
-    tmp_seq <- tmp_seq[-1]
-    tmp_cseq <- tmp_cseq[-1]
-  }
-  right_tmm <- paste0(c2s(tmp_seq[(length(tmp_seq)-1):length(tmp_seq)]),'/',
-                      c2s(tmp_cseq[(length(tmp_cseq)-1):length(tmp_cseq)]),collapse='')
-  if(right_tmm %in% tmm_table_name){
-    delta_h <- tmm_table_list[right_tmm,d_h]+delta_h
-    delta_s <- tmm_table_list[right_tmm,d_s]+delta_s
-    tmp_seq <- tmp_seq[-length(tmp_seq)]
-    tmp_cseq <- tmp_cseq[-length(tmp_cseq)]
-  }
-  delta_h <- nn_table_list['init',d_h]+delta_h
-  delta_s <- nn_table_list['init',d_s]+delta_s
-  
-  if(GC(my_seq) == 0){
-    delta_h <- nn_table_list['init_allA/T',d_h]+delta_h
-    delta_s <- nn_table_list['init_allA/T',d_s]+delta_s
-  }else{
-    delta_h <- nn_table_list['init_oneG/C',d_h]+delta_h
-    delta_s <- nn_table_list['init_oneG/C',d_s]+delta_s
-  }
-
-  if(my_seq[1] == 'T'){
-    delta_h <- nn_table_list['init_5T/A',d_h]+delta_h
-    delta_s <- nn_table_list['init_5T/A',d_s]+delta_s
-  }
-  if(my_seq[1] == 'A'){
-    delta_h <- nn_table_list['init_5T/A',d_h]+delta_h
-    delta_s <- nn_table_list['init_5T/A',d_s]+delta_s
-  }
-  
-  ends <- c(my_seq[1],my_seq[length(my_seq)])
-  at <- sum(ends %in% 'A')+sum(ends %in% 'T')
-  gc <- sum(ends %in% 'G')+sum(ends %in% 'C')
-  delta_h <- nn_table_list['init_A/T',d_h]*at+delta_h
-  delta_s <- nn_table_list['init_A/T',d_s]*at+delta_s
-  delta_h <- nn_table_list['init_G/C',d_h]*gc+delta_h
-  delta_s <- nn_table_list['init_G/C',d_s]*gc+delta_s
-
-  for(bn in 1:(length(tmp_seq)-1)){
-    neighbors <- paste0(c2s(tmp_seq[bn:(bn+1)]),'/',c2s(tmp_cseq[bn:(bn+1)]),collapse='')
-    rev_neighbors <- paste0(c2s(tmp_cseq[(bn+1):bn]),'/',c2s(tmp_seq[(bn+1):bn]),collapse='')
-    if(neighbors %in% imm_table_name){
-      delta_h <- imm_table_list[neighbors,d_h]+delta_h
-      delta_s <- imm_table_list[neighbors,d_s]+delta_s
-    }else if(rev_neighbors %in% imm_table_name){
-      delta_h <- imm_table_list[rev_neighbors,d_h]+delta_h
-      delta_s <- imm_table_list[rev_neighbors,d_s]+delta_s
-    }else if(neighbors %in% nn_table_name){
-      delta_h <- nn_table_list[neighbors,d_h]+delta_h
-      delta_s <- nn_table_list[neighbors,d_s]+delta_s
-    }else if(rev_neighbors %in% nn_table_name){
-      delta_h <- nn_table_list[rev_neighbors,d_h]+delta_h
-      delta_s <- nn_table_list[rev_neighbors,d_s]+delta_s
+    delta_h <- nn_table_list['init', d_h] + delta_h
+    delta_s <- nn_table_list['init', d_s] + delta_s
+    
+    if(gc(my_seq) == 0){
+      delta_h <- nn_table_list['init_allA/T', d_h] + delta_h
+      delta_s <- nn_table_list['init_allA/T', d_s] + delta_s
     }else{
-      stop("No such combination in de_table_list")
+      delta_h <- nn_table_list['init_oneG/C', d_h] + delta_h
+      delta_s <- nn_table_list['init_oneG/C', d_s] + delta_s
     }
-  }
-  k <- (dnac_high-(dnac_low/2.0))*1e-9
-  if(self_comp==TRUE){
-    k <- dnac_high*1e-9
-    delta_h <- nn_table_list['sym',d_h]
-    delta_s <- nn_table_list['sym',d_s]
-  }
-  R <- 1.987
-  if(!is.null(salt_correct)){
-    corr_salt = salt_correction(Na=Na,K=K,Tris=Tris,Mg=Mg,dNTPs=dNTPs,method=salt_correct,input_seq=my_seq,ambiguous = ambiguous)
-    if(salt_correct == "SantaLucia1998-2"){
-      delta_s <- corr_salt+delta_s
-    }
-    tm <- (1000*delta_h)/(delta_s+(R*(log(k))))-273.15
-    if(salt_correct %in% c("Schildkraut2010","Wetmur1991","SantaLucia1996","SantaLucia1998-1")){
-      tm <- tm+corr_salt
-    }
-    if(salt_correct %in% c("Owczarzy2004","Owczarzy2008")){
-      tm <- (1/(1/(tm+273.15)+corr_salt)-273.15)
-    }
-  }else{
-    tm <- (1000*delta_h)/(delta_s+(R*(log(k))))-273.15
-  }
-  
-  corr_chem <- chem_correction(DMSO=DMSO,formamide_value_unit=formamide_value_unit,dmso_factor=dmso_factor,formamide_factor=formamide_factor,pt_gc=pt_gc)
-  tm <- tm + corr_chem
-  
-  nn_table_list <- list("DNA_NN_Breslauer_1986"="Breslauer K J (1986) <doi:10.1073/pnas.83.11.3746>",
-                      "DNA_NN_Sugimoto_1996"="Sugimoto N (1996) <doi:10.1093/nar/24.22.4501>",
-                      "DNA_NN_Allawi_1998"="Allawi H (1998) <doi:10.1093/nar/26.11.2694>",
-                      "DNA_NN_SantaLucia_2004"="SantaLucia J (2004) <doi:10.1146/annurev.biophys.32.110601.141800>",
-                      "RNA_NN_Freier_1986"="Freier S (1986) <doi:10.1073/pnas.83.24.9373>",
-                      "RNA_NN_Xia_1998"="Xia T (1998) <doi:10.1021/bi9809425>",
-                      "RNA_NN_Chen_2012"="Chen JL (2012) <doi:10.1021/bi3002709>",
-                      "RNA_DNA_NN_Sugimoto_1995"="Sugimoto N (1995)<doi:10.1016/S0048-9697(98)00088-6>",
-                      "DNA_TMM_Bommarito_2000"="Bommarito S (2000)  <doi:10.1093/nar/28.9.1929>",
-                      "DNA_IMM_Peyret_1999"="Peyret N (1999) <doi:10.1021/bi9825091> & Allawi H T (1997) <doi:10.1021/bi962590c> & Santalucia N (2005) <doi:10.1093/nar/gki918>",
-                      "DNA_DE_Bommarito_2000"="Bommarito S (2000) <doi:10.1093/nar/28.9.1929>",
-                      "RNA_DE_Turner_2010"="Turner D H (2010) <doi:10.1093/nar/gkp892>")
 
-  result_list <- vector('list',2L)
-  names(result_list) <- c("Tm","Options")
-  result_list$Tm <- as.numeric(tm)
-  result_list$Options <- list("Sequence"=input_seq,
-                            "Check filter"=c2s(my_seq),
-                            "Ambiguous"=ambiguous,
-                            "Complement Sequence" = complement_seq,  
-                            "Shift"= shift, 
-                            "Thermodynamic NN values" = paste0(nn_table,": ",nn_table_list[[nn_table]]), 
-                            "Thermodynamic values for terminal mismatches" = paste0(tmm_table,": ",nn_table_list[[tmm_table]]), 
-                            "Thermodynamic values for internal mismatches" = paste0(imm_table,": ",nn_table_list[[imm_table]]),
-                            "Thermodynamic values for dangling ends" = paste0(de_table,": ",nn_table_list[[de_table]]), 
-                            "Concentration of the higher concentrated strand" = dnac_high,
-                            "Concentration of the lower concentrated strand" = dnac_low, 
-                            "Sequence self-complementary" = self_comp, 
-                            "Na"=Na,
-                            "K"=K,
-                            "Tris"=Tris,
-                            "Mg"=Mg,
-                            "dNTPs"=dNTPs,
-                            "Salt correction method"=salt_correct,
-                            "Percent of DMSO"=DMSO,
-                            "Formamide concentration"=formamide_value_unit$value,
-                            "Coeffecient of Tm decreases per percent DMSO"=dmso_factor,
-                            "Method for formamide concentration"=formamide_value_unit$unit,
-                            "Coefficient of Tm decrease per percent formamide"=formamide_factor,
-                            "Percent of GC"=pt_gc)
-  class(result_list) <- c("TmCalculator","list")
+    if(my_seq[1] == 'T'){
+      delta_h <- nn_table_list['init_5T/A', d_h] + delta_h
+      delta_s <- nn_table_list['init_5T/A', d_s] + delta_s
+    }
+    if(my_seq[1] == 'A'){
+      delta_h <- nn_table_list['init_5T/A', d_h] + delta_h
+      delta_s <- nn_table_list['init_5T/A', d_s] + delta_s
+    }
+    
+    ends <- c(my_seq[1],my_seq[length(my_seq)])
+    at <- sum(ends %in% 'A') + sum(ends %in% 'T')
+    gc <- sum(ends %in% 'G') + sum(ends %in% 'C')
+    delta_h <- nn_table_list['init_A/T', d_h] * at + delta_h
+    delta_s <- nn_table_list['init_A/T', d_s] * at + delta_s
+    delta_h <- nn_table_list['init_G/C', d_h] * gc + delta_h
+    delta_s <- nn_table_list['init_G/C', d_s] * gc + delta_s
+
+    for(bn in 1:(length(tmp_seq)-1)){
+      neighbors <- paste0(c2s(tmp_seq[bn:(bn+1)]),'/', c2s(tmp_cseq[bn:(bn+1)]), collapse='')
+      rev_neighbors <- paste0(c2s(tmp_cseq[(bn+1):bn]),'/', c2s(tmp_seq[(bn+1):bn]), collapse='')
+      if(neighbors %in% imm_table_name){
+        delta_h <- imm_table_list[neighbors,d_h] + delta_h
+        delta_s <- imm_table_list[neighbors,d_s] + delta_s
+      }else if(rev_neighbors %in% imm_table_name){
+        delta_h <- imm_table_list[rev_neighbors,d_h] + delta_h
+        delta_s <- imm_table_list[rev_neighbors,d_s] + delta_s
+      }else if(neighbors %in% nn_table_name){
+        delta_h <- nn_table_list[neighbors,d_h] + delta_h
+        delta_s <- nn_table_list[neighbors,d_s] + delta_s
+      }else if(rev_neighbors %in% nn_table_name){
+        delta_h <- nn_table_list[rev_neighbors,d_h] + delta_h
+        delta_s <- nn_table_list[rev_neighbors,d_s] + delta_s
+      }else{
+        stop(paste0(c("Mismatch pair '",neighbors,"' or '",rev_neighbors,"' are not reported in thermodynamic parameters for internal mismatches"),sep=""))
+      }
+    }
+    k <- (dnac_high-(dnac_low/2.0))*1e-9
+    if(self_comp==TRUE){
+      k <- dnac_high*1e-9
+      delta_h <- nn_table_list['sym', d_h]
+      delta_s <- nn_table_list['sym', d_s]
+    }
+    R <- 1.987
+    if(!is.null(salt_corr_method)){
+      corr_salt <- salt_correct(Na = Na, 
+      K = K,
+      Tris = Tris,
+      Mg = Mg,
+      dNTPs = dNTPs,
+      method = salt_corr_method,
+      input_seq = my_seq,
+      ambiguous = ambiguous)
+      if(salt_corr_method == "SantaLucia1998-2"){
+        delta_s <- corr_salt+delta_s
+      }
+      tm <- (1000 * delta_h) / (delta_s + (R * (log(k)))) - 273.15
+      if (salt_corr_method %in% c("Schildkraut2010", "Wetmur1991",
+                          "SantaLucia1996", "SantaLucia1998-1")) {
+        tm <- tm + corr_salt
+      }
+      if(salt_corr_method %in% c("Owczarzy2004","Owczarzy2008")){
+        tm <- (1 / (1 / (tm + 273.15) + corr_salt) - 273.15)
+      }
+    } else {
+      tm <- (1000 * delta_h) / (delta_s + (R * (log(k)))) - 273.15
+    }
+    pt_gc <- gc(my_seq, ambiguous = ambiguous)
+    corr_chem <- chem_correct(
+      DMSO = DMSO,
+      formamide_value_unit = formamide_value_unit,
+      dmso_factor = dmso_factor,
+      formamide_factor = formamide_factor,
+      pt_gc = pt_gc
+    )
+    tm <- tm + corr_chem
+    attr(seq_checked[[i]], "Tm") <- tm
+  }
+  nn_table_list <- list("DNA_NN_Breslauer_1986" = "Breslauer K J (1986) <doi:10.1073/pnas.83.11.3746>",
+                        "DNA_NN_Sugimoto_1996" = "Sugimoto N (1996) <doi:10.1093/nar/24.22.4501>",
+                        "DNA_NN_Allawi_1998" = "Allawi H (1998) <doi:10.1093/nar/26.11.2694>",
+                        "DNA_NN_SantaLucia_2004" = "SantaLucia J (2004) <doi:10.1146/annurev.biophys.32.110601.141800>",
+                        "RNA_NN_Freier_1986" = "Freier S (1986) <doi:10.1073/pnas.83.24.9373>",
+                        "RNA_NN_Xia_1998" = "Xia T (1998) <doi:10.1021/bi9809425>",
+                        "RNA_NN_Chen_2012" = "Chen JL (2012) <doi:10.1021/bi3002709>",
+                        "RNA_DNA_NN_Sugimoto_1995" = "Sugimoto N (1995)<doi:10.1016/S0048-9697(98)00088-6>",
+                        "DNA_TMM_Bommarito_2000" = "Bommarito S (2000)  <doi:10.1093/nar/28.9.1929>",
+                        "DNA_IMM_Peyret_1999" = "Peyret N (1999) <doi:10.1021/bi9825091> & Allawi H T (1997) <doi:10.1021/bi962590c> & Santalucia N (2005) <doi:10.1093/nar/gki918>",
+                        "DNA_DE_Bommarito_2000" = "Bommarito S (2000) <doi:10.1093/nar/28.9.1929>",
+                        "RNA_DE_Turner_2010" = "Turner D H (2010) <doi:10.1093/nar/gkp892>")
+
+  
+  
+  
+  # Create result list with proper structure
+  result_list <- list(
+    Tm = seq_checked,
+    Options = list("Ambiguous" = ambiguous,
+                  "Shift" = shift,
+                  "Thermodynamic NN values" = paste0(nn_table, ": ", nn_table_list[[nn_table]]), 
+                  "Thermodynamic values for terminal mismatches" = paste0(tmm_table,": ",nn_table_list[[tmm_table]]), 
+                  "Thermodynamic values for internal mismatches" = paste0(imm_table,": ",nn_table_list[[imm_table]]),
+                  "Thermodynamic values for dangling ends" = paste0(de_table,": ",nn_table_list[[de_table]]), 
+                  "Concentration of the higher concentrated strand" = dnac_high,
+                  "Concentration of the lower concentrated strand" = dnac_low, 
+                  "Sequence self-complementary" = self_comp, 
+                  "Na" = Na,
+                  "K" = K,
+                  "Tris" = Tris,
+                  "Mg" = Mg,
+                  "dNTPs" = dNTPs,
+                  "Salt correction method" = salt_corr_method,
+                  "Percent of DMSO" = DMSO,
+                  "Formamide concentration" = formamide_value_unit$value,
+                  "Coeffecient of Tm decreases per percent DMSO" = dmso_factor,
+                  "Method for formamide concentration" = formamide_value_unit$unit,
+                  "Coefficient of Tm decrease per percent formamide" = formamide_factor)
+  )
+  # Set class and attributes
+  class(result_list) <- c("TmCalculator", "list")
   attr(result_list, "nonhidden") <- "Tm"
   return(result_list)
 }

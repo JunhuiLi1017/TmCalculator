@@ -5,7 +5,7 @@
 #' 
 #' @param input_seq Sequence (5' to 3') of one strand of the nucleic acid duplex. Can be provided as either:
 #'   - A character string (e.g., "ATGCG")
-#'   - A vector of characters (e.g., c("A","T","G","C","G"))
+#'   - A path to a FASTA file containing the sequence(s)
 #' 
 #' @param ambiguous Logical. If TRUE, ambiguous bases are taken into account when computing the G and C content.
 #'   The function handles various ambiguous bases (S, W, M, K, R, Y, V, H, D, B) by proportionally
@@ -21,35 +21,38 @@
 #' @examples 
 #' 
 #' # Calculate GC content of a DNA sequence
-#' GC(c("a","t","c","t","g","g","g","c","c","a","g","t","a"))  # 53.85%
+#' gc(c("a","t","c","t","g","g","g","c","c","a","g","t","a"))  # 53.85%
 #' 
 #' # Calculate GC content including ambiguous bases
-#' GC("GCATSWSYK", ambiguous = TRUE)  # 55.56%
+#' gc("GCATSWSYK", ambiguous = TRUE)  # 55.56%
 #' 
 #' @author Junhui Li
 #' 
-#' @export GC
-GC <- function(input_seq, ambiguous = FALSE) {
+#' @export gc
+gc <- function(input_seq, ambiguous = FALSE) {
   if (length(input_seq) == 1 && is.na(input_seq)) {
     return(NA)
   }
   
+  # Process input sequence
   if (inherits(input_seq, "character")) {
     input_seq <- toupper(input_seq)
-    if (length(input_seq) == 1 && nchar(input_seq) > 1) {
+    if (length(input_seq) == 1) {
       vec_seq <- s2c(input_seq)
-    } else if (length(input_seq) > 1) {
+    } else {
       vec_seq <- input_seq
     }
   } else {
-    stop("sequence is not characters")
+    stop("sequence must be a character string or vector")
   }
   
+  # Check for valid nucleic acid bases
   n_seq <- length(vec_seq)
   if (!all(vec_seq %in% c("A","B","C","D","G","H","I","K","M","N","R","S","T","V","W","Y"))) {
-    warning("None Nucleic Acid Base are found in input Sequence")
+    warning("Non-nucleic acid bases found in input sequence")
   }
   
+  # Count bases
   nc <- sum(vec_seq %in% "C")
   ng <- sum(vec_seq %in% "G")
   na <- sum(vec_seq %in% "A")
