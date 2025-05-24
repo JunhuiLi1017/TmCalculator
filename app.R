@@ -192,15 +192,9 @@ ui <- dashboardPage(
 
 server <- function(input, output, session) {
   # Update sequence selectors when FASTA file is uploaded
-  observeEvent(input$fasta_file, {
-    req(input$fasta_file)
-    sequences <- input$fasta_file
-  })
+
   
-  observeEvent(input$fasta_file_complement, {
-    req(input$fasta_file_complement)
-    comp_sequences <- input$fasta_file_complement
-  })
+
   
   # Calculate Tm when button is clicked
   observeEvent(input$calculate, {
@@ -214,12 +208,15 @@ server <- function(input, output, session) {
           NULL
         }
       } else {
-        req(input$fasta_file)
-        primers <- sequences
-        templates <- if(input$method == "tm_nn" && !is.null(comp_sequences)) {
-          comp_sequences
-        } else {
-          NULL
+          observeEvent(input$fasta_file, {
+            req(input$fasta_file)
+            primers <- input$fasta_file
+          })
+          observeEvent(input$fasta_file_complement, {
+          req(input$fasta_file_complement)
+          comp_sequences <- input$fasta_file_complement
+          } else {
+          comp_sequences <- NULL
         }
       }
       
