@@ -1,7 +1,11 @@
 library(shiny)
 library(TmCalculator)
 library(shinydashboard)
-library(stringr)
+
+# Ensure the package is properly loaded
+if (!requireNamespace("TmCalculator", quietly = TRUE)) {
+  stop("TmCalculator package is required but not installed")
+}
 
 ui <- dashboardPage(
   dashboardHeader(title = "TmCalculator"),
@@ -55,26 +59,20 @@ ui <- dashboardPage(
               condition = "input.input_type == 'fasta' && input.method == 'tm_nn'",
               fileInput("fasta_file", "Upload FASTA File",
                        accept = c(".fasta", ".fa", ".txt")),
-              selectInput("fasta_seq", "Select Primer Sequence",
-                         choices = NULL),
               fileInput("fasta_file_complement", "Upload reverse complement FASTA File",
-                       accept = c(".fasta", ".fa", ".txt")),
-              selectInput("fasta_seq_complement", "Select reverse complement Primer Sequence",
-                         choices = NULL)
+                       accept = c(".fasta", ".fa", ".txt"))
             ),
             conditionalPanel(
               condition = "input.input_type == 'fasta' && (input.method == 'tm_gc' || input.method == 'tm_wallace')",
               fileInput("fasta_file", "Upload FASTA File",
-                       accept = c(".fasta", ".fa", ".txt")),
-              selectInput("fasta_seq", "Select Sequence",
-                         choices = NULL)
+                       accept = c(".fasta", ".fa", ".txt"))
             ),
             actionButton("calculate", "Calculate Tm", class = "btn-primary")
           ),
           
           # Right column - Parameters
           box(
-            title = "Specific Parameters for selected method",
+            title = "Specific Parameters",
             width = 6,
             checkboxInput("ambiguous", "Ambiguous Bases", value = FALSE),
             conditionalPanel(
@@ -135,16 +133,7 @@ ui <- dashboardPage(
           conditionalPanel(
             condition = "input.method == 'tm_nn' || input.method == 'tm_gc'",
             box(
-              title = "Chemical Modifications",
-              width = 6,
-              numericInput("DMSO", "DMSO (%)", value = 0, min = 0, max = 100),
-              numericInput("formamide", "Formamide", value = 0, min = 0),
-              selectInput("formamide_unit", "Formamide Unit",
-                        choices = list("Percent (%)" = "percent", "Molar (M)" = "molar"),
-                        selected = "percent")
-            ),
-            box(
-              title = "Salt Conditions",
+              title = "Salt Corrections",
               width = 6,
               selectInput("salt_corr_method", "Salt Correction Method:",
                          choices = c("Schildkraut2010",
@@ -159,6 +148,21 @@ ui <- dashboardPage(
               numericInput("Tris", "Tris (mM)", value = 0, min = 0),
               numericInput("Mg", "Mg2+ (mM)", value = 0, min = 0),
               numericInput("dNTPs", "dNTPs (mM)", value = 0, min = 0)
+            ),
+            box(
+              title = "Chemical Corrections",
+              width = 6,
+              numericInput("DMSO", "DMSO (%)", value = 0, min = 0, max = 100),
+              numericInput("formamide", "Formamide", value = 0, min = 0),
+              selectInput("formamide_unit", "Formamide Unit",
+                        choices = list("Percent (%)" = "percent", "Molar (M)" = "molar"),
+                        selected = "percent"),
+              selectInput("formamide_factor", "Formamide Factor", 
+                         choices = list("0.65" = "0.65", "0.6" = "0.6", "0.72" = "0.72"),
+                         selected = "0.65"),
+              selectInput("DMSO_factor", "DMSO Factor",
+                         choices = list("0.75" = "0.75", "0.5" = "0.5", "0.6" = "0.6", "0.65" = "0.65", "0.675" = "0.675"),
+                         selected = "0.75")
             )
           )
         ),
@@ -187,46 +191,15 @@ ui <- dashboardPage(
 )
 
 server <- function(input, output, session) {
-  
-  # Function to read FASTA file
-  read_fasta <- function(file_path) {
-    lines <- readLines(file_path)
-    sequences <- list()
-    current_seq <- NULL
-    current_name <- NULL
-    
-    for (line in lines) {
-      if (grepl("^>", line)) {
-        if (!is.null(current_seq)) {
-          sequences[[current_name]] <- current_seq
-        }
-        current_name <- sub("^>", "", line)
-        current_seq <- ""
-      } else {
-        current_seq <- paste0(current_seq, line)
-      }
-    }
-    if (!is.null(current_seq)) {
-      sequences[[current_name]] <- current_seq
-    }
-    return(sequences)
-  }
-  
   # Update sequence selectors when FASTA file is uploaded
   observeEvent(input$fasta_file, {
     req(input$fasta_file)
-    sequences <- read_fasta(input$fasta_file$datapath)
-    updateSelectInput(session, "fasta_seq",
-                     choices = names(sequences),
-                     selected = names(sequences)[1])
+    sequences <- input$fasta_file
   })
   
   observeEvent(input$fasta_file_complement, {
     req(input$fasta_file_complement)
-    sequences <- read_fasta(input$fasta_file_complement$datapath)
-    updateSelectInput(session, "fasta_seq_complement",
-                     choices = names(sequences),
-                     selected = names(sequences)[1])
+    comp_sequences <- input$fasta_file_complement
   })
   
   # Calculate Tm when button is clicked
@@ -234,104 +207,55 @@ server <- function(input, output, session) {
     tryCatch({
       # Get sequences based on input type
       if (input$input_type == "direct") {
-        primer <- input$input_seq
-        template <- if(input$method == "tm_nn") input$rev_input_seq else NULL
+        primers <- input$input_seq
+        templates <- if(input$method == "tm_nn" && !is.null(input$rev_input_seq) && input$rev_input_seq != "") {
+          input$rev_input_seq
+        } else {
+          NULL
+        }
       } else {
         req(input$fasta_file)
-        sequences <- read_fasta(input$fasta_file$datapath)
-        primer <- sequences[[input$fasta_seq]]
-        if(input$method == "tm_nn") {
-          req(input$fasta_file_complement)
-          comp_sequences <- read_fasta(input$fasta_file_complement$datapath)
-          template <- comp_sequences[[input$fasta_seq_complement]]
+        primers <- sequences
+        templates <- if(input$method == "tm_nn" && !is.null(comp_sequences)) {
+          comp_sequences
         } else {
-          template <- NULL
+          NULL
         }
       }
       
-      # Validate sequences
-      if (is.null(primer) || primer == "") {
-        showNotification("Please enter a sequence", type = "error")
-        return()
-      }
+      # Calculate Tm using tm_calculate
+      result <- tm_calculate(
+          input_seq = primers,
+          complement_seq = templates,
+          method = input$method,
+          ambiguous = input$ambiguous,
+          shift = input$shift,
+          nn_table = input$nn_table,
+          tmm_table = input$tmm_table,
+          imm_table = input$imm_table,
+          de_table = input$de_table,
+          dnac_high = input$dnac_high,
+          dnac_low = input$dnac_low,
+          self_comp = input$self_comp,
+          variant = input$variant,
+          Na = input$Na,
+          K = input$K,
+          Tris = input$Tris,
+          Mg = input$Mg,
+          dNTPs = input$dNTPs,
+          salt_corr_method = input$salt_corr_method,
+          DMSO = input$DMSO,
+          formamide_value_unit = list(
+            value = input$formamide,
+            unit = input$formamide_unit
+          ),
+          dmso_factor = as.numeric(input$DMSO_factor),
+          formamide_factor = as.numeric(input$formamide_factor)
+        )
       
-      if (input$method == "tm_nn" && (is.null(template) || template == "")) {
-        showNotification("Please enter both primer and template sequences", type = "error")
-        return()
-      }
-      
-      # Convert sequences to uppercase for consistency
-      primer <- toupper(primer)
-      if (!is.null(template)) template <- toupper(template)
-      
-      # Calculate Tm based on selected method
-      result <- switch(input$method,
-        "tm_nn" = {
-          tm_nn(
-            input_seq = primer,
-            complement_seq = template,
-            ambiguous = input$ambiguous,
-            shift = input$shift,
-            nn_table = input$nn_table,
-            tmm_table = input$tmm_table,
-            imm_table = input$imm_table,
-            de_table = input$de_table,
-            dnac_high = input$dnac_high,
-            dnac_low = input$dnac_low,
-            self_comp = input$self_comp,
-            Na = input$Na,
-            K = input$K,
-            Tris = input$Tris,
-            Mg = input$Mg,
-            dNTPs = input$dNTPs,
-            salt_corr_method = input$salt_corr_method,
-            DMSO = input$DMSO,
-            formamide_value_unit = list(
-              value = input$formamide,
-              unit = input$formamide_unit
-            )
-          )
-        },
-        "tm_gc" = {
-          tm_gc(
-            input_seq = primer,
-            ambiguous = input$ambiguous,
-            variant = input$variant,
-            Na = input$Na,
-            K = input$K,
-            Tris = input$Tris,
-            Mg = input$Mg,
-            dNTPs = input$dNTPs,
-            salt_corr_method = input$salt_corr_method,
-            DMSO = input$DMSO,
-            formamide_value_unit = list(
-              value = input$formamide,
-              unit = input$formamide_unit
-            )
-          )
-        },
-        "tm_wallace" = {
-          tm_wallace(
-            input_seq = primer,
-            ambiguous = input$ambiguous
-          )
-        }
-      )
       
       # Display results
       output$results <- renderPrint({
-        cat("Method:", input$method, "\n")
-        if (input$input_type == "fasta") {
-          cat("Sequence:", input$fasta_seq, "\n")
-          if (input$method == "tm_nn") {
-            cat("Complement:", input$fasta_seq_complement, "\n")
-          }
-        }
-        cat("Sequence: ", primer, "\n")
-        if (!is.null(template)) {
-          cat("Complement: ", template, "\n")
-        }
-        cat("\nResults:\n")
         print(result)
       })
       
@@ -342,19 +266,19 @@ server <- function(input, output, session) {
         },
         content = function(file) {
           writeLines(capture.output(
-            cat("Method:", input$method, "\n"),
-            if (input$input_type == "fasta") {
-              cat("Sequence:", input$fasta_seq, "\n")
-              if (input$method == "tm_nn") {
-                cat("Complement:", input$fasta_seq_complement, "\n")
+            cat("Method:", input$method, "\n\n"),
+            for (i in seq_along(results)) {
+              cat("Sequence:", names(results)[i], "\n")
+              if (input$input_type == "fasta") {
+                cat("Sequence: ", primers[[i]], "\n")
+                if (!is.null(templates)) {
+                  cat("Complement: ", templates[[i]], "\n")
+                }
               }
-            },
-            cat("Sequence: ", primer, "\n"),
-            if (!is.null(template)) {
-              cat("Complement: ", template, "\n")
-            },
-            cat("\nResults:\n"),
-            print(result)
+              cat("\nResults:\n")
+              print(results[[i]])
+              cat("\n", paste(rep("-", 50), collapse = ""), "\n\n")
+            }
           ), file)
         }
       )

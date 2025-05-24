@@ -210,7 +210,7 @@
 #'   salt_corr_method = "Owczarzy2008"
 #' )
 #' 
-#' @export
+#' @export tm_calculate
 tm_calculate <- function(input_seq,
                         complement_seq = NULL,
                         method = c("tm_nn", "tm_gc", "tm_wallace"),
