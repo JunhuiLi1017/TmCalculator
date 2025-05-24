@@ -2,12 +2,13 @@
 #' 
 #' The Wallace rule is often used as rule of thumb for approximate melting temperature calculations for primers with 14 to 20 nt length.
 #'  
-#' @param ntseq Sequence (5' to 3') of one strand of the DNA nucleic acid duplex
-#' as string or vector of characters (\strong{Note:} Non-DNA characters are ignored
-#' by this method).
+#' @param raw_seq Pre-processed sequence(s) in 5' to 3' direction. This should be the output from
+#'   process_seq() function.
 #'    
 #' @param ambiguous Ambiguous bases are taken into account to compute the G and C content when ambiguous is TRUE. 
 #'    
+#' @returns Returns a list of sequences with updated Tm attributes
+#' 
 #' @export
 #' @encoding UTF-8
 #'
@@ -21,25 +22,43 @@
 #' 
 #' @examples
 #'
-#' ntseq = c('acgtTGCAATGCCGTAWSDBSY') #for wallace rule
-#'
-#' out <- Tm_Wallace(ntseq,ambiguous = TRUE)
+#' input_seq = c('acgtTGCAATGCCGTAWSDBSY','acgtTGCCCCGGCCGCGCCGTAWSDBSY') #for wallace rule
+#' raw_seq <- process_seq(input_seq)
+#' out <- tm_wallace(raw_seq, ambiguous = TRUE)
 #' out
 #' out$Options
 #' 
-#' @export Tm_Wallace
+#' @export tm_wallace
 
-Tm_Wallace <- function (ntseq, ambiguous = FALSE){
-  mySeq <- check_filter(ntseq, method = "Tm_Wallace")
-  nSeq <- length(mySeq)
-  nGC <- nSeq * GC(mySeq, ambiguous = ambiguous)/100
-  nAT <- nSeq - nGC
-  Tm <- 4 * nGC + 2 * nAT
-  resultList <- vector('list',2L)
-  names(resultList) <- c("Tm","Options")
-  resultList$Tm <- Tm
-  resultList$Options <- list("Sequence"=ntseq,"Ambiguous"=ambiguous,"Check filter"=c2s(mySeq),Method="Thein & Wallace 1986")
-  class(resultList) <- c("TmCalculator","list")
-  attr(resultList, "nonhidden") <- "Tm"
-  return(resultList)
+tm_wallace <- function(raw_seq, ambiguous = FALSE) {
+  # Filter sequence
+  seq_checked <- filter_seq(raw_seq, method = "tm_wallace")
+  
+  # Calculate Tm for each sequence in the list
+  seq_tm <- lapply(seq_checked, function(i) {
+    filter_seq <- attr(i, "filtered_seq")
+    n_seq <- length(s2c(filter_seq))
+    n_gc <- n_seq * gc(filter_seq, ambiguous = ambiguous) / 100
+    n_at <- n_seq - n_gc
+    tm <- 4 * n_gc + 2 * n_at
+    
+    # Update the Tm attribute
+    attr(i, "Tm") <- tm
+    return(i)
+  })
+  
+  # Create result list with proper structure
+  result_list <- list(
+    Tm = seq_tm,
+    Options = list(
+      Ambiguous = ambiguous,
+      Method = "tm_wallace (Thein & Wallace 1986)"
+    )
+  )
+  
+  # Set class and attributes
+  attr(result_list, "class") <- c("list","TmCalculator")
+  attr(result_list, "nonhidden") <- "Tm"
+  
+  return(result_list)
 }

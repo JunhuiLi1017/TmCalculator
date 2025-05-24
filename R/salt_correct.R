@@ -1,0 +1,109 @@
+#' Corrections of melting temperature with salt concentration
+#' 
+#' Apply corrections to melting temperature calculations based on salt concentrations.
+#' Different correction methods are available for various experimental conditions.
+#' 
+#' @param Na Millimolar concentration of sodium ions. Default: 0
+#' 
+#' @param K Millimolar concentration of potassium ions. Default: 0
+#' 
+#' @param Tris Millimolar concentration of Tris buffer. Default: 0
+#' 
+#' @param Mg Millimolar concentration of magnesium ions. Default: 0
+#' 
+#' @param dNTPs Millimolar concentration of deoxynucleotide triphosphates. Default: 0
+#' 
+#' @param method Method for calculating salt concentration corrections to the melting temperature.
+#'   Available options:
+#'   - "Schildkraut2010": Updated salt correction method
+#'   - "Wetmur1991": Classic salt correction method
+#'   - "SantaLucia1996": DNA-specific salt correction
+#'   - "SantaLucia1998-1": Improved DNA salt correction
+#'   - "SantaLucia1998-2": Alternative DNA salt correction (requires input_seq)
+#'   - "Owczarzy2004": Comprehensive salt correction (requires input_seq)
+#'   - "Owczarzy2008": Updated comprehensive salt correction (requires input_seq)
+#'   Note: Setting to NA disables salt correction
+#' 
+#' @param input_seq Sequence (5' to 3') of one strand of the nucleic acid duplex. Can be provided as either:
+#'   - A character string (e.g., "ATGCG")
+#'   - A path to a FASTA file containing the sequence(s)
+#'   Required for methods: "SantaLucia1998-2", "Owczarzy2004", and "Owczarzy2008"
+#' 
+#' @param ambiguous Logical. If TRUE, ambiguous bases are taken into account when computing the G and C content.
+#'   The function handles various ambiguous bases (S, W, M, K, R, Y, V, H, D, B) by proportionally
+#'   distributing their contribution to GC content based on their possible nucleotide compositions.
+#' 
+#' @details
+#' 
+#' Different correction methods are available for various experimental conditions:
+#' 
+#' - Schildkraut2010: Updated salt correction method that accounts for monovalent and divalent cations
+#' - Wetmur1991: Classic salt correction method for monovalent cations
+#' - SantaLucia1996: DNA-specific salt correction
+#' - SantaLucia1998-1: Improved DNA salt correction
+#' - SantaLucia1998-2: Alternative DNA salt correction (requires sequence information)
+#' - Owczarzy2004: Comprehensive salt correction including effects of divalent cations (requires sequence information)
+#' - Owczarzy2008: Updated comprehensive salt correction (requires sequence information)
+#' 
+#' @references
+#' 
+#' Schildkraut C, Lifson S. Dependence of the melting temperature of DNA on salt concentration.
+#' Biopolymers. 1965;3(2):195-208.
+#' 
+#' Wetmur JG. DNA Probes: Applications of the Principles of Nucleic Acid Hybridization.
+#' Critical Reviews in Biochemistry and Molecular Biology. 1991;26(3-4):227-259.
+#' 
+#' SantaLucia J. A unified view of polymer, dumbbell, and oligonucleotide DNA nearest-neighbor
+#' thermodynamics. Proceedings of the National Academy of Sciences. 1998;95(4):1460-1465.
+#' 
+#' Owczarzy R, Moreira BG, Manthey JA, et al. Predicting stability of DNA duplexes in solutions
+#' containing magnesium and monovalent cations. Biochemistry. 2008;47(19):5336-5353.
+#' 
+#' @author Junhui Li
+#' 
+#' @examples
+#' 
+#' salt_correct(Na = 50, Mg = 1.5, method = "Owczarzy2008", 
+#'                input_seq = "ATGCGATGCG")
+#' 
+#' @export salt_correct
+
+salt_correct <- function(Na = 0,
+                           K = 0,
+                           Tris = 0,
+                           Mg = 0,
+                           dNTPs = 0,
+                           method = c("Schildkraut2010",
+                                    "Wetmur1991",
+                                    "SantaLucia1996",
+                                    "SantaLucia1998-1",
+                                    "Owczarzy2004",
+                                    "Owczarzy2008"),
+                           input_seq = NULL,
+                           ambiguous = FALSE){
+  method <- match.arg(method)
+  
+  if(length(input_seq) == 1){
+    my_seq <- input_seq
+  }else{
+    my_seq <- input_seq
+  }
+  
+  pt_gc <- gc(my_seq, ambiguous = ambiguous)
+  
+  if(method == "Schildkraut2010"){
+    corr_salt <- 16.6*log10(Na/1000)
+  }else if(method == "Wetmur1991"){
+    corr_salt <- 16.6*log10(Na/(1.0 + 0.7*Na))
+  }else if(method == "SantaLucia1996"){
+    corr_salt <- 16.6*log10(Na/1000)
+  }else if(method == "SantaLucia1998-1"){
+    corr_salt <- 16.6*log10(Na/1000)
+  }else if(method == "Owczarzy2004"){
+    corr_salt <- 16.6*log10(Na/1000)
+  }else if(method == "Owczarzy2008"){
+    corr_salt <- 16.6*log10(Na/1000)
+  }
+  
+  return(corr_salt)
+}
