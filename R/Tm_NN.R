@@ -176,9 +176,9 @@
 #' input_seq <- c("AAAATTTTTTTCCCCCCCCCCCCCCGGGGGGGGGGGGTGTGCGCTGC",
 #' "AAAATTTTTTTCCCCCCCCCCCCCCGGGGGGGGGGGGTGTGCGCTGC")
 #' raw_seq <- process_seq(input_seq)
-#' out <- tm_nn(input_seq, Na=50)
+#' out <- tm_nn(raw_seq, Na=50)
 #' out
-#' out$Options
+#' out$tm_nn$Options
 #' 
 #' @export tm_nn
 
