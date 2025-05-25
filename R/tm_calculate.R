@@ -1,6 +1,6 @@
 #' Calculate melting temperature using multiple methods
 #' 
-#' A wrapper function that calculates melting temperature using multiple methods:
+#' Calculates melting temperature using multiple methods:
 #' - Nearest Neighbor thermodynamics (tm_nn)
 #' - GC content-based method (tm_gc)
 #' - Wallace rule (tm_wallace)

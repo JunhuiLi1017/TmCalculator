@@ -21,13 +21,18 @@ BugReports: https://github.com/JunhuiLi1017/TmCalculator/issues
 License: MIT + file LICENSE
 Depends: R (>= 2.10)
 Imports: 
-    seqinr
+    seqinr,
+    shiny,
+    shinydashboard,
+    shinyjs,
+    shinythemes,
+    DT
 Suggests: 
     testthat (>= 3.0.0),
-    shiny (>= 1.7.0),
-    shinyjs (>= 2.1.0),
-    shinythemes (>= 1.2.0),
-    DT (>= 0.24)
+    knitr,
+    rmarkdown,
+    devtools,
+    roxygen2
 NeedsCompilation: no
 Repository: CRAN
 RoxygenNote: 7.3.2

@@ -40,14 +40,6 @@
 #' @export process_seq
 
 process_seq <- function(input_seq) {
-  #' Add attributes to a sequence
-  sequence_attr <- function(seq) {
-    seq_vec <- as.character(seq)
-    attr(seq_vec, "name") <- attr(seq, "name")
-    attr(seq_vec, "Tm") <- NA
-    return(seq_vec)
-  }
-  
   if(is.null(input_seq) || length(input_seq) == 0) {
     stop("Input sequence cannot be NULL or empty")
   }
@@ -59,14 +51,25 @@ process_seq <- function(input_seq) {
       stop("No sequences found in the FASTA file")
     }
     # Assign custom class to each sequence
-    result <- sequence_attr(seq_list)
+    result <- lapply(seq_list, function(x) {
+      seq_vec <- as.character(x)
+      attr(seq_vec, "name") <- attr(x, "name")
+      attr(seq_vec, "Tm") <- NA
+      return(seq_vec)
+    })
     return(result)
   } else if(is.character(input_seq)) {
     # Convert string or vector of strings to list
     seq_list <- as.list(input_seq)
     names(seq_list) <- paste("seq", 1:length(seq_list), sep = "_")
     # Assign custom class to each sequence
-    result <- sequence_attr(seq_list)
+    result <- lapply(seq_along(seq_list), function(x) {
+      seq_vec <- as.character(seq_list[[x]])
+      attr(seq_vec, "name") <- names(seq_list)[x]
+      attr(seq_vec, "Tm") <- NA
+      return(seq_vec)
+    })
+    names(result) <-names(seq_list)
     return(result)
   } else {
     stop("Input must be either a character string, a vector of character strings, or a path to a FASTA file")

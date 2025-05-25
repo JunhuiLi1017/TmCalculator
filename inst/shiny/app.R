@@ -51,14 +51,14 @@ ui <- dashboardPage(
                   conditionalPanel(
                     condition = "input.input_type == 'direct' && input.method == 'tm_nn'",
                     textInput("input_seq", "Primer Sequence (5' to 3')",
-                              placeholder = "Enter primer sequence..."),
+                              placeholder = "for example AACAGACT or AACAGACT, CGTGCATG"),
                     textInput("rev_input_seq", "Template Sequence (5' to 3')",
-                              placeholder = "Enter template sequence...")
+                              placeholder = "for example AGTCTGTT or AGTCTGTT, CATGCACG")
                   ),
                   conditionalPanel(
                     condition = "input.input_type == 'direct' && (input.method == 'tm_gc' || input.method == 'tm_wallace')",
                     textInput("input_seq", "Sequence (5' to 3')",
-                              placeholder = "Enter primer sequence...")
+                              placeholder = "for example AACAGACT or AACAGACT, CGTGCATG")
                   ),
                   conditionalPanel(
                     condition = "input.input_type == 'fasta' && input.method == 'tm_nn'",
@@ -203,9 +203,9 @@ server <- function(input, output, session) {
     tryCatch({
       # Get sequences based on input type
       if (input$input_type == "direct") {
-        primers <- input$input_seq
+        primers <- unlist(strsplit(input$input_seq, ","))
         templates <- if(input$method == "tm_nn" && !is.null(input$rev_input_seq) && input$rev_input_seq != "") {
-          input$rev_input_seq
+          unlist(strsplit(input$rev_input_seq, ","))
         } else {
           NULL
         }
