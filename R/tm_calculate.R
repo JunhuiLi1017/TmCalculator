@@ -99,13 +99,16 @@
 #' @param input_seq Input sequence(s) in 5' to 3' direction. Can be provided as either:
 #'   - A character string (e.g., "ATGCG")
 #'   - A path to a FASTA file containing the sequence(s)
+#'   - A character vector where each element is a string in the format "chr:start-end:strand:species" #' (e.g., "chr1:100-200:+:hg38"). Strand is "+" for positive (default if not provided) or "-" for negative.
+#'     - chr: Chromosome ID
+#'     - start: Start position
+#'     - end: End position
+#'     - strand: positive or negtive strand
+#'     - species:  Species name for reference genome (e.g., "hg38"), the function will  attempt to load the appropriate BSgenome from genome package.
 #' 
 #' @param complement_seq Complementary sequence(s) in 3' to 5' direction. If not provided,
 #'   the function will automatically generate it from input_seq. This is the template/target
-#'   sequence that the input sequence will hybridize with.
-#'   - A character string (e.g., "ATGCG")
-#'   - A path to a FASTA file containing the sequence(s)
-#'   - A NULL value (default)
+#'   sequence that the input sequence will hybridize with. Can be provided as input_seq format besides A NULL value(default)
 #' 
 #' @param method Method(s) to use for Tm calculation. Can be one or more of:
 #'   - "tm_nn": Nearest Neighbor thermodynamics (default)
@@ -212,8 +215,8 @@
 #' 
 #' @export tm_calculate
 tm_calculate <- function(input_seq,
-                        complement_seq = NULL,
                         method = c("tm_nn", "tm_gc", "tm_wallace"),
+                        complement_seq = NULL,
                         ambiguous = FALSE,
                         shift = 0,
                         nn_table = c("DNA_NN_SantaLucia_2004",
@@ -259,16 +262,20 @@ tm_calculate <- function(input_seq,
   # Validate method argument
   method <- match.arg(method, several.ok = FALSE)
   
-  # Process sequence once for all methods
-  raw_seq <- process_seq(input_seq)
+  # convert input_seq to genomic ranges
+  gr <- to_genomic_ranges(input_seq=input_seq, complement_seq = complement_seq)
+
+  # check and filter the sequence
+  gr$sequence <- check_filter_seq(gr$sequence, method)
+  gr$complement <- check_filter_seq(gr$complement, method)
+
   # Initialize result list
   result <- list()
   
   # Calculate Tm using each selected method
   if ("tm_nn" %in% method) {
-    result$tm_nn <- tm_nn(
-      raw_seq = raw_seq,
-      complement_seq = complement_seq,
+    result$tm <- tm_nn(
+      gr_seq = gr,
       ambiguous = ambiguous,
       shift = shift,
       nn_table = nn_table,
@@ -292,8 +299,8 @@ tm_calculate <- function(input_seq,
   }
   
   if ("tm_gc" %in% method) {
-    result$tm_gc <- tm_gc(
-      raw_seq = raw_seq,
+    result$tm <- tm_gc(
+      gr_seq = gr,
       ambiguous = ambiguous,
       userset = userset,
       variant = variant,
@@ -312,8 +319,8 @@ tm_calculate <- function(input_seq,
   }
   
   if ("tm_wallace" %in% method) {
-    result$tm_wallace <- tm_wallace(
-      raw_seq = raw_seq,
+    result$tm <- tm_wallace(
+      gr_seq = gr,
       ambiguous = ambiguous
     )
   }

@@ -5,8 +5,7 @@
 \title{Calculate melting temperature using nearest neighbor thermodynamics}
 \usage{
 tm_nn(
-  raw_seq,
-  complement_seq = NULL,
+  gr_seq,
   ambiguous = FALSE,
   shift = 0,
   nn_table = c("DNA_NN_SantaLucia_2004", "DNA_NN_Breslauer_1986", "DNA_NN_Sugimoto_1996",
@@ -32,15 +31,8 @@ tm_nn(
 )
 }
 \arguments{
-\item{raw_seq}{Pre-processed sequence(s) in 5' to 3' direction. This should be the output from
-process_seq() function.}
-
-\item{complement_seq}{Complementary sequence(s) in 3' to 5' direction. If not provided,
-the function will automatically generate it from raw_seq. This is the template/target
-sequence that the input sequence will hybridize with.
-- A character string (e.g., "ATGCG")
-- A path to a FASTA file containing the sequence(s)
-- A NULL value (default)}
+\item{gr_seq}{Pre-processed sequence(s) in 5' to 3' direction. This should be the output from
+to_genomic_ranges() function.}
 
 \item{ambiguous}{Logical value controlling how ambiguous bases are handled:
 - TRUE: Ambiguous bases (e.g., N, R, Y) are included in calculations
@@ -177,10 +169,10 @@ DNA_NN_Breslauer_1986: Breslauer K J (1986) <doi:10.1073/pnas.83.11.3746>
 
 input_seq <- c("AAAATTTTTTTCCCCCCCCCCCCCCGGGGGGGGGGGGTGTGCGCTGC",
 "AAAATTTTTTTCCCCCCCCCCCCCCGGGGGGGGGGGGTGTGCGCTGC")
-raw_seq <- process_seq(input_seq)
-out <- tm_nn(input_seq, Na=50)
+gr_seq <- to_genomic_ranges(input_seq)
+out <- tm_nn(gr_seq, Na=50)
 out
-out$Options
+out$tm_nn$Options
 
 }
 \references{

@@ -5,7 +5,7 @@
 \title{Calculate the melting temperature using empirical formulas based on GC content}
 \usage{
 tm_gc(
-  raw_seq,
+  gr_seq,
   ambiguous = FALSE,
   userset = NULL,
   variant = c("Primer3Plus", "Chester1993", "QuikChange", "Schildkraut1965",
@@ -25,8 +25,8 @@ tm_gc(
 )
 }
 \arguments{
-\item{raw_seq}{Pre-processed sequence(s) in 5' to 3' direction. This should be the output from
-process_seq() function.}
+\item{gr_seq}{Pre-processed sequence(s) in 5' to 3' direction. This should be the output from
+to_genomic_ranges() function.}
 
 \item{ambiguous}{Logical. If TRUE, ambiguous bases are taken into account when computing the G and C content.
 The function handles various ambiguous bases (S, W, M, K, R, Y, V, H, D, B) by proportionally
@@ -90,8 +90,8 @@ The function returns a list of sequences with updated Tm attributes and calculat
 
 # Example with multiple sequences
 input_seq <- c("ATCGTGCGTAGCAGTACGATCAGTAG", "ATCGTGCGTAGCAGTACGATCAGTAG")
-raw_seq <- process_seq(input_seq)
-out <- tm_gc(raw_seq, ambiguous = TRUE, variant = "Primer3Plus", Na = 50, mismatch = TRUE)
+gr_seq <- to_genomic_ranges(input_seq)
+out <- tm_gc(gr_seq, ambiguous = TRUE, variant = "Primer3Plus", Na = 50, mismatch = TRUE)
 out
 out$Options
 

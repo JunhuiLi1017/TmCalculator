@@ -3,8 +3,8 @@
 #' Calculate the melting temperature using empirical formulas based on GC content with different options.
 #' The function returns a list of sequences with updated Tm attributes and calculation options.
 #' 
-#' @param raw_seq Pre-processed sequence(s) in 5' to 3' direction. This should be the output from
-#'   process_seq() function.
+#' @param gr_seq Pre-processed sequence(s) in 5' to 3' direction. This should be the output from
+#'   to_genomic_ranges() function.
 #' 
 #' @param ambiguous Logical. If TRUE, ambiguous bases are taken into account when computing the G and C content.
 #'   The function handles various ambiguous bases (S, W, M, K, R, Y, V, H, D, B) by proportionally
@@ -77,13 +77,13 @@
 #' 
 #' # Example with multiple sequences
 #' input_seq <- c("ATCGTGCGTAGCAGTACGATCAGTAG", "ATCGTGCGTAGCAGTACGATCAGTAG")
-#' raw_seq <- process_seq(input_seq)
-#' out <- tm_gc(raw_seq, ambiguous = TRUE, variant = "Primer3Plus", Na = 50, mismatch = TRUE)
+#' gr_seq <- to_genomic_ranges(input_seq)
+#' out <- tm_gc(gr_seq, ambiguous = TRUE, variant = "Primer3Plus", Na = 50, mismatch = TRUE)
 #' out
 #' out$Options
 #' 
 #' @export tm_gc
-tm_gc <- function(raw_seq,
+tm_gc <- function(gr_seq,
                   ambiguous = FALSE,
                   userset = NULL,
                   variant = c("Primer3Plus",
@@ -126,11 +126,11 @@ tm_gc <- function(raw_seq,
   }
 
   # Filter sequence
-  seq_checked <- filter_seq(raw_seq, method = 'tm_gc')
+  gr_seq$sequence <- check_filter_seq(gr_seq$sequence, method = 'tm_gc')
 
   # Calculate Tm for each sequence and update seq_checked
-  seq_tm <- lapply(seq_checked, function(x) {
-    filtered_seq <- attr(x, "filtered_seq")
+  seq_tm <- sapply(seq_along(gr_seq), function(i) {
+    filtered_seq <- gr_seq$sequence[i]
     n_seq <- nchar(filtered_seq)
     pt_gc <- gc(filtered_seq, ambiguous = ambiguous)
     tm <- gc_coef[1] + gc_coef[2]*pt_gc - gc_coef[3]/n_seq
@@ -157,13 +157,13 @@ tm_gc <- function(raw_seq,
                                    pt_gc = pt_gc)
       tm <- tm + corr_chem
     }
-    attr(x, "Tm") <- as.numeric(tm)
-    x
+    return(tm)
   })
+  gr_seq$Tm <- seq_tm
   
   # Create result list with proper structure
   result_list <- list(
-    Tm = seq_tm,
+    Tm = gr_seq,
     Options = list(
       Ambiguous = ambiguous,
       Method = paste0(variant, " (", 

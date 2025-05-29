@@ -8,7 +8,7 @@ generate_complement(input_seq, reverse = FALSE)
 }
 \arguments{
 \item{input_seq}{Input sequence(s) in 5' to 3' direction. Must be provided as either:
-- A character string (e.g., "ATGCG")}
+- A character string (e.g., c("ATGCG", "GCTAG"))}
 
 \item{reverse}{Logical. If TRUE, the complementary sequence is reversed (3' to 5').
 If FALSE (default), the complementary sequence is in the same direction (5' to 3').}

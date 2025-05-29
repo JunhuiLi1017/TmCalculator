@@ -45,7 +45,8 @@ ui <- dashboardPage(
                   radioButtons("input_type", "Input Type",
                                choices = list(
                                  "Direct Input" = "direct",
-                                 "FASTA File" = "fasta"
+                                 "FASTA File" = "fasta",
+                                 "Genomic Coordinates" = "genomic_coordinates"
                                ),
                                selected = "direct"),
                   conditionalPanel(
@@ -58,7 +59,7 @@ ui <- dashboardPage(
                   conditionalPanel(
                     condition = "input.input_type == 'direct' && (input.method == 'tm_gc' || input.method == 'tm_wallace')",
                     textInput("input_seq", "Sequence (5' to 3')",
-                              placeholder = "for example AACAGACT or AACAGACT, CGTGCATG")
+                              placeholder = "for example AGTCTGTT or AGTCTGTT, CATGCACG")
                   ),
                   conditionalPanel(
                     condition = "input.input_type == 'fasta' && input.method == 'tm_nn'",
@@ -68,9 +69,16 @@ ui <- dashboardPage(
                               accept = c(".fasta", ".fa", ".txt"))
                   ),
                   conditionalPanel(
-                    condition = "input.input_type == 'fasta' && (input.method == 'tm_gc' || input.method == 'tm_wallace')",
-                    fileInput("fasta_file", "Upload FASTA File",
-                              accept = c(".fasta", ".fa", ".txt"))
+                    condition = "input.input_type == 'genomic_coordinates' && input.method == 'tm_nn'",
+                    textInput("genomic_coordinates", "Genomic Coordinates",
+                              placeholder = "for example chr1:100-200:+:hg38 or chr2:100-200:-:hg38"),
+                    textInput("genomic_coordinates_complement", "Genomic Coordinates of reverse complement",
+                              placeholder = "for example chr1:100-200:-:hg38 or chr2:100-200:+:hg38")
+                  ),
+                  conditionalPanel(
+                    condition = "input.input_type == 'genomic_coordinates' && (input.method == 'tm_gc' || input.method == 'tm_wallace')",
+                    textInput("genomic_coordinates", "Genomic Coordinates",
+                              placeholder = "for example chr1:100-200:+:hg38 or chr2:100-200:-:hg38")
                   ),
                   actionButton("calculate", "Calculate Tm", class = "btn-primary")
                 ),
@@ -206,6 +214,13 @@ server <- function(input, output, session) {
         primers <- unlist(strsplit(input$input_seq, ","))
         templates <- if(input$method == "tm_nn" && !is.null(input$rev_input_seq) && input$rev_input_seq != "") {
           unlist(strsplit(input$rev_input_seq, ","))
+        } else {
+          NULL
+        }
+      } else if (input$input_type == "genomic_coordinates") {
+        primers <- input$genomic_coordinates
+        templates <- if(input$method == "tm_nn" && !is.null(input$genomic_coordinates_complement)) {
+          input$genomic_coordinates_complement
         } else {
           NULL
         }

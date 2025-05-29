@@ -4,15 +4,8 @@
 #' sequence combinations in the input sequence are present in the thermodynamic parameter tables
 #' before performing calculations.
 #' 
-#' @param raw_seq Pre-processed sequence(s) in 5' to 3' direction. This should be the output from
-#'   process_seq() function.
-#' 
-#' @param complement_seq Complementary sequence(s) in 3' to 5' direction. If not provided,
-#'   the function will automatically generate it from raw_seq. This is the template/target
-#'   sequence that the input sequence will hybridize with.
-#'   - A character string (e.g., "ATGCG")
-#'   - A path to a FASTA file containing the sequence(s)
-#'   - A NULL value (default)
+#' @param gr_seq Pre-processed sequence(s) in 5' to 3' direction. This should be the output from
+#'   to_genomic_ranges() function.
 #' 
 #' @param ambiguous Logical value controlling how ambiguous bases are handled:
 #'   - TRUE: Ambiguous bases (e.g., N, R, Y) are included in calculations
@@ -175,15 +168,14 @@
 #' 
 #' input_seq <- c("AAAATTTTTTTCCCCCCCCCCCCCCGGGGGGGGGGGGTGTGCGCTGC",
 #' "AAAATTTTTTTCCCCCCCCCCCCCCGGGGGGGGGGGGTGTGCGCTGC")
-#' raw_seq <- process_seq(input_seq)
-#' out <- tm_nn(raw_seq, Na=50)
+#' gr_seq <- to_genomic_ranges(input_seq)
+#' out <- tm_nn(gr_seq, Na=50)
 #' out
 #' out$tm_nn$Options
 #' 
 #' @export tm_nn
 
-tm_nn <- function(raw_seq,
-                  complement_seq = NULL,
+tm_nn <- function(gr_seq,
                   ambiguous = FALSE,
                   shift = 0,
                   nn_table = c("DNA_NN_SantaLucia_2004",
@@ -235,43 +227,19 @@ tm_nn <- function(raw_seq,
   de_table_name <- rownames(de_table_list)
   
   # Process sequence
-  seq_checked <- filter_seq(raw_seq, method = "tm_nn")
-  
-  # Process complement sequence(s) if provided
-  if (!is.null(complement_seq)) {
-    raw_comp_seq <- process_seq(complement_seq)
-    comp_seq_checked <- filter_seq(raw_comp_seq, method = "tm_nn")
-    # Merge complement sequence information into seq_checked
-    for (i in seq_along(seq_checked)) {
-      attr(seq_checked[[i]], "complement_seq") <- 
-      as.character(comp_seq_checked[[i]])
-      filtered_seq <- attr(comp_seq_checked[[i]], "filtered_seq")
-      attr(seq_checked[[i]], "filtered_complement_seq") <- 
-        as.character(filtered_seq)
-    }
-  } else {
-    # Generate complement sequences if not provided
-    for (i in seq_along(seq_checked)) {
-      seq_filtered <- attr(seq_checked[[i]], "filtered_seq")
-      comp_x <- generate_complement(seq_checked[[i]], reverse = FALSE)
-      comp_x_filtered <- generate_complement(seq_filtered, reverse = FALSE)
-      attr(seq_checked[[i]], "complement_seq") <- as.character(comp_x)
-      attr(seq_checked[[i]], "filtered_complement_seq") <- 
-      as.character(comp_x_filtered)
-    }
-  }
-  
+  gr_seq$sequence <- check_filter_seq(gr_seq$sequence, method = "tm_nn")
+  gr_seq$complement <- check_filter_seq(gr_seq$complement, method = "tm_nn")
+
   # Calculate Tm for each sequence
-  for (i in seq_along(seq_checked)) {
-    all_seq <- seq_checked[[i]]
-    my_seq <- s2c(attr(all_seq, "filtered_seq"))
-    my_cseq <- s2c(attr(all_seq, "filtered_complement_seq"))
+  seq_tm <- sapply(seq_along(gr_seq), function(i) {
+    my_seq <- s2c(gr_seq$sequence[i])
+    my_cseq <- s2c(gr_seq$complement[i])
     
     tmp_seq <- my_seq
     tmp_cseq <- my_cseq
     delta_h <- 0
     delta_s <- 0
-    d_h <- 1
+    d_h <- 1  
     d_s <- 2
 
     if(shift != 0 || length(my_seq) != length(my_cseq)) {
@@ -420,8 +388,10 @@ tm_nn <- function(raw_seq,
       pt_gc = pt_gc
     )
     tm <- tm + corr_chem
-    attr(seq_checked[[i]], "Tm") <- tm
-  }
+    return(tm)
+  })
+  gr_seq$Tm <- seq_tm
+  
   nn_table_list <- list("DNA_NN_Breslauer_1986" = "Breslauer K J (1986) <doi:10.1073/pnas.83.11.3746>",
                         "DNA_NN_Sugimoto_1996" = "Sugimoto N (1996) <doi:10.1093/nar/24.22.4501>",
                         "DNA_NN_Allawi_1998" = "Allawi H (1998) <doi:10.1093/nar/26.11.2694>",
@@ -435,12 +405,9 @@ tm_nn <- function(raw_seq,
                         "DNA_DE_Bommarito_2000" = "Bommarito S (2000) <doi:10.1093/nar/28.9.1929>",
                         "RNA_DE_Turner_2010" = "Turner D H (2010) <doi:10.1093/nar/gkp892>")
 
-  
-  
-  
   # Create result list with proper structure
   result_list <- list(
-    Tm = seq_checked,
+    Tm = gr_seq,
     Options = list("Ambiguous" = ambiguous,
                   "Shift" = shift,
                   "Thermodynamic NN values" = paste0(nn_table, ": ", nn_table_list[[nn_table]]), 

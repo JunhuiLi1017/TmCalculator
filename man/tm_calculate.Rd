@@ -6,8 +6,8 @@
 \usage{
 tm_calculate(
   input_seq,
-  complement_seq = NULL,
   method = c("tm_nn", "tm_gc", "tm_wallace"),
+  complement_seq = NULL,
   ambiguous = FALSE,
   shift = 0,
   nn_table = c("DNA_NN_SantaLucia_2004", "DNA_NN_Breslauer_1986", "DNA_NN_Sugimoto_1996",
@@ -39,20 +39,23 @@ tm_calculate(
 \arguments{
 \item{input_seq}{Input sequence(s) in 5' to 3' direction. Can be provided as either:
 - A character string (e.g., "ATGCG")
-- A path to a FASTA file containing the sequence(s)}
-
-\item{complement_seq}{Complementary sequence(s) in 3' to 5' direction. If not provided,
-the function will automatically generate it from input_seq. This is the template/target
-sequence that the input sequence will hybridize with.
-- A character string (e.g., "ATGCG")
 - A path to a FASTA file containing the sequence(s)
-- A NULL value (default)}
+- A character vector where each element is a string in the format "chr:start-end:strand:species" #' (e.g., "chr1:100-200:+:hg38"). Strand is "+" for positive (default if not provided) or "-" for negative.
+  - chr: Chromosome ID
+  - start: Start position
+  - end: End position
+  - strand: positive or negtive strand
+  - species:  Species name for reference genome (e.g., "hg38"), the function will  attempt to load the appropriate BSgenome from genome package.}
 
 \item{method}{Method(s) to use for Tm calculation. Can be one or more of:
 - "tm_nn": Nearest Neighbor thermodynamics (default)
 - "tm_gc": GC content-based method
 - "tm_wallace": Wallace rule
 Default: c("tm_nn", "tm_gc", "tm_wallace")}
+
+\item{complement_seq}{Complementary sequence(s) in 3' to 5' direction. If not provided,
+the function will automatically generate it from input_seq. This is the template/target
+sequence that the input sequence will hybridize with. Can be provided as input_seq format besides A NULL value(default)}
 
 \item{ambiguous}{Logical. If TRUE, ambiguous bases are taken into account when computing
 the G and C content. The function handles various ambiguous bases (S, W, M, K, R, Y, V, H, D, B)
@@ -131,7 +134,7 @@ A list containing Tm values and options for each method used. The structure incl
   - Options: A list containing calculation parameters and method information
 }
 \description{
-A wrapper function that calculates melting temperature using multiple methods:
+Calculates melting temperature using multiple methods:
 - Nearest Neighbor thermodynamics (tm_nn)
 - GC content-based method (tm_gc)
 - Wallace rule (tm_wallace)

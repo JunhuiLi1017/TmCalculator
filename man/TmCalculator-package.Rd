@@ -6,6 +6,8 @@
 \alias{TmCalculator-package}
 \title{TmCalculator: Melting Temperature of Nucleic Acid Sequences}
 \description{
+\if{html}{\figure{logo.png}{options: style='float: right' alt='logo' width='120'}}
+
 A comprehensive R package for calculating melting temperatures of nucleic acid sequences. Implements three calculation methods: 1. Wallace rule (Thein & Wallace, 1986) 2. Empirical formulas based on GC content (Marmur, 1962; Schildkraut, 2010; Wetmur, 1991; Untergasser, 2012; von Ahsen, 2001) 3. Nearest neighbor thermodynamics (Breslauer, 1986; Sugimoto, 1996; Allawi, 1998; SantaLucia, 2004; Freier, 1986; Xia, 1998; Chen, 2012; Bommarito, 2000; Turner, 2010; Sugimoto, 1995; Allawi, 1997; Santalucia, 2005) Includes corrections for: - Salt ions (SantaLucia, 1996, 1998; Owczarzy, 2004, 2008) - Chemical compounds (DMSO, formamide) Supports both direct sequence input and FASTA file input.
 }
 \seealso{

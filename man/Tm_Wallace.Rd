@@ -5,11 +5,11 @@
 \alias{tm_wallace}
 \title{Calculate the melting temperature using the 'Wallace rule'}
 \usage{
-tm_wallace(raw_seq, ambiguous = FALSE)
+tm_wallace(gr_seq, ambiguous = FALSE)
 }
 \arguments{
-\item{raw_seq}{Pre-processed sequence(s) in 5' to 3' direction. This should be the output from
-process_seq() function.}
+\item{gr_seq}{Pre-processed sequence(s) in 5' to 3' direction. This should be the output from
+to_genomic_ranges() function.}
 
 \item{ambiguous}{Ambiguous bases are taken into account to compute the G and C content when ambiguous is TRUE.}
 }
@@ -22,8 +22,8 @@ The Wallace rule is often used as rule of thumb for approximate melting temperat
 \examples{
 
 input_seq = c('acgtTGCAATGCCGTAWSDBSY','acgtTGCCCCGGCCGCGCCGTAWSDBSY') #for wallace rule
-raw_seq <- process_seq(input_seq)
-out <- tm_wallace(raw_seq, ambiguous = TRUE)
+gr_seq <- to_genomic_ranges(input_seq)
+out <- tm_wallace(gr_seq, ambiguous = TRUE)
 out
 out$Options
 

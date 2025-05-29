@@ -1,6 +1,6 @@
-#' Filter and replace invalid bases in nucleotide sequences
+#' Filter invalid bases in nucleotide sequences
 #' 
-#' This function processes nucleotide sequences by converting characters to uppercase and replacing invalid bases with "." 
+#' This function processes nucleotide sequences by converting characters to uppercase and replacing invalid bases with "". 
 #' based on the specified method. The function preserves the sequence length and attributes (name and Tm) of each sequence.
 #'
 #' @param seq_list Input sequence in 5' to 3' direction. Must be provided as:
@@ -14,7 +14,7 @@
 #' 
 #' TM_NN: Valid bases are "A","C","G","I" and "T" 
 #' 
-#' @returns Returns a list of sequences with the same structure as input, where invalid bases are replaced with "."
+#' @returns Returns a list of sequences with the same structure as input, where invalid bases are replaced with ""
 #' 
 #' @author Junhui Li
 #' 
@@ -23,13 +23,13 @@
 #' \code{citation("TmCalculator")}
 #' 
 
-filter_seq <- function(seq_list, method) {
+check_filter_seq <- function(seq_list, method) {
   if(is.null(seq_list) || length(seq_list) == 0) {
     stop("Input sequence list cannot be NULL or empty")
   }
   
   # Process each sequence in the list
-  result <- lapply(seq_list, function(i) {
+  result <- sapply(seq_list, function(i) {
     if(is.null(i)) {
       return(NULL)
     }
@@ -48,21 +48,15 @@ filter_seq <- function(seq_list, method) {
       stop("Invalid method specified")
     }
     
-    filtered <- NULL
+    filtered_seq <- vector()
     for(idx in i_s2c){
       if(idx %in% baseset){
-        filtered <- append(filtered,idx)
+        filtered_seq <- append(filtered_seq,idx)
       }
     }
     
-    # Create result with attributes
-    attr(i, "filtered_seq") <- paste(filtered, collapse = "")
-    
-    return(i)
+    return(c2s(filtered_seq))
   })
-  
-  # Remove NULL results
-  result <- result[!sapply(result, is.null)]
   
   if(length(result) == 0) {
     stop("No valid sequences after filtering")

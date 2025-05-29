@@ -3,7 +3,7 @@
 #' Generate the complementary sequence of a nucleic acid sequence, with an option to reverse it.
 #' 
 #' @param input_seq Input sequence(s) in 5' to 3' direction. Must be provided as either:
-#'   - A character string (e.g., "ATGCG")
+#'   - A character string (e.g., c("ATGCG", "GCTAG"))
 #' 
 #' @param reverse Logical. If TRUE, the complementary sequence is reversed (3' to 5').
 #'   If FALSE (default), the complementary sequence is in the same direction (5' to 3').
@@ -25,11 +25,8 @@
 #' generate_complement("ATGCG", reverse = TRUE)
 #' 
 #' @export generate_complement
-
-generate_complement <- function(input_seq, reverse = FALSE) {
-  # Process input sequence
-  raw_seq <- process_seq(input_seq)
-  
+#' 
+generate_complement <- function(input_seq, reverse = FALSE) { 
   # Define complement table
   complement_table <- c(
     "A" = "T", "T" = "A", "G" = "C", "C" = "G",
@@ -37,11 +34,11 @@ generate_complement <- function(input_seq, reverse = FALSE) {
     "W" = "W", "S" = "S", "B" = "V", "V" = "B",
     "D" = "H", "H" = "D", "N" = "N", "I" = "I"
   )
-  
+
   # Process each sequence
-  result <- lapply(raw_seq, function(seq) {
+  result <- sapply(input_seq, function(seqs) {
     # Convert to character vector
-    seq_vec <- s2c(seq)
+    seq_vec <- s2c(seqs)
     
     # Get complement
     comp_vec <- sapply(seq_vec, function(base) {
@@ -58,9 +55,7 @@ generate_complement <- function(input_seq, reverse = FALSE) {
     }
     
     # Convert back to string and preserve attributes
-    result <- c2s(comp_vec)
-    attributes(result) <- attributes(seq)
-    return(result)
+    return(c2s(comp_vec))
   })
   
   return(result)
