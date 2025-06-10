@@ -61,7 +61,8 @@
 #' @importFrom rlang .data
 #' @export
 
-plot_tm_heatmap <- function(gr, genome_assembly,
+plot_tm_heatmap <- function(gr, 
+                           genome_assembly = NULL,
                            plot_type = c("karyogram","faceted"), 
                            color_palette = c("viridis", "magma", "plasma", "inferno", "cividis"),
                            title_name = NULL) {
@@ -78,7 +79,7 @@ plot_tm_heatmap <- function(gr, genome_assembly,
   plot_type <- match.arg(plot_type)
   color_palette <- match.arg(color_palette)
   
-    if (is.null(genome_assembly)) {
+  if (is.null(genome_assembly)) {
     # If genome_assembly is NULL, try to infer from gr
     if (!is.null(genome(seqinfo(gr))) && all(!is.na(genome(seqinfo(gr))))) {
       if (length(unique(genome(seqinfo(gr)))) == 1) {
@@ -171,17 +172,16 @@ plot_tm_heatmap <- function(gr, genome_assembly,
   # Process the GRanges object
   gr <- .set_default_seqlengths(gr, genome_assembly = genome_assembly)
   
-  # Get unique sequences and assign a 'y_pos' for stacking
-  gr_df <- as.data.frame(gr) # Convert to data.frame for easy dplyr manipulation
-  gr_df <- gr_df %>%
+  # Get unique sequences and assign a 'y_pos' for stacking and seq_id for labeling
+  gr_df <- as.data.frame(gr) %>%
     dplyr::arrange(seqnames, start) %>%
-    dplyr::mutate(
-      seq_id = paste0("seq_", 1:dplyr::n())) %>%
     dplyr::group_by(seqnames) %>%
     dplyr::mutate(
-      y_pos = dplyr::n()) %>% # Assign y-position per chromosome
+      y_pos = 1:n(), # Assign y-position per chromosome
+      seq_id = paste0("seq_", y_pos) # Generate seq_id based on y_pos per chromosome
+    ) %>%
     dplyr::ungroup()
-  
+
   # Convert back to GRanges for ggbio, carrying over the y_pos
   gr_plot <- GenomicRanges::makeGRangesFromDataFrame(gr_df, keep.extra.columns = TRUE)
   
