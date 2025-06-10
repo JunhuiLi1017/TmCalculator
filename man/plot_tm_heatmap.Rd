@@ -6,7 +6,7 @@
 \usage{
 plot_tm_heatmap(
   gr,
-  genome_assembly,
+  genome_assembly = NULL,
   plot_type = c("karyogram", "faceted"),
   color_palette = c("viridis", "magma", "plasma", "inferno", "cividis"),
   title_name = NULL

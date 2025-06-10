@@ -27,7 +27,6 @@ The TmCalculator package provides comprehensive options for calculating melting 
 - FASTA file input and Tm calculation with nearest neighbor method
 - Complementary sequence input and Tm calculation with nearest neighbor method
 - DNA genome melting temperature map visualization
-- Interactive sequence viewer
 - An overview of R shiny application
 
 ## Installation
@@ -153,8 +152,10 @@ plot_tm_karyotype(tm_results, genome_assembly = "hg38")
 
 # Example usage by plot_tm_genome_tracks with custom settings (plot_type=4)
 plot_tm_karyotype(tm_results,
-                      genome_assembly = "hg38",
-                      plot_type = 4)
+                  genome_assembly = "hg38",
+                  plot_type = 4,
+                  xaxis_cex = 0.5
+                  )
 
 # Example usage by plot_tm_genome_tracks with default settings (plot_type=1)
 plot_tm_genome_tracks(tm_results, chromosome_to_plot = "chr1", genome_assembly = "hg38")
