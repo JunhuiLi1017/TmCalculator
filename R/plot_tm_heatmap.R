@@ -62,10 +62,10 @@
 #' @export
 
 plot_tm_heatmap <- function(gr, 
-                           genome_assembly = NULL,
-                           plot_type = c("karyogram","faceted"), 
-                           color_palette = c("viridis", "magma", "plasma", "inferno", "cividis"),
-                           title_name = NULL) {
+                            genome_assembly = NULL,
+                            plot_type = c("karyogram","faceted"), 
+                            color_palette = c("viridis", "magma", "plasma", "inferno", "cividis"),
+                            title_name = NULL) {
   
   # Input validation
   if (!inherits(gr, "GRanges")) {
@@ -124,7 +124,7 @@ plot_tm_heatmap <- function(gr,
   } else {
     stop("Invalid 'genome_assembly' type. Must be a character string, BSgenome, Seqinfo, or GRanges object.")
   }
-
+  
   # Set default chromosome lengths
   .set_default_seqlengths <- function(gr, genome_assembly = NULL) {
     if (!is.null(seqlengths(gr)) && all(!is.na(seqlengths(gr)))) {
@@ -181,7 +181,7 @@ plot_tm_heatmap <- function(gr,
       seq_id = paste0("seq_", y_pos) # Generate seq_id based on y_pos per chromosome
     ) %>%
     dplyr::ungroup()
-
+  
   # Convert back to GRanges for ggbio, carrying over the y_pos
   gr_plot <- GenomicRanges::makeGRangesFromDataFrame(gr_df, keep.extra.columns = TRUE)
   

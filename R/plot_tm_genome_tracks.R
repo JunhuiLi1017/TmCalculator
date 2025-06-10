@@ -122,7 +122,7 @@ plot_tm_genome_tracks <- function(gr,
   # Helper function to set default seqlengths if missing
   .set_default_seqlengths <- function(gr, genome_assembly = NULL) {
     # If seqlengths are already fully defined, no need to do anything
-    if (!is.null(seqlengths(gr)) && all(!is.na(seqlengths(gr)))) {
+    if (!is.null(GenomeInfoDb::seqlengths(gr)) && all(!is.na(GenomeInfoDb::seqlengths(gr)))) {
       message("seqlengths are already defined for the GRanges object. Skipping default setting.")
       return(gr)
     }
@@ -135,10 +135,9 @@ plot_tm_genome_tracks <- function(gr,
     # This uses GenomeInfoDb, which is a standard bioconductor package
     # It will download the necessary sequence information if not already cached.
     tryCatch({
-      fetched_lengths <- GenomeInfoDb::seqlengths(GenomeInfoDb::Seqinfo(genome = genome_assembly))
-      
+      fetched_lengths <- GenomeInfoDb::seqlengths(GenomeInfoDb::Seqinfo(genome = genome_assembly))      
       # Get unique chromosomes present in the GRanges object
-      chr_in_gr <- unique(as.character(seqnames(gr)))
+      chr_in_gr <- unique(as.character(GenomicRanges::seqnames(gr)))
       
       # Filter fetched lengths to only include chromosomes present in your GRanges object
       # and that are available in the fetched data.
@@ -152,7 +151,7 @@ plot_tm_genome_tracks <- function(gr,
       }
       
       # Set seqlengths for only the chromosomes present in the data and available
-      seqlengths(gr) <- fetched_lengths[valid_chrs_to_set]
+      GenomeInfoDb::seqlengths(gr) <- fetched_lengths[valid_chrs_to_set]
       
       message("Setting default chromosome lengths for '", genome_assembly, "' for: ",
               paste(valid_chrs_to_set, collapse = ", "))
@@ -178,9 +177,9 @@ plot_tm_genome_tracks <- function(gr,
   if (!"Tm" %in% names(mcols(gr))) {
     stop("GRanges object must have a 'Tm' metadata column.")
   }
-  if (!all(chromosome_to_plot %in% unique(as.character(seqnames(gr))))) {
+  if (!all(chromosome_to_plot %in% unique(as.character(GenomicRanges::seqnames(gr))))) {
     stop(paste0("One or more chromosomes not found in the GRanges object: ",
-                paste(setdiff(chromosome_to_plot, unique(as.character(seqnames(gr)))), collapse = ", ")))
+                paste(setdiff(chromosome_to_plot, unique(as.character(GenomicRanges::seqnames(gr)))), collapse = ", ")))
   }
   
   # Set default seqlengths if missing
@@ -203,7 +202,7 @@ plot_tm_genome_tracks <- function(gr,
     gr_filtered <- gr[seqnames(gr) == chr]
     
     # Ensure all ranges have the same strand for DataTrack
-    strand(gr_filtered) <- "*"
+    GenomicRanges::strand(gr_filtered) <- "*"
     
     # Create tracks
     iTrack <- NULL
@@ -239,10 +238,10 @@ plot_tm_genome_tracks <- function(gr,
       track_list <- c(iTrack, track_list)
     }
     
-    plotTracks(track_list,
+    Gviz::plotTracks(track_list,
                chromosome = chr,
-               from = min(start(gr_filtered)),
-               to = max(end(gr_filtered)),
+               from = min(GenomicRanges::start(gr_filtered)),
+               to = max(GenomicRanges::end(gr_filtered)),
                title.width = 1.5
     )
   }
