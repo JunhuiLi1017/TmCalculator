@@ -1,0 +1,182 @@
+---
+title: "TmCalculator: A Comprehensive Tool for Melting Temperature Calculations"
+author: "Junhui Li"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{TmCalculator: A Comprehensive Tool for Melting Temperature Calculations}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 8,
+  fig.height = 6
+)
+```
+
+# Introduction
+
+The TmCalculator package provides comprehensive options for calculating melting temperatures (Tm) of DNA/RNA sequences. This vignette demonstrates the package's functionality, including:
+
+- Basic sequence input and Tm calculation with Wallace rule method
+- Genomic coordinate input and Tm calculation with nearest neighbor method
+- FASTA file input and Tm calculation with nearest neighbor method
+- Complementary sequence input and Tm calculation with nearest neighbor method
+- DNA genome melting temperature map visualization
+- Interactive sequence viewer
+- An overview of R shiny application
+
+## Installation
+
+```{r install, eval = FALSE}
+# Install required packages
+suppressMessages({
+  library(BiocManager)
+  BiocManager::install(c("Biostrings", "BSgenome", "BSgenome.Hsapiens.UCSC.hg38"))
+})
+install.packages("TmCalculator")
+pak::pkg_install("Gviz")
+pak::pkg_install("JunhuiLi1017/TmCalculator@dev")
+```
+
+# Basic Usage
+
+## Simple Sequence Input with Wallace rule method
+
+```{r basic_usage, message=FALSE}
+library(TmCalculator)
+
+# Calculate Tm for simple sequences
+seqs <- c("ATGCGCGAAAT", "GCTAGCTAGCT")
+names(seqs) <- c("chr1:1-11:+:seq1", "chr2:1-11:+:seq2")
+result <- tm_calculate(seqs, method = "tm_wallace")
+print(result)
+```
+
+## Genomic Coordinate Input with nearest neighbor method
+
+### In this example, we calculate the melting temperature of the sequences in the hg38 genome with nearest neighbor method. The coordinates should be in the format of "chr:start-end:+:genome_name:seq_name"
+
+```{r genomic_input, message=FALSE}
+# Example with genomic coordinates
+coords <- c(
+  "chr1:1898000-1898050:+:BSgenome.Hsapiens.UCSC.hg38:seq1",
+  "chr2:2563000-2563050:-:BSgenome.Hsapiens.UCSC.hg38:seq2"
+)
+result <- tm_calculate(coords)
+result
+```
+
+### The options of the nearest neighbor method are:
+```{r genomic_input_options, message=FALSE}
+result$tm$Options
+```
+
+## FASTA File Processing
+
+### In this example, we calculate the melting temperature of the sequences in the fasta file with nearest neighbor method.
+
+```{r fasta_processing, message=FALSE}
+# Process sequences from a FASTA file
+fasta_file <- system.file("extdata", "example1.fasta", package = "TmCalculator")
+result_fa <- tm_calculate(fasta_file)
+result_fa
+```
+
+## Complementary Sequence with a mismatch
+
+### In this example, we calculate the melting temperature of the complementary sequences with nearest neighbor method. there is a mismatch between the two sequences.
+GCTAGCCGA[C]AATGGGCAGATAGTAGAAA
+CGATCGGCT[A]TTACCCGTCTATCATCTTT
+
+```{r complement_mismatch, message=FALSE}
+# Example with provided complementary sequences
+seqs <- c("GCTAGCCGACAATGGGCAGATAGTAGAAA")
+comp_seqs <- c("CGATCGGCTATTACCCGTCTATCATCTTT")
+result <- tm_calculate(input_seq=seqs,complement_seq=comp_seqs, method="tm_nn")
+result
+```
+
+## Complementary Sequence with a dangling end and a mismatch
+
+### In this example, we calculate the melting temperature of the complementary sequences with nearest neighbor method. there is a dangling end between the two sequences.
+GCTAGCCGA[C]AATGGGCAGATAGTAGAAA
+ GATCGGCT[A]TTACCCGTCTATCATCTTT
+
+```{r complement_dangling_end, message=FALSE}
+seqs <- c("GCTAGCCGACAATGGGCAGATAGTAGAAA")
+comp_seqs <- c("GATCGGCTATTACCCGTCTATCATCTTT")
+result <- tm_calculate(input_seq=seqs,
+                       complement_seq=comp_seqs,
+                       method="tm_nn",
+                       shift=-1)
+result
+```
+
+# Visualization of Tm values
+
+```{r tm_viz, message=FALSE}
+
+# Generate sample data with 150 sequences
+set.seed(123)
+
+# Generate 100 sequences for chr1
+chr1_starts <- sort(sample(1:249250621, 100))  # chr1 length in hg19
+chr1_lengths <- sample(50:200, 100, replace=TRUE)
+chr1_ends <- chr1_starts + chr1_lengths
+chr1_tms <- runif(100, min=60, max=80)
+
+# Generate 50 sequences for chr2
+chr2_starts <- sort(sample(1:243199373, 50))   # chr2 length in hg19
+chr2_lengths <- sample(50:200, 50, replace=TRUE)
+chr2_ends <- chr2_starts + chr2_lengths
+chr2_tms <- runif(50, min=60, max=80)
+
+# Create GRanges object
+tm_results <- GRanges(
+  seqnames = Rle(c(rep("chr1", 100), rep("chr2", 50))),
+  ranges = IRanges(
+    start = c(chr1_starts, chr2_starts),
+    end = c(chr1_ends, chr2_ends)
+  ),
+  strand = Rle(sample(c("+", "-"), 150, replace=TRUE)),
+  Tm = c(chr1_tms, chr2_tms)
+)
+
+
+# Example usage by plot_tm_karyotype
+plot_tm_karyotype(tm_results, genome_assembly = "hg38")
+
+# Example usage by plot_tm_genome_tracks with default settings (plot_type=1)
+plot_tm_genome_tracks(tm_results)
+
+# Example usage by plot_tm_genome_tracks with custom settings (plot_type=4)
+plot_tm_genome_tracks(tm_results,
+                      chromosome_to_plot = "chr1",
+                      genome_assembly = "hg38",
+                      tm_track_title = "Melting Temperature (\u00B0C)",
+                      color_palette = "viridis",
+                      show_ideogram = TRUE)
+
+# Example usage by plot_tm_heatmap with default settings
+plot_tm_heatmap(tm_results)
+
+# Example usage by plot_tm_heatmap with custom settings
+plot_tm_heatmap(tm_results, plot_type = "faceted", color_palette = "viridis")
+```
+
+## launch the shiny application
+
+```{r launch_shiny, eval = FALSE}
+TmCalculatorShinyApp()
+```
+
+# Conclusion
+
+The TmCalculator package provides a comprehensive suite of tools for calculating and analyzing melting temperatures of DNA/RNA sequences. The visualization tools help in understanding the genomic context and comparing Tm values across different sequences.
+
+For more information, please refer to the package documentation and examples. 

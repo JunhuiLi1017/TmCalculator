@@ -429,6 +429,7 @@ tm_nn <- function(gr_seq,
                   "Method for formamide concentration" = formamide_value_unit$unit,
                   "Coefficient of Tm decrease per percent formamide" = formamide_factor)
   )
+ 
   # Set class and attributes
   class(result_list) <- c("TmCalculator", "list")
   attr(result_list, "nonhidden") <- "Tm"

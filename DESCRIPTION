@@ -2,7 +2,7 @@ Package: TmCalculator
 Type: Package
 Title: Melting Temperature of Nucleic Acid Sequences
 Version: 1.1.0
-Date: 2025-05-19
+Date: 2025-06-10
 Author: Junhui Li
 Maintainer: Junhui Li <junhuili@cau.edu.cn>
 Description: A comprehensive R package for calculating melting temperatures of nucleic acid sequences. 
@@ -20,18 +20,24 @@ Description: A comprehensive R package for calculating melting temperatures of n
 BugReports: https://github.com/JunhuiLi1017/TmCalculator/issues
 License: MIT + file LICENSE
 Depends: R (>= 2.10)
+VignetteBuilder: knitr
 Imports: 
     seqinr,
     shiny,
     shinydashboard,
-    shinyjs,
-    shinythemes,
-    DT,
     BSgenome,
     Biostrings,
     GenomicRanges,
     IRanges,
-    S4Vectors
+    S4Vectors,
+    GenomeInfoDb,
+    Gviz,
+    dplyr,
+    ggbio,
+    ggplot2,
+    karyoploteR,
+    viridis,
+    rlang
 Suggests: 
     testthat (>= 3.0.0),
     knitr,
