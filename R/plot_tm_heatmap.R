@@ -176,7 +176,7 @@ plot_tm_heatmap <- function(gr, genome_assembly,
   gr_df <- gr_df %>%
     dplyr::arrange(seqnames, start) %>%
     dplyr::mutate(
-      seq_id = paste0("seq_", dplyr::n())) %>%
+      seq_id = paste0("seq_", 1:dplyr::n())) %>%
     dplyr::group_by(seqnames) %>%
     dplyr::mutate(
       y_pos = dplyr::n()) %>% # Assign y-position per chromosome

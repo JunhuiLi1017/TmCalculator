@@ -146,27 +146,36 @@ tm_results <- GRanges(
   strand = Rle(sample(c("+", "-"), 150, replace=TRUE)),
   Tm = c(chr1_tms, chr2_tms)
 )
-
+genome(seqinfo(tm_results)) <- "hg38"
 
 # Example usage by plot_tm_karyotype
 plot_tm_karyotype(tm_results, genome_assembly = "hg38")
 
-# Example usage by plot_tm_genome_tracks with default settings (plot_type=1)
-plot_tm_genome_tracks(tm_results)
-
 # Example usage by plot_tm_genome_tracks with custom settings (plot_type=4)
-plot_tm_genome_tracks(tm_results,
-                      chromosome_to_plot = "chr1",
+plot_tm_karyotype(tm_results,
                       genome_assembly = "hg38",
-                      tm_track_title = "Melting Temperature (\u00B0C)",
-                      color_palette = "viridis",
-                      show_ideogram = TRUE)
+                      plot_type = 4)
 
-# Example usage by plot_tm_heatmap with default settings
-plot_tm_heatmap(tm_results)
+# Example usage by plot_tm_genome_tracks with default settings (plot_type=1)
+plot_tm_genome_tracks(tm_results, chromosome_to_plot = "chr1", genome_assembly = "hg38")
 
-# Example usage by plot_tm_heatmap with custom settings
-plot_tm_heatmap(tm_results, plot_type = "faceted", color_palette = "viridis")
+
+
+# Create example GRanges object  
+gr_tm <- GenomicRanges::GRanges(
+  seqnames = c("chr1", "chr2", "chr1", "chr2", "chr1"),
+  ranges = IRanges::IRanges(
+    start = c(100, 200, 300, 400, 150),
+    end = c(150, 250, 350, 450, 200)
+  ),
+  Tm = c(65.5, 68.2, 70.1, 63.8, 72.0)
+)
+
+# Plot with ideograms
+plot_tm_heatmap(gr_tm, genome_assembly = "hg19", plot_type = "karyogram")
+
+# Faceted plot by chromosome
+plot_tm_heatmap(gr_tm, genome_assembly = "hg19", plot_type = "faceted")
 ```
 
 ## launch the shiny application
