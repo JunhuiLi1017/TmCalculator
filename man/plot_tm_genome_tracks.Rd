@@ -11,14 +11,14 @@ plot_tm_genome_tracks(
   tm_track_title = "Melting Temperature (°C)",
   color_palette = c("viridis", "magma", "plasma", "inferno", "cividis"),
   show_ideogram = TRUE,
-  ncol = 2
+  zoom = NULL
 )
 }
 \arguments{
 \item{gr}{A GRanges object. It MUST contain a metadata column named 'Tm'
 with numeric melting temperature values.}
 
-\item{chromosome_to_plot}{A character vector specifying the chromosomes to visualize.
+\item{chromosome_to_plot}{A character string specifying the chromosome to visualize.
 These chromosomes must exist in your GRanges object.}
 
 \item{genome_assembly}{A character string indicating the genome assembly (e.g., "hg19", "mm10").
@@ -39,7 +39,9 @@ All palettes are colorblind-friendly and perceptually uniform.}
 
 \item{show_ideogram}{Logical, whether to display the chromosome ideogram tracks.}
 
-\item{ncol}{Number of columns in the plot layout when multiple chromosomes are plotted.}
+\item{zoom}{A character string specifying the genomic region to zoom into.
+If NULL (default), the entire range of each chromosome will be shown.
+Example: "chr1:1000000-2000000" for zooming into chr1:1000000-2000000}
 }
 \value{
 Invisible NULL. The function generates a plot directly.
@@ -51,6 +53,8 @@ Tm values are visualized using a heatmap-like color gradient.
 }
 \examples{
 \dontrun{
+library(GenomicRanges)
+library(Gviz)
 # Example 1: Generate sample data with 150 sequences
 set.seed(123)
 
@@ -77,33 +81,21 @@ tm_results <- GRanges(
   Tm = c(chr1_tms, chr2_tms)
 )
 
-# Plot single chromosome
+# Plot single chromosome with zoom
 plot_tm_genome_tracks(
   gr = tm_results,
   chromosome_to_plot = "chr1",
   genome_assembly = "hg19",
   tm_track_title = "DNA Sequence Tm",
-  show_ideogram = TRUE
+  zoom = "chr1:10062800-20000000"
 )
 
-# Plot both chromosomes
+# Example with custom color palette and no zoom
 plot_tm_genome_tracks(
   gr = tm_results,
-  chromosome_to_plot = c("chr1", "chr2"),
+  chromosome_to_plot = "chr2",
   genome_assembly = "hg19",
-  tm_track_title = "DNA Sequence Tm",
-  show_ideogram = TRUE,
-  ncol = 2
-)
-
-# Example with custom color palette
-plot_tm_genome_tracks(
-  gr = tm_results,
-  chromosome_to_plot = c("chr1"),
-  genome_assembly = "hg19",
-  color_palette = "plasma",
-  show_ideogram = TRUE,
-  ncol = 2
+  color_palette = "plasma"
 )
 }
 

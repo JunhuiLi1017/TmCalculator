@@ -1,32 +1,52 @@
 library(shiny)
 library(TmCalculator)
 library(shinydashboard)
+library(GenomicRanges) # Required for GRanges object manipulation
 
 # Ensure the package is properly loaded
 if (!requireNamespace("TmCalculator", quietly = TRUE)) {
   stop("TmCalculator package is required but not installed")
 }
+# Ensure karyoploteR is available if you're using plot_tm_karyotype
+if (!requireNamespace("karyoploteR", quietly = TRUE)) {
+  stop("karyoploteR package is required for karyotype plots but not installed")
+}
+# Ensure ggbio is available if you're using plot_tm_heatmap or plot_tm_genome_tracks
+if (!requireNamespace("ggbio", quietly = TRUE)) {
+  stop("ggbio package is required for heatmap and genome tracks plots but not installed")
+}
+if (!requireNamespace("ggplot2", quietly = TRUE)) {
+  stop("ggplot2 package is required for ggbio plots but not installed")
+}
+if (!requireNamespace("RColorBrewer", quietly = TRUE)) {
+  stop("RColorBrewer package is required for ggbio plots but not installed")
+}
+if (!requireNamespace("viridis", quietly = TRUE)) {
+  stop("viridis package is required for color palettes but not installed")
+}
 
+
+# --- UI Definition ---
 ui <- dashboardPage(
   dashboardHeader(
-    title = tags$a(href = "https://github.com/JunhuiLi1017/TmCalculator", 
-                   "TmCalculator", 
+    title = tags$a(href = "https://github.com/JunhuiLi1017/TmCalculator",
+                   "TmCalculator",
                    style = "color: black; font-family: Arial, Helvetica, sans-serif;"),
     titleWidth = 200
   ),
-  
+
   dashboardSidebar(
     sidebarMenu(
       menuItem("Calculator", tabName = "calculator", icon = icon("calculator")),
       menuItem("About", tabName = "about", icon = icon("info-circle"))
     )
   ),
-  
+
   dashboardBody(
     tags$head(
       tags$link(rel = "stylesheet", type = "text/css", href = "style.css")
     ),
-    
+
     tabItems(
       # Calculator Tab
       tabItem(tabName = "calculator",
@@ -82,7 +102,7 @@ ui <- dashboardPage(
                   ),
                   actionButton("calculate", "Calculate Tm", class = "btn-primary")
                 ),
-                
+
                 # Right column - Parameters
                 box(
                   title = "Specific Parameters",
@@ -140,7 +160,7 @@ ui <- dashboardPage(
                   )
                 )
               ),
-              
+
               # Second row - Chemical and Salt Parameters
               fluidRow(
                 conditionalPanel(
@@ -170,7 +190,7 @@ ui <- dashboardPage(
                     selectInput("formamide_unit", "Formamide Unit",
                                 choices = list("Percent (%)" = "percent", "Molar (M)" = "molar"),
                                 selected = "percent"),
-                    selectInput("formamide_factor", "Formamide Factor", 
+                    selectInput("formamide_factor", "Formamide Factor",
                                 choices = list("0.65" = "0.65", "0.6" = "0.6", "0.72" = "0.72"),
                                 selected = "0.65"),
                     selectInput("DMSO_factor", "DMSO Factor",
@@ -179,7 +199,7 @@ ui <- dashboardPage(
                   )
                 )
               ),
-              
+
               # Third row - Results
               fluidRow(
                 box(
@@ -202,23 +222,47 @@ ui <- dashboardPage(
                         selected = "karyotype"
                       )
                     ),
-                    column(3,
+                    column(9, # Increased column width for plot options
+                      # --- Karyotype Plot Options (Updated from previous turn) ---
                       conditionalPanel(
                         condition = "input.plot_type == 'karyotype'",
-                        selectInput("karyotype_plot_type", "Karyotype Layout",
-                          choices = list(
-                            "Horizontal" = "1",
-                            "Vertical" = "4",
-                            "Grid" = "7"
-                          ),
+                        textInput("karyotype_genome_assembly", "Genome Assembly",
+                          placeholder = "e.g., hg38, hg19, mm10, etc."
+                        ),
+                        # Chromosomes will typically be populated dynamically from your data on the server side
+                        selectInput("karyotype_chromosomes", "Chromosomes to Plot",
+                          choices = NULL, # Choices will be set by the server
+                          multiple = TRUE
+                        ),
+                        textInput("karyotype_colors", "Chromosome Colors (named, e.g., chr1=red,chr2=blue)",
+                          placeholder = "e.g., chr1=#FF0000,chr2=blue,chrX=#00FF00"
+                        ),
+                        textInput("karyotype_shapes", "Chromosome Shapes (named, e.g., chr1=16,chr2=17)",
+                          placeholder = "e.g., chr1=16,chr2=17,chrY=18 (see ggplot2 pch values 0-25, 32-127)"
+                        ),
+                        selectInput("karyotype_plot_type", "Karyotype Layout (plot_type)",
+                          choices = as.list(setNames(1:7, 1:7)), # Options 1 through 7 for plotKaryotype layout
                           selected = "1"
                         ),
-                        numericInput("karyotype_point_cex", "Point Size", value = 1.5, min = 0.5, max = 3, step = 0.1),
-                        numericInput("karyotype_xaxis_cex", "X-axis Text Size", value = 0.7, min = 0.5, max = 1.5, step = 0.1),
-                        numericInput("karyotype_yaxis_cex", "Y-axis Text Size", value = 0.8, min = 0.5, max = 1.5, step = 0.1)
+                        numericInput("karyotype_point_cex", "Point Size (cex)", value = 1.5, min = 0.1, max = 3, step = 0.1),
+                        numericInput("karyotype_xaxis_cex", "X-axis Text Size (cex)", value = 0.7, min = 0.1, max = 1.5, step = 0.1),
+                        numericInput("karyotype_yaxis_cex", "Y-axis Text Size (cex)", value = 0.8, min = 0.1, max = 1.5, step = 0.1),
+                        numericInput("karyotype_chr_cex", "Chromosome Name Text Size (chr_cex)", value = 1, min = 0.1, max = 2, step = 0.1),
+                        numericInput("karyotype_tick_dist", "X-axis Tick Distance (bp)", value = 10000000, min = 100000, max = 100000000, step = 1000000)
                       ),
+                      # --- Heatmap Plot Options ---
                       conditionalPanel(
                         condition = "input.plot_type == 'heatmap'",
+                        textInput("heatmap_genome_assembly", "Genome Assembly",
+                          placeholder = "e.g., hg38, hg19, mm10, etc."
+                        ),
+                        selectInput("heatmap_chromosomes", "Chromosome to Plot",
+                          choices = NULL, # Choices will be set by the server
+                          multiple = TRUE  # Multiple chromosome selection
+                        ),
+                        textInput("heatmap_zoom", "Zoom Region",
+                          placeholder = "e.g., chr1:1000000-2000000, chr2:1000000-2000000"
+                        ),
                         selectInput("heatmap_plot_type", "Heatmap Type",
                           choices = list(
                             "Karyogram" = "karyogram",
@@ -235,13 +279,22 @@ ui <- dashboardPage(
                             "Cividis" = "cividis"
                           ),
                           selected = "viridis"
-                        )
+                        ),
+                        textInput("heatmap_title", "Plot Title", value = "Tm Values on Chromosomes (ggbio)",
+                                  placeholder = "e.g., My Tm Heatmap")
                       ),
+                      # --- Genome Tracks Plot Options ---
                       conditionalPanel(
                         condition = "input.plot_type == 'genome_tracks'",
-                        selectInput("genome_tracks_chromosomes", "Chromosomes to Plot",
-                          choices = NULL,
-                          multiple = TRUE
+                        textInput("genome_tracks_genome_assembly", "Genome Assembly",
+                          placeholder = "e.g., hg38, hg19, mm10, etc."
+                        ),
+                        selectInput("genome_tracks_chromosomes", "Chromosome to Plot",
+                          choices = NULL, # Choices will be set by the server
+                          multiple = FALSE  # Single chromosome selection
+                        ),
+                        textInput("genome_tracks_zoom", "Zoom Region",
+                          placeholder = "e.g., chr1:1000000-2000000"
                         ),
                         selectInput("genome_tracks_color_palette", "Color Palette",
                           choices = list(
@@ -253,8 +306,7 @@ ui <- dashboardPage(
                           ),
                           selected = "viridis"
                         ),
-                        checkboxInput("genome_tracks_show_ideogram", "Show Ideogram", value = TRUE),
-                        numericInput("genome_tracks_ncol", "Number of Columns", value = 2, min = 1, max = 5)
+                        checkboxInput("genome_tracks_show_ideogram", "Show Ideogram", value = TRUE)
                       )
                     )
                   ),
@@ -263,12 +315,13 @@ ui <- dashboardPage(
                 )
               )
       ),
-      
+
       # About Tab
       tabItem(tabName = "about",
               box(
                 title = "About Tm Calculator",
                 width = 12,
+                # Make sure about.md exists in inst/shiny/about.md within your package
                 includeMarkdown(system.file("shiny", "about.md", package = "TmCalculator"))
               )
       )
@@ -276,64 +329,114 @@ ui <- dashboardPage(
   )
 )
 
+# --- Server Definition ---
 server <- function(input, output, session) {
-  # Update sequence selectors when FASTA file is uploaded
-  
-  # Update chromosome choices for genome tracks
+
+  # Initialize result to NULL globally within the server session
+  # This makes 'result' accessible to observers outside of observeEvent
+  result <- reactiveVal(NULL)
+
+  # Helper function to parse named string inputs (e.g., "chr1=red,chr2=blue")
+  parse_named_vector <- function(text_input_string, type = "character") {
+    if (is.null(text_input_string) || text_input_string == "") {
+      return(NULL)
+    }
+
+    pairs <- strsplit(text_input_string, ",")[[1]]
+    names_vec <- character(length(pairs))
+    values_vec <- character(length(pairs))
+
+    for (i in seq_along(pairs)) {
+      parts <- strsplit(pairs[i], "=")[[1]]
+      if (length(parts) == 2) {
+        names_vec[i] <- trimws(parts[1])
+        values_vec[i] <- trimws(parts[2])
+      } else {
+        # Warning for malformed input
+        warning(paste("Invalid format for pair:", pairs[i], ". Skipping this entry."))
+      }
+    }
+
+    # Filter out any pairs that were malformed (i.e., names_vec[i] is empty)
+    valid_indices <- nchar(names_vec) > 0
+    names_vec <- names_vec[valid_indices]
+    values_vec <- values_vec[valid_indices]
+
+    if (type == "numeric") {
+      values_vec <- as.numeric(values_vec)
+    }
+
+    if (length(names_vec) == 0) return(NULL) # Return NULL if no valid pairs were found
+    setNames(values_vec, names_vec)
+  }
+
+  # Update chromosome choices for karyotype, genome tracks, and heatmap plots
   observe({
-    if (!is.null(result)) {
-      chromosomes <- unique(as.character(seqnames(result$tm)))
+    req(result()) # Ensure result is not NULL
+    current_gr <- result()$tm$Tm
+    if (!is.null(current_gr) && inherits(current_gr, "GRanges")) {
+      chromosomes <- unique(as.character(GenomicRanges::seqnames(current_gr)))
+      # Update for karyotype
+      updateSelectInput(session, "karyotype_chromosomes",
+        choices = chromosomes,
+        selected = chromosomes # Select all chromosome by default
+      )
+      # Update for genome tracks
       updateSelectInput(session, "genome_tracks_chromosomes",
         choices = chromosomes,
-        selected = chromosomes[1]
+        selected = chromosomes[1] # Select first chromosome by default
+      )
+      # Update for heatmap
+      updateSelectInput(session, "heatmap_chromosomes",
+        choices = chromosomes,
+        selected = chromosomes # Select all chromosomes by default
       )
     }
   })
-  
+
   # Calculate Tm when button is clicked
   observeEvent(input$calculate, {
     tryCatch({
       # Get sequences based on input type
+      primers <- NULL
+      templates <- NULL
+
       if (input$input_type == "direct") {
         primers <- unlist(strsplit(input$input_seq, ","))
-        templates <- if(input$method == "tm_nn" && !is.null(input$rev_input_seq) && input$rev_input_seq != "") {
-          unlist(strsplit(input$rev_input_seq, ","))
-        } else {
-          NULL
+        if(input$method == "tm_nn" && !is.null(input$rev_input_seq) && input$rev_input_seq != "") {
+          templates <- unlist(strsplit(input$rev_input_seq, ","))
         }
       } else if (input$input_type == "genomic_coordinates") {
         primers <- input$genomic_coordinates
-        templates <- if(input$method == "tm_nn" && !is.null(input$genomic_coordinates_complement)) {
-          input$genomic_coordinates_complement
-        } else {
-          NULL
+        if(input$method == "tm_nn" && !is.null(input$genomic_coordinates_complement) && input$genomic_coordinates_complement != "") {
+          templates <- input$genomic_coordinates_complement
         }
-      } else {
+      } else if (input$input_type == "fasta") {
         req(input$fasta_file)
         primers <- input$fasta_file$datapath
-        templates <- if(input$method == "tm_nn" && !is.null(input$fasta_file_complement)) {
+        if(input$method == "tm_nn" && !is.null(input$fasta_file_complement)) {
           req(input$fasta_file_complement)
-          input$fasta_file_complement$datapath
-        } else {
-          NULL
+          templates <- input$fasta_file_complement$datapath
         }
       }
-      
+
       # Calculate Tm using tm_calculate
-      result <<- tm_calculate(
+      calculated_result <- tm_calculate(
         input_seq = primers,
         complement_seq = templates,
         method = input$method,
         ambiguous = input$ambiguous,
-        shift = input$shift,
-        nn_table = input$nn_table,
-        tmm_table = input$tmm_table,
-        imm_table = input$imm_table,
-        de_table = input$de_table,
-        dnac_high = input$dnac_high,
-        dnac_low = input$dnac_low,
-        self_comp = input$self_comp,
-        variant = input$variant,
+        # Only pass NN-specific parameters if method is tm_nn
+        shift = if(input$method == "tm_nn") input$shift else NULL,
+        nn_table = if(input$method == "tm_nn") input$nn_table else NULL,
+        tmm_table = if(input$method == "tm_nn") input$tmm_table else NULL,
+        imm_table = if(input$method == "tm_nn") input$imm_table else NULL,
+        de_table = if(input$method == "tm_nn") input$de_table else NULL,
+        dnac_high = if(input$method == "tm_nn") input$dnac_high else NULL,
+        dnac_low = if(input$method == "tm_nn") input$dnac_low else NULL,
+        self_comp = if(input$method == "tm_nn") input$self_comp else FALSE,
+        # Only pass GC-specific parameters if method is tm_gc
+        variant = if(input$method == "tm_gc") input$variant else NULL,
         Na = input$Na,
         K = input$K,
         Tris = input$Tris,
@@ -348,112 +451,184 @@ server <- function(input, output, session) {
         dmso_factor = as.numeric(input$DMSO_factor),
         formamide_factor = as.numeric(input$formamide_factor)
       )
-      
+
+      # Store result in reactiveVal
+      result(calculated_result)
+
       # Display results
       output$results <- renderPrint({
-        print(result)
+        print(result())
       })
 
       # Create plot based on selected type
       output$plot_output <- renderPlot({
-        if (is.null(result)) return(NULL)
-        
+        req(result()) # Ensure result is available before plotting
+        current_gr <- result()$tm$Tm
+        req(current_gr) # Ensure the GRanges object is not NULL
+
+        # Parse colors and shapes for karyotype plot
+        karyotype_colors_parsed <- parse_named_vector(input$karyotype_colors, type = "character")
+        karyotype_shapes_parsed <- parse_named_vector(input$karyotype_shapes, type = "numeric")
+
+        # Determine genome assembly for plotting functions from input
+        plot_genome_assembly_karyotype <- if (input$karyotype_genome_assembly != "") input$karyotype_genome_assembly else NULL
+        plot_genome_assembly_heatmap <- if (input$heatmap_genome_assembly != "") input$heatmap_genome_assembly else NULL
+        plot_genome_assembly_genome_tracks <- if (input$genome_tracks_genome_assembly != "") input$genome_tracks_genome_assembly else NULL
+
+
         switch(input$plot_type,
           "karyotype" = {
             plot_tm_karyotype(
-              result$tm,
-              genome_assembly = "hg38",
+              gr = current_gr,
+              chromosomes = input$karyotype_chromosomes,
+              genome_assembly = plot_genome_assembly_karyotype,
+              colors = karyotype_colors_parsed, # Pass parsed colors
+              shapes = karyotype_shapes_parsed, # Pass parsed shapes
               plot_type = as.numeric(input$karyotype_plot_type),
               point_cex = input$karyotype_point_cex,
               xaxis_cex = input$karyotype_xaxis_cex,
-              yaxis_cex = input$karyotype_yaxis_cex
+              yaxis_cex = input$karyotype_yaxis_cex,
+              chr_cex = input$karyotype_chr_cex, # New parameter
+              tick_dist = input$karyotype_tick_dist # New parameter
             )
           },
           "heatmap" = {
             plot_tm_heatmap(
-              result$tm,
-              genome_assembly = "hg38",
+              gr = current_gr,
+              genome_assembly = plot_genome_assembly_heatmap,
+              chromosome_to_plot = input$heatmap_chromosomes,
               plot_type = input$heatmap_plot_type,
-              color_palette = input$heatmap_color_palette
+              color_palette = input$heatmap_color_palette,
+              title_name = input$heatmap_title,
+              zoom = if (input$heatmap_zoom != "") input$heatmap_zoom else NULL
             )
           },
           "genome_tracks" = {
             plot_tm_genome_tracks(
-              result$tm,
+              gr = current_gr,
               chromosome_to_plot = input$genome_tracks_chromosomes,
-              genome_assembly = "hg38",
+              genome_assembly = plot_genome_assembly_genome_tracks,
               color_palette = input$genome_tracks_color_palette,
               show_ideogram = input$genome_tracks_show_ideogram,
-              ncol = input$genome_tracks_ncol
+              zoom = if (input$genome_tracks_zoom != "") input$genome_tracks_zoom else NULL
             )
           }
         )
       })
-      
-      # Update download handler
+
+      # Update download handler for plot
       output$download_plot <- downloadHandler(
         filename = function() {
-          paste("tm_plot_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png", sep = "")
+          paste("tm_plot_", input$plot_type, "_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png", sep = "")
         },
         content = function(file) {
+          # Make sure to re-evaluate inputs and data for the download
+          req(result())
+          current_gr <- result()$tm$Tm
+          req(current_gr)
+
+          # Parse colors and shapes for karyotype plot download
+          karyotype_colors_parsed <- parse_named_vector(input$karyotype_colors, type = "character")
+          karyotype_shapes_parsed <- parse_named_vector(input$karyotype_shapes, type = "numeric")
+
+          # Determine genome assembly for plotting functions from input for download
+          plot_genome_assembly_karyotype <- if (input$karyotype_genome_assembly != "") input$karyotype_genome_assembly else NULL
+          plot_genome_assembly_heatmap <- if (input$heatmap_genome_assembly != "") input$heatmap_genome_assembly else NULL
+          plot_genome_assembly_genome_tracks <- if (input$genome_tracks_genome_assembly != "") input$genome_tracks_genome_assembly else NULL
+
+          # Generate the plot
           p <- switch(input$plot_type,
             "karyotype" = {
               plot_tm_karyotype(
-                result$tm,
-                genome_assembly = "hg38",
+                gr = current_gr,
+                chromosomes = input$karyotype_chromosomes,
+                genome_assembly = plot_genome_assembly_karyotype,
+                colors = karyotype_colors_parsed,
+                shapes = karyotype_shapes_parsed,
                 plot_type = as.numeric(input$karyotype_plot_type),
                 point_cex = input$karyotype_point_cex,
                 xaxis_cex = input$karyotype_xaxis_cex,
-                yaxis_cex = input$karyotype_yaxis_cex
+                yaxis_cex = input$karyotype_yaxis_cex,
+                chr_cex = input$karyotype_chr_cex,
+                tick_dist = input$karyotype_tick_dist
               )
             },
             "heatmap" = {
               plot_tm_heatmap(
-                result$tm,
-                genome_assembly = "hg38",
+                gr = current_gr,
+                genome_assembly = plot_genome_assembly_heatmap,
+                chromosome_to_plot = input$heatmap_chromosomes,
                 plot_type = input$heatmap_plot_type,
-                color_palette = input$heatmap_color_palette
+                color_palette = input$heatmap_color_palette,
+                title_name = input$heatmap_title,
+                zoom = if (input$heatmap_zoom != "") input$heatmap_zoom else NULL
               )
             },
             "genome_tracks" = {
               plot_tm_genome_tracks(
-                result$tm,
+                gr = current_gr,
                 chromosome_to_plot = input$genome_tracks_chromosomes,
-                genome_assembly = "hg38",
+                genome_assembly = plot_genome_assembly_genome_tracks,
                 color_palette = input$genome_tracks_color_palette,
                 show_ideogram = input$genome_tracks_show_ideogram,
-                ncol = input$genome_tracks_ncol
+                zoom = if (input$genome_tracks_zoom != "") input$genome_tracks_zoom else NULL
               )
             }
           )
-          ggsave(file, plot = p, device = "png", width = 10, height = 8)
+          # For karyoploteR plots, direct ggsave might not work without a ggplot object.
+          # We'll need to capture the plot generated by karyoploteR.
+          # For ggbio plots, they return ggplot objects, so ggsave will work.
+          if (input$plot_type == "karyotype") {
+            # KaryoploteR plots are drawn directly to the device.
+            # We need to open a graphics device, draw the plot, then close it.
+            png(file, width = 1000, height = 800, res = 100) # Adjust dimensions as needed
+            plot_tm_karyotype(
+                gr = current_gr,
+                chromosomes = input$karyotype_chromosomes,
+                genome_assembly = plot_genome_assembly_karyotype,
+                colors = karyotype_colors_parsed,
+                shapes = karyotype_shapes_parsed,
+                plot_type = as.numeric(input$karyotype_plot_type),
+                point_cex = input$karyotype_point_cex,
+                xaxis_cex = input$karyotype_xaxis_cex,
+                yaxis_cex = input$karyotype_yaxis_cex,
+                chr_cex = input$karyotype_chr_cex,
+                tick_dist = input$karyotype_tick_dist
+              )
+            dev.off()
+          } else {
+            # For ggbio plots (heatmap and genome_tracks), the functions return a ggplot object
+            # which can be passed to ggsave.
+            ggsave(file, plot = p, device = "png", width = 10, height = 8, units = "in")
+          }
         }
       )
-      
+
       # Enable download button for results
       output$download_results <- downloadHandler(
         filename = function() {
           paste("tm_results_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".txt", sep = "")
         },
         content = function(file) {
-          writeLines(capture.output(
-            cat("Method:", input$method, "\n\n"),
-            for (i in seq_along(result$tm)) {
-              cat("Sequence:", names(result$tm)[i], "\n")
-              if (input$input_type == "fasta") {
-                cat("Sequence: ", primers[[i]], "\n")
-                if (!is.null(templates)) {
-                  cat("Complement: ", templates[[i]], "\n")
+          req(result()) # Ensure result is available
+          writeLines(capture.output({
+            cat("Method:", input$method, "\n\n")
+            if (inherits(result()$tm, "GRanges")) {
+                cat("GRanges Tm Results:\n")
+                print(result()$tm)
+            } else if (is.list(result()$tm)) {
+                # For cases where Tm is a list (e.g., from tm_nn on multiple sequences)
+                for (i in seq_along(result()$tm)) {
+                    cat("Sequence ", i, " Tm: ", result()$tm[[i]]$Tm, "\n", sep="")
+                    # Add more details if needed, e.g., print(result()$tm[[i]])
                 }
-              }
-              cat("\nResults:\n")
-              print(result$tm[[i]])
-              cat("\n", paste(rep("-", 50), collapse = ""), "\n\n")
+            } else {
+                cat("Tm Result:", result()$tm, "\n")
             }
-          ), file)
+          }), file)
         }
       )
-      
+
     }, error = function(e) {
       showNotification(paste("Error:", e$message), type = "error")
     })

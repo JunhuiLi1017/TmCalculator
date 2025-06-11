@@ -8,6 +8,9 @@
 #'           The Tm values should be in a metadata column named "Tm".
 #' @param genome_assembly Character string specifying the genome assembly
 #'                        (e.g., "hg19", "hg38", "mm10") for setting chromosome lengths.
+#' @param chromosome_to_plot Character string specifying the chromosome to plot.
+#'                          If NULL (default), all chromosomes will be plotted.
+#'                          Example: "chr1" for plotting chr1 only.
 #' @param plot_type Character string specifying the plot type: "karyogram" for
 #'                  integrated ideogram view or "faceted" for separate chromosome panels.
 #'                  Default is "karyogram".
@@ -22,6 +25,9 @@
 #'                      }
 #'                      All palettes are colorblind-friendly and perceptually uniform.
 #' @param title_name Character string for the plot title. If NULL, a default title will be used.
+#' @param zoom A character string vector specifying the genomic region to zoom into.
+#'            If NULL (default), the entire range of each chromosome will be shown.
+#'            Example: c("chr1:1000000-2000000", "chr2:1000000-2000000") for zooming into chr1:1000000-2000000 and chr2:1000000-2000000
 #'
 #' @return A ggplot object displaying Tm values across genomic coordinates.
 #'
@@ -51,21 +57,34 @@
 #' 
 #' # Faceted plot by chromosome
 #' plot_tm_heatmap(gr_tm, genome_assembly = "hg19", plot_type = "faceted")
+#' 
+#' # Plot with zoom
+#' plot_tm_heatmap(gr_tm, genome_assembly = "hg19", plot_type = "faceted", zoom = "chr1:100-200")
+#' 
 #' }
-#'
+#' # calculate Tm values from a fasta file
+#' fasta_file <- system.file("extdata", "BSgenome.Hsapiens.UCSC.hg38.fasta", package = "TmCalculator")
+#' gr_tm <- tm_calculate(fasta_file)
+#' 
+#' # plot with zoom
+#' plot_tm_heatmap(gr_tm, genome_assembly = "hg38", chromosome_to_plot = c("chr1"),
+#' plot_type = "faceted", zoom = "chr1:1000-2000000")
+#' 
 #' @importFrom GenomeInfoDb seqinfo genome seqlengths seqlevels seqlevelsInUse
-#' @importFrom GenomicRanges makeGRangesFromDataFrame
+#' @importFrom GenomicRanges makeGRangesFromDataFrame mcols
 #' @importFrom ggplot2 ggplot geom_rect scale_fill_viridis_c scale_y_continuous labs theme_bw theme_minimal theme element_text element_blank element_line aes
 #' @importFrom viridis viridis
-#' @importFrom dplyr arrange mutate group_by ungroup
+#' @importFrom dplyr arrange mutate group_by ungroup n %>%
 #' @importFrom rlang .data
 #' @export
 
 plot_tm_heatmap <- function(gr, 
                             genome_assembly = NULL,
+                            chromosome_to_plot = NULL,
                             plot_type = c("karyogram","faceted"), 
                             color_palette = c("viridis", "magma", "plasma", "inferno", "cividis"),
-                            title_name = NULL) {
+                            title_name = NULL,
+                            zoom = NULL) {
   
   # Input validation
   if (!inherits(gr, "GRanges")) {
@@ -78,6 +97,32 @@ plot_tm_heatmap <- function(gr,
   
   plot_type <- match.arg(plot_type)
   color_palette <- match.arg(color_palette)
+  
+  if (!is.null(chromosome_to_plot)) {
+    gr_filtered <- gr[seqnames(gr) == chromosome_to_plot]
+    if (length(gr_filtered) == 0) {
+      stop(paste0("No data points found for chromosome: ", chromosome_to_plot))
+    }
+    gr <- gr_filtered
+  }
+  
+  # Validate zoom parameter if provided
+  if (!is.null(zoom)) {
+    zoom_list <- list()
+    for (i in seq_along(zoom)) {
+      if (!is.character(zoom) || !grepl("^chr[0-9]+:[0-9]+-[0-9]+$", zoom)) {
+        stop("zoom must be a character string like 'chr1:1000000-2000000'")
+      }
+      zoom_range <- strsplit(zoom, ":")[[1]]
+      chr_zoom <- zoom_range[1]
+      zoom_range_pos <- as.numeric(strsplit(zoom_range[2], "-")[[1]])
+      zoom_start <- zoom_range_pos[1]
+      zoom_end <- zoom_range_pos[2]
+      zoom_list[[i]] <- list(chr = chr_zoom, start = zoom_start, end = zoom_end)
+    }
+  } else {
+    zoom_list <- NULL
+  }
   
   if (is.null(genome_assembly)) {
     # If genome_assembly is NULL, try to infer from gr
@@ -173,14 +218,61 @@ plot_tm_heatmap <- function(gr,
   gr <- .set_default_seqlengths(gr, genome_assembly = genome_assembly)
   
   # Get unique sequences and assign a 'y_pos' for stacking and seq_id for labeling
-  gr_df <- as.data.frame(gr) %>%
-    dplyr::arrange(seqnames, start) %>%
-    dplyr::group_by(seqnames) %>%
-    dplyr::mutate(
-      y_pos = 1:n(), # Assign y-position per chromosome
-      seq_id = paste0("seq_", y_pos) # Generate seq_id based on y_pos per chromosome
-    ) %>%
-    dplyr::ungroup()
+  # If zoom is provided, filter the GRanges object to the zoom region for each chromosome
+  if (!is.null(zoom_list)) {
+    # Section 1: Extract regions that match zoom list criteria
+    gr_df_list_zoomed <- list()
+    for (i in seq_along(zoom_list)) {
+      gr_filtered <- gr[seqnames(gr) == zoom_list[[i]]$chr & 
+                         start(gr) >= zoom_list[[i]]$start & 
+                         end(gr) <= zoom_list[[i]]$end]
+      if (length(gr_filtered) > 0) {
+        gr_df <- as.data.frame(gr_filtered) %>%
+          dplyr::arrange(seqnames, start) %>%
+          dplyr::group_by(seqnames) %>%
+          dplyr::mutate(
+            y_pos = 1:dplyr::n(), # Assign y-position per chromosome
+            seq_id = paste0("seq_", y_pos), # Generate seq_id based on y_pos per chromosome
+            is_zoomed = TRUE # Mark as zoomed region
+          ) %>%
+          dplyr::ungroup()
+        gr_df_list_zoomed[[i]] <- gr_df
+      }
+    }
+    
+    # Section 2: Extract regions that are not in zoom list
+    zoom_chrs <- sapply(zoom_list, function(x) x$chr)
+    gr_non_zoomed <- gr[!seqnames(gr) %in% zoom_chrs]
+    if (length(gr_non_zoomed) > 0) {
+      gr_df_non_zoomed <- as.data.frame(gr_non_zoomed) %>%
+        dplyr::arrange(seqnames, start) %>%
+        dplyr::group_by(seqnames) %>%
+        dplyr::mutate(
+          y_pos = 1:dplyr::n(), # Assign y-position per chromosome
+          seq_id = paste0("seq_", y_pos), # Generate seq_id based on y_pos per chromosome
+          is_zoomed = FALSE # Mark as non-zoomed region
+        ) %>%
+        dplyr::ungroup()
+    } else {
+      gr_df_non_zoomed <- NULL
+    }
+    
+    # Combine both sections
+    gr_df_list <- c(gr_df_list_zoomed, list(gr_df_non_zoomed))
+    gr_df_list <- gr_df_list[!sapply(gr_df_list, is.null)] # Remove NULL entries
+    gr_df <- do.call(rbind, gr_df_list)
+    
+  } else {
+    gr_df <- as.data.frame(gr) %>%
+      dplyr::arrange(seqnames, start) %>%
+      dplyr::group_by(seqnames) %>%
+      dplyr::mutate(
+        y_pos = 1:dplyr::n(), # Assign y-position per chromosome
+        seq_id = paste0("seq_", y_pos), # Generate seq_id based on y_pos per chromosome
+        is_zoomed = FALSE # Mark as non-zoomed region
+      ) %>%
+      dplyr::ungroup()
+  }
   
   # Convert back to GRanges for ggbio, carrying over the y_pos
   gr_plot <- GenomicRanges::makeGRangesFromDataFrame(gr_df, keep.extra.columns = TRUE)
@@ -206,7 +298,7 @@ plot_tm_heatmap <- function(gr,
         color = "black",
         linewidth = 0.1
       ) +
-      scale_fill_viridis_c(option = color_palette, name = "Tm (\u00B0C)") +
+      ggplot2::scale_fill_viridis_c(option = color_palette, name = "Tm (\u00B0C)") +
       ggplot2::scale_y_continuous(
         breaks = gr_df$y_pos,
         labels = gr_df$seq_id
@@ -231,7 +323,7 @@ plot_tm_heatmap <- function(gr,
         breaks = gr_df$y_pos,
         labels = gr_df$seq_id
       ) + 
-      scale_fill_viridis_c(option = color_palette, name = "Tm (\u00B0C)") +
+      ggplot2::scale_fill_viridis_c(option = color_palette, name = "Tm (\u00B0C)") +
       ggplot2::labs(title = title_name, x = "Genomic Position", y = "Sequence ID") +
       ggplot2::theme_minimal() +
       ggplot2::theme(

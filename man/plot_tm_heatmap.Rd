@@ -7,9 +7,11 @@
 plot_tm_heatmap(
   gr,
   genome_assembly = NULL,
+  chromosome_to_plot = NULL,
   plot_type = c("karyogram", "faceted"),
   color_palette = c("viridis", "magma", "plasma", "inferno", "cividis"),
-  title_name = NULL
+  title_name = NULL,
+  zoom = NULL
 )
 }
 \arguments{
@@ -18,6 +20,10 @@ The Tm values should be in a metadata column named "Tm".}
 
 \item{genome_assembly}{Character string specifying the genome assembly
 (e.g., "hg19", "hg38", "mm10") for setting chromosome lengths.}
+
+\item{chromosome_to_plot}{Character string specifying the chromosome to plot.
+If NULL (default), all chromosomes will be plotted.
+Example: "chr1" for plotting chr1 only.}
 
 \item{plot_type}{Character string specifying the plot type: "karyogram" for
 integrated ideogram view or "faceted" for separate chromosome panels.
@@ -35,6 +41,10 @@ Default is "viridis". Available options are:
 All palettes are colorblind-friendly and perceptually uniform.}
 
 \item{title_name}{Character string for the plot title. If NULL, a default title will be used.}
+
+\item{zoom}{A character string vector specifying the genomic region to zoom into.
+If NULL (default), the entire range of each chromosome will be shown.
+Example: c("chr1:1000000-2000000", "chr2:1000000-2000000") for zooming into chr1:1000000-2000000 and chr2:1000000-2000000}
 }
 \value{
 A ggplot object displaying Tm values across genomic coordinates.
@@ -61,6 +71,19 @@ plot_tm_heatmap(gr_tm, genome_assembly = "hg19", plot_type = "karyogram")
 
 # Faceted plot by chromosome
 plot_tm_heatmap(gr_tm, genome_assembly = "hg19", plot_type = "faceted")
+
+# Plot with zoom
+plot_tm_heatmap(gr_tm, genome_assembly = "hg19", plot_type = "faceted", zoom = "chr1:100-200")
+
 }
+# calculate Tm values from a fasta file
+fasta_file <- system.file("extdata", "BSgenome.Hsapiens.UCSC.hg38.fasta", package = "TmCalculator")
+gr_tm <- tm_calculate(fasta_file)
+
+# plot with zoom
+plot_tm_heatmap(gr_tm, genome_assembly = "hg38", plot_type = "faceted", zoom = "chr1:1000-2000000")
+
+# plot with multiple chromosomes
+plot_tm_heatmap(gr_tm, genome_assembly = "hg38", plot_type = "faceted", chromosome_to_plot = c("chr1", "chr2"))
 
 }

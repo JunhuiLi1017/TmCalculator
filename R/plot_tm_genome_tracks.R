@@ -6,7 +6,7 @@
 #'
 #' @param gr A GRanges object. It MUST contain a metadata column named 'Tm'
 #'           with numeric melting temperature values.
-#' @param chromosome_to_plot A character vector specifying the chromosomes to visualize.
+#' @param chromosome_to_plot A character string specifying the chromosome to visualize.
 #'                          These chromosomes must exist in your GRanges object.
 #' @param genome_assembly A character string indicating the genome assembly (e.g., "hg19", "mm10").
 #'                        This is used by IdeogramTrack for correct ideogram display.
@@ -22,10 +22,14 @@
 #'                     }
 #'                     All palettes are colorblind-friendly and perceptually uniform.
 #' @param show_ideogram Logical, whether to display the chromosome ideogram tracks.
-#' @param ncol Number of columns in the plot layout when multiple chromosomes are plotted.
+#' @param zoom A character string specifying the genomic region to zoom into.
+#'            If NULL (default), the entire range of each chromosome will be shown.
+#'            Example: "chr1:1000000-2000000" for zooming into chr1:1000000-2000000
 #' @return Invisible NULL. The function generates a plot directly.
 #' @examples
 #' \dontrun{
+#' library(GenomicRanges)
+#' library(Gviz)
 #' # Example 1: Generate sample data with 150 sequences
 #' set.seed(123)
 #' 
@@ -52,33 +56,21 @@
 #'   Tm = c(chr1_tms, chr2_tms)
 #' )
 #'
-#' # Plot single chromosome
+#' # Plot single chromosome with zoom
 #' plot_tm_genome_tracks(
 #'   gr = tm_results,
 #'   chromosome_to_plot = "chr1",
 #'   genome_assembly = "hg19",
 #'   tm_track_title = "DNA Sequence Tm",
-#'   show_ideogram = TRUE
+#'   zoom = "chr1:10062800-20000000"
 #' )
 #'
-#' # Plot both chromosomes
+#' # Example with custom color palette and no zoom
 #' plot_tm_genome_tracks(
 #'   gr = tm_results,
-#'   chromosome_to_plot = c("chr1", "chr2"),
+#'   chromosome_to_plot = "chr2",
 #'   genome_assembly = "hg19",
-#'   tm_track_title = "DNA Sequence Tm",
-#'   show_ideogram = TRUE,
-#'   ncol = 2
-#' )
-#'
-#' # Example with custom color palette
-#' plot_tm_genome_tracks(
-#'   gr = tm_results,
-#'   chromosome_to_plot = c("chr1"),
-#'   genome_assembly = "hg19",
-#'   color_palette = "plasma",
-#'   show_ideogram = TRUE,
-#'   ncol = 2
+#'   color_palette = "plasma"
 #' )
 #' }
 #'
@@ -98,21 +90,22 @@ plot_tm_genome_tracks <- function(gr,
                                   tm_track_title = "Melting Temperature (\u00B0C)",
                                   color_palette = c("viridis", "magma", "plasma", "inferno", "cividis"),
                                   show_ideogram = TRUE,
-                                  ncol = 2) {
+                                  zoom = NULL) {
   
   # Helper function to get viridis colors for Gviz
-  .get_viridis_gviz_colors <- function(palette = c("viridis", "magma", "plasma", "inferno", "cividis")) {
+  .get_viridis_gviz_colors <- function(color_palette = c("viridis", "magma", "plasma", "inferno", "cividis")) {
     # Get the first and last colors from the viridis palette
-    if (palette == "viridis") {
-      colors <- viridis::viridis(2, option = "viridis")
-    } else if (palette == "magma") {
-      colors <- viridis::magma(2, option = "magma")
-    } else if (palette == "plasma") {
-      colors <- viridis::plasma(2, option = "plasma")
-    } else if (palette == "inferno") {
-      colors <- viridis::inferno(2, option = "inferno")
-    } else if (palette == "cividis") {
-      colors <- viridis::cividis(2, option = "cividis")
+    color_palette <- match.arg(color_palette)
+    if (color_palette == "viridis") {
+      colors <- viridis::viridis(2)
+    } else if (color_palette == "magma") {
+      colors <- viridis::magma(2)
+    } else if (color_palette == "plasma") {
+      colors <- viridis::plasma(2)
+    } else if (color_palette == "inferno") {
+      colors <- viridis::inferno(2)
+    } else if (color_palette == "cividis") {
+      colors <- viridis::cividis(2)
     } else {
       stop("Invalid palette. Please choose from: viridis, magma, plasma, inferno, cividis")
     }
@@ -177,9 +170,15 @@ plot_tm_genome_tracks <- function(gr,
   if (!"Tm" %in% names(mcols(gr))) {
     stop("GRanges object must have a 'Tm' metadata column.")
   }
+  if (length(chromosome_to_plot) > 1) {
+    warning("Please provide a single chromosome to plot, only the first chromosome will be plotted. If you want to plot multiple chromosomes, use the 'chromosome_to_plot' argument multiple times.")
+    chromosome_to_plot <- chromosome_to_plot[1]
+  }
+
   if (!all(chromosome_to_plot %in% unique(as.character(GenomicRanges::seqnames(gr))))) {
-    stop(paste0("One or more chromosomes not found in the GRanges object: ",
-                paste(setdiff(chromosome_to_plot, unique(as.character(GenomicRanges::seqnames(gr)))), collapse = ", ")))
+    stop(paste0("Chromosomes not found in the GRanges object: ",
+                paste(setdiff(chromosome_to_plot, unique(as.character(GenomicRanges::seqnames(gr)))), collapse = ", "),
+                ". Please provide a valid chromosome name."))
   }
   
   # Set default seqlengths if missing
@@ -229,7 +228,7 @@ plot_tm_genome_tracks <- function(gr,
       color.scheme = list(
         "gradient",
         limits = tm_range,
-        color = colorRampPalette(c(tm_color_low_derived, tm_color_high_derived))(100)
+        color = colorRampPalette(c(tm_color_low_derived, tm_color_high_derived))(nrow(gr_filtered))
       )
     )
     
@@ -238,50 +237,40 @@ plot_tm_genome_tracks <- function(gr,
       track_list <- c(iTrack, track_list)
     }
     
+    # Determine plot range
+    if (!is.null(zoom)) {
+      # Validate zoom parameter
+      if (!is.character(zoom) || !grepl("^chr[0-9]+:[0-9]+-[0-9]+$", zoom)) {
+        stop("zoom must be a character string like 'chr1:1000000-2000000'")
+      }
+      if (length(zoom) != 1) {
+        warning("zoom must be a character string like 'chr1:1000000-2000000', only the first chromosome will be plotted. If you want to plot multiple chromosomes, use the 'zoom' argument multiple times.")
+        zoom <- zoom[1]
+      }
+      zoom_range <- strsplit(zoom, ":")[[1]]
+      chr_zoom <- zoom_range[1]
+      if (chr_zoom != chromosome_to_plot) {
+        stop(paste0("zoom chromosome '", chr_zoom, "' does not match the chromosome to plot '", chromosome_to_plot, "'. Please provide a valid chromosome name."))
+      }
+      zoom_range_pos <- as.numeric(strsplit(zoom_range[2], "-")[[1]])
+      from <- zoom_range_pos[1]
+      to <- zoom_range_pos[2]
+
+    } else {
+      from <- min(GenomicRanges::start(gr_filtered))
+      to <- max(GenomicRanges::end(gr_filtered))
+    }
+    
     Gviz::plotTracks(track_list,
                chromosome = chr,
-               from = min(GenomicRanges::start(gr_filtered)),
-               to = max(GenomicRanges::end(gr_filtered)),
+               from = from,
+               to = to,
                title.width = 1.5
     )
   }
   
   # --- Handle multiple chromosomes ---
-  if (length(chromosome_to_plot) > 1) {
-    # Calculate layout dimensions
-    n_plots <- length(chromosome_to_plot)
-    nrow <- ceiling(n_plots / ncol)
-    
-    # Set up the plotting layout
-    old_par <- par(no.readonly = TRUE)
-    on.exit(par(old_par))
-    
-    # Create layout matrix
-    layout_matrix <- matrix(1:(nrow * ncol), nrow = nrow, ncol = ncol, byrow = TRUE)
-    
-    # Create a new plot device if none exists
-    if (dev.cur() == 1) {
-      dev.new()
-    }
-    
-    # Set up the layout
-    layout(layout_matrix)
-    
-    # Plot each chromosome
-    for (chr in chromosome_to_plot) {
-      tryCatch({
-        create_chr_plot(chr)
-      }, error = function(e) {
-        message(sprintf("Error plotting chromosome %s: %s", chr, e$message))
-        # Create an empty plot with error message
-        plot(1, 1, type = "n", axes = FALSE, xlab = "", ylab = "")
-        text(1, 1, sprintf("Error plotting %s", chr), col = "red")
-      })
-    }
-  } else {
-    # Single chromosome plot
-    create_chr_plot(chromosome_to_plot)
-  }
+  create_chr_plot(chromosome_to_plot)
   
   invisible(NULL)
 }
