@@ -43,7 +43,8 @@ Suggests:
     knitr,
     rmarkdown,
     devtools,
-    roxygen2
+    roxygen2,
+    BSgenome.Hsapiens.UCSC.hg38
 NeedsCompilation: no
 Repository: CRAN
 RoxygenNote: 7.3.2

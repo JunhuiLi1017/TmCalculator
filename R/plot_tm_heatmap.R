@@ -199,7 +199,8 @@ plot_tm_heatmap <- function(gr,
     p <- ggplot2::ggplot(gr_plot) +
       ggbio::layout_karyogram() +
       ggplot2::geom_rect(
-        ggplot2::aes(xmin = start, xmax = end, 
+        data = gr_df,
+        ggplot2::aes(xmin = .data$start, xmax = .data$end, 
                      ymin = .data$y_pos - 0.4, ymax = .data$y_pos + 0.4, 
                      fill = .data$Tm),
         color = "black",
@@ -222,13 +223,13 @@ plot_tm_heatmap <- function(gr,
         legend.position = "right"
       )
   } else { # faceted plot
-    p <- ggplot2::ggplot(gr_plot, ggplot2::aes(xmin = start, xmax = end, fill = .data$Tm)) +
+    p <- ggplot2::ggplot(gr_df, ggplot2::aes(xmin = .data$start, xmax = .data$end, fill = .data$Tm)) +
       ggplot2::geom_rect(ggplot2::aes(ymin = .data$y_pos - 0.4, ymax = .data$y_pos + 0.4), 
                          color = "black", linewidth = 0.1) +
       ggplot2::facet_grid(seqnames ~ ., scales = "free_x", space = "free_y") +
       ggplot2::scale_y_continuous(
         breaks = gr_df$y_pos,
-        labels = gr_df$seq_id,
+        labels = gr_df$seq_id
       ) + 
       scale_fill_viridis_c(option = color_palette, name = "Tm (\u00B0C)") +
       ggplot2::labs(title = title_name, x = "Genomic Position", y = "Sequence ID") +

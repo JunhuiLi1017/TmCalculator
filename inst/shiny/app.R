@@ -187,6 +187,79 @@ ui <- dashboardPage(
                   width = 12,
                   verbatimTextOutput("results"),
                   downloadButton("download_results", "Download Results")
+                ),
+                box(
+                  title = "Visualization",
+                  width = 12,
+                  fluidRow(
+                    column(3,
+                      selectInput("plot_type", "Plot Type",
+                        choices = list(
+                          "Karyotype Plot" = "karyotype",
+                          "Heatmap Plot" = "heatmap",
+                          "Genome Tracks" = "genome_tracks"
+                        ),
+                        selected = "karyotype"
+                      )
+                    ),
+                    column(3,
+                      conditionalPanel(
+                        condition = "input.plot_type == 'karyotype'",
+                        selectInput("karyotype_plot_type", "Karyotype Layout",
+                          choices = list(
+                            "Horizontal" = "1",
+                            "Vertical" = "4",
+                            "Grid" = "7"
+                          ),
+                          selected = "1"
+                        ),
+                        numericInput("karyotype_point_cex", "Point Size", value = 1.5, min = 0.5, max = 3, step = 0.1),
+                        numericInput("karyotype_xaxis_cex", "X-axis Text Size", value = 0.7, min = 0.5, max = 1.5, step = 0.1),
+                        numericInput("karyotype_yaxis_cex", "Y-axis Text Size", value = 0.8, min = 0.5, max = 1.5, step = 0.1)
+                      ),
+                      conditionalPanel(
+                        condition = "input.plot_type == 'heatmap'",
+                        selectInput("heatmap_plot_type", "Heatmap Type",
+                          choices = list(
+                            "Karyogram" = "karyogram",
+                            "Faceted" = "faceted"
+                          ),
+                          selected = "karyogram"
+                        ),
+                        selectInput("heatmap_color_palette", "Color Palette",
+                          choices = list(
+                            "Viridis" = "viridis",
+                            "Magma" = "magma",
+                            "Plasma" = "plasma",
+                            "Inferno" = "inferno",
+                            "Cividis" = "cividis"
+                          ),
+                          selected = "viridis"
+                        )
+                      ),
+                      conditionalPanel(
+                        condition = "input.plot_type == 'genome_tracks'",
+                        selectInput("genome_tracks_chromosomes", "Chromosomes to Plot",
+                          choices = NULL,
+                          multiple = TRUE
+                        ),
+                        selectInput("genome_tracks_color_palette", "Color Palette",
+                          choices = list(
+                            "Viridis" = "viridis",
+                            "Magma" = "magma",
+                            "Plasma" = "plasma",
+                            "Inferno" = "inferno",
+                            "Cividis" = "cividis"
+                          ),
+                          selected = "viridis"
+                        ),
+                        checkboxInput("genome_tracks_show_ideogram", "Show Ideogram", value = TRUE),
+                        numericInput("genome_tracks_ncol", "Number of Columns", value = 2, min = 1, max = 5)
+                      )
+                    )
+                  ),
+                  plotOutput("plot_output"),
+                  downloadButton("download_plot", "Download Plot")
                 )
               )
       ),
@@ -205,6 +278,17 @@ ui <- dashboardPage(
 
 server <- function(input, output, session) {
   # Update sequence selectors when FASTA file is uploaded
+  
+  # Update chromosome choices for genome tracks
+  observe({
+    if (!is.null(result)) {
+      chromosomes <- unique(as.character(seqnames(result$tm)))
+      updateSelectInput(session, "genome_tracks_chromosomes",
+        choices = chromosomes,
+        selected = chromosomes[1]
+      )
+    }
+  })
   
   # Calculate Tm when button is clicked
   observeEvent(input$calculate, {
@@ -236,7 +320,7 @@ server <- function(input, output, session) {
       }
       
       # Calculate Tm using tm_calculate
-      result <- tm_calculate(
+      result <<- tm_calculate(
         input_seq = primers,
         complement_seq = templates,
         method = input$method,
@@ -265,13 +349,88 @@ server <- function(input, output, session) {
         formamide_factor = as.numeric(input$formamide_factor)
       )
       
-      
       # Display results
       output$results <- renderPrint({
         print(result)
       })
+
+      # Create plot based on selected type
+      output$plot_output <- renderPlot({
+        if (is.null(result)) return(NULL)
+        
+        switch(input$plot_type,
+          "karyotype" = {
+            plot_tm_karyotype(
+              result$tm,
+              genome_assembly = "hg38",
+              plot_type = as.numeric(input$karyotype_plot_type),
+              point_cex = input$karyotype_point_cex,
+              xaxis_cex = input$karyotype_xaxis_cex,
+              yaxis_cex = input$karyotype_yaxis_cex
+            )
+          },
+          "heatmap" = {
+            plot_tm_heatmap(
+              result$tm,
+              genome_assembly = "hg38",
+              plot_type = input$heatmap_plot_type,
+              color_palette = input$heatmap_color_palette
+            )
+          },
+          "genome_tracks" = {
+            plot_tm_genome_tracks(
+              result$tm,
+              chromosome_to_plot = input$genome_tracks_chromosomes,
+              genome_assembly = "hg38",
+              color_palette = input$genome_tracks_color_palette,
+              show_ideogram = input$genome_tracks_show_ideogram,
+              ncol = input$genome_tracks_ncol
+            )
+          }
+        )
+      })
       
-      # Enable download button
+      # Update download handler
+      output$download_plot <- downloadHandler(
+        filename = function() {
+          paste("tm_plot_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png", sep = "")
+        },
+        content = function(file) {
+          p <- switch(input$plot_type,
+            "karyotype" = {
+              plot_tm_karyotype(
+                result$tm,
+                genome_assembly = "hg38",
+                plot_type = as.numeric(input$karyotype_plot_type),
+                point_cex = input$karyotype_point_cex,
+                xaxis_cex = input$karyotype_xaxis_cex,
+                yaxis_cex = input$karyotype_yaxis_cex
+              )
+            },
+            "heatmap" = {
+              plot_tm_heatmap(
+                result$tm,
+                genome_assembly = "hg38",
+                plot_type = input$heatmap_plot_type,
+                color_palette = input$heatmap_color_palette
+              )
+            },
+            "genome_tracks" = {
+              plot_tm_genome_tracks(
+                result$tm,
+                chromosome_to_plot = input$genome_tracks_chromosomes,
+                genome_assembly = "hg38",
+                color_palette = input$genome_tracks_color_palette,
+                show_ideogram = input$genome_tracks_show_ideogram,
+                ncol = input$genome_tracks_ncol
+              )
+            }
+          )
+          ggsave(file, plot = p, device = "png", width = 10, height = 8)
+        }
+      )
+      
+      # Enable download button for results
       output$download_results <- downloadHandler(
         filename = function() {
           paste("tm_results_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".txt", sep = "")
@@ -279,8 +438,8 @@ server <- function(input, output, session) {
         content = function(file) {
           writeLines(capture.output(
             cat("Method:", input$method, "\n\n"),
-            for (i in seq_along(results)) {
-              cat("Sequence:", names(results)[i], "\n")
+            for (i in seq_along(result$tm)) {
+              cat("Sequence:", names(result$tm)[i], "\n")
               if (input$input_type == "fasta") {
                 cat("Sequence: ", primers[[i]], "\n")
                 if (!is.null(templates)) {
@@ -288,7 +447,7 @@ server <- function(input, output, session) {
                 }
               }
               cat("\nResults:\n")
-              print(results[[i]])
+              print(result$tm[[i]])
               cat("\n", paste(rep("-", 50), collapse = ""), "\n\n")
             }
           ), file)

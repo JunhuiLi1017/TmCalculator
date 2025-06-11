@@ -16,6 +16,12 @@ knitr::opts_chunk$set(
   fig.width = 8,
   fig.height = 6
 )
+
+# Load required packages
+library(TmCalculator)
+library(BSgenome.Hsapiens.UCSC.hg38)
+library(GenomicRanges)
+library(IRanges)
 ```
 
 # Introduction
@@ -47,8 +53,6 @@ pak::pkg_install("JunhuiLi1017/TmCalculator@dev")
 ## Simple Sequence Input with Wallace rule method
 
 ```{r basic_usage, message=FALSE}
-library(TmCalculator)
-
 # Calculate Tm for simple sequences
 seqs <- c("ATGCGCGAAAT", "GCTAGCTAGCT")
 names(seqs) <- c("chr1:1-11:+:seq1", "chr2:1-11:+:seq2")
@@ -119,7 +123,6 @@ result
 # Visualization of Tm values
 
 ```{r tm_viz, message=FALSE}
-
 # Generate sample data with 150 sequences
 set.seed(123)
 
@@ -159,8 +162,6 @@ plot_tm_karyotype(tm_results,
 
 # Example usage by plot_tm_genome_tracks with default settings (plot_type=1)
 plot_tm_genome_tracks(tm_results, chromosome_to_plot = "chr1", genome_assembly = "hg38")
-
-
 
 # Create example GRanges object  
 gr_tm <- GenomicRanges::GRanges(
