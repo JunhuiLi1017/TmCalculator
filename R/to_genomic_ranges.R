@@ -55,6 +55,7 @@
 #' @importFrom BSgenome available.genomes
 #' @importFrom IRanges IRanges
 #' @importFrom S4Vectors mcols
+#' @importFrom GenomeInfoDb genome
 #' 
 #' @export to_genomic_ranges
  

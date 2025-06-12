@@ -1,12 +1,25 @@
 # Tm Calculator
 
-A web-based tool for calculating melting temperatures (Tm) of nucleic acid sequences.
+A web-based tool for calculating melting temperatures (Tm) of nucleic acid sequences with advanced visualization capabilities.
 
 ## Features
 
-- Calculate Tm using both primer and template sequences
+### Input Options
+- Multiple input methods:
+  - Direct sequence input
+  - FASTA file upload
+  - Genomic coordinates
+- Support for both single and multiple sequences
 - Support for ambiguous bases
-- Adjustable salt conditions:
+- Real-time progress tracking during calculations
+
+### Calculation Methods
+- Nearest Neighbor (tm_nn)
+- GC Content (tm_gc)
+- Wallace Rule (tm_wallace)
+
+### Adjustable Parameters
+- Salt conditions:
   - Na+ concentration
   - K+ concentration
   - Tris buffer
@@ -15,16 +28,51 @@ A web-based tool for calculating melting temperatures (Tm) of nucleic acid seque
 - Chemical modifications:
   - DMSO percentage
   - Formamide (percent or molar)
-- Download results for further analysis
+- Multiple salt correction methods available
+
+### Visualization Options
+- Karyotype Plot:
+  - Customizable chromosome colors and shapes
+  - Adjustable point sizes and text scaling
+  - Flexible layout options
+- Heatmap Plot:
+  - Karyogram and faceted views
+  - Customizable color palettes
+  - Zoom functionality for detailed analysis
+- Genome Tracks:
+  - Interactive ideogram display
+  - Customizable color schemes
+  - Region-specific zooming
+
+### Output Features
+- Real-time calculation progress
+- Interactive visualization
+- Downloadable results and plots
+- Multiple export formats
 
 ## How to Use
 
-1. Enter your primer sequence (5' to 3')
-2. Enter your template sequence (5' to 3')
-3. Adjust salt conditions if needed
-4. Add chemical modifications if required
-5. Click "Calculate Tm" to get results
-6. Download results if needed
+1. Select your preferred calculation method
+2. Choose your input type (direct, FASTA, or genomic coordinates)
+3. Enter your sequence(s) or upload file(s)
+4. Adjust calculation parameters as needed
+5. Click "Calculate Tm" to start the process
+6. Monitor the calculation progress
+7. View and interact with the results
+8. Choose your preferred visualization type
+9. Download results and plots for further analysis
+
+## Citation
+
+If you use Tm Calculator in your research, please cite:
+
+```
+Li, J., & [Your Institution]. (2024). TmCalculator: A web-based tool for calculating and visualizing melting temperatures of nucleic acid sequences. [Journal Name], [Volume], [Pages]. https://github.com/JunhuiLi1017/TmCalculator
+```
+
+## Contact
+
+For questions, suggestions, or bug reports, please visit our [GitHub repository](https://github.com/JunhuiLi1017/TmCalculator/issues) or open an issue.
 
 ## About the Calculations
 
@@ -34,10 +82,3 @@ The Tm Calculator uses the nearest-neighbor thermodynamic parameters to calculat
 - Salt effects
 - Chemical modifications
 - Ambiguous bases
-
-## References
-
-For more information about the thermodynamic parameters and calculation methods, please refer to:
-
-- SantaLucia J. (1998) A unified view of polymer, dumbbell, and oligonucleotide DNA nearest-neighbor thermodynamics. PNAS 95:1460-1465
-- Owczarzy R. et al. (2008) Predicting stability of DNA duplexes in solutions containing magnesium and monovalent cations. Biochemistry 47:5336-5353 
