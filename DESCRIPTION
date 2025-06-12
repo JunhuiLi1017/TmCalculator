@@ -19,7 +19,8 @@ Description: A comprehensive R package for calculating melting temperatures of n
     Supports both direct sequence input and FASTA file input.
 BugReports: https://github.com/JunhuiLi1017/TmCalculator/issues
 License: MIT + file LICENSE
-Depends: R (>= 2.10)
+Depends: 
+    R (>= 3.5)
 VignetteBuilder: knitr
 Imports: 
     seqinr,
