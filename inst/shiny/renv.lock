@@ -358,9 +358,9 @@
     },
     "Gviz": {
       "Package": "Gviz",
-      "Version": "1.50.0",
+      "Version": "1.48.0",
       "Source": "Bioconductor",
-      "Repository": "Bioconductor 3.20",
+      "Repository": "Bioconductor 3.19",
       "Requirements": [
         "AnnotationDbi",
         "BSgenome",
@@ -392,7 +392,7 @@
         "stats",
         "utils"
       ],
-      "Hash": "dce8ff75b2b7daceb0ff78c257c5554c"
+      "Hash": "10e7499913d72552a31bbd96600e29f7"
     },
     "Hmisc": {
       "Package": "Hmisc",
@@ -497,9 +497,9 @@
     },
     "OrganismDbi": {
       "Package": "OrganismDbi",
-      "Version": "1.48.0",
+      "Version": "1.46.0",
       "Source": "Bioconductor",
-      "Repository": "Bioconductor 3.20",
+      "Repository": "Bioconductor 3.19",
       "Requirements": [
         "AnnotationDbi",
         "Biobase",
@@ -518,7 +518,7 @@
         "txdbmaker",
         "utils"
       ],
-      "Hash": "0dc11926897ee05364435587bda54f3d"
+      "Hash": "d49304b16ee159e1e10a6a58d25cdcde"
     },
     "PKI": {
       "Package": "PKI",
@@ -1442,9 +1442,9 @@
     },
     "ggbio": {
       "Package": "ggbio",
-      "Version": "1.54.0",
+      "Version": "1.52.0",
       "Source": "Bioconductor",
-      "Repository": "Bioconductor 3.20",
+      "Repository": "Bioconductor 3.19",
       "Requirements": [
         "AnnotationDbi",
         "AnnotationFilter",
@@ -1480,7 +1480,7 @@
         "stats",
         "utils"
       ],
-      "Hash": "8c05beb63f8b12dfcc7d0577272c0de5"
+      "Hash": "c7abc2449aa6c22cff74528ffc208b92"
     },
     "ggplot2": {
       "Package": "ggplot2",
@@ -1767,9 +1767,9 @@
     },
     "karyoploteR": {
       "Package": "karyoploteR",
-      "Version": "1.32.0",
+      "Version": "1.30.0",
       "Source": "Bioconductor",
-      "Repository": "Bioconductor 3.20",
+      "Repository": "Bioconductor 3.19",
       "Requirements": [
         "AnnotationDbi",
         "GenomeInfoDb",
@@ -1792,7 +1792,7 @@
         "rtracklayer",
         "stats"
       ],
-      "Hash": "a671247535ab0a8dedd2889ba2d62405"
+      "Hash": "881bab82a4071a43876d0829559e746a"
     },
     "knitr": {
       "Package": "knitr",
@@ -2582,9 +2582,9 @@
     },
     "txdbmaker": {
       "Package": "txdbmaker",
-      "Version": "1.2.1",
+      "Version": "1.0.1",
       "Source": "Bioconductor",
-      "Repository": "Bioconductor 3.20",
+      "Repository": "Bioconductor 3.19",
       "Requirements": [
         "AnnotationDbi",
         "Biobase",
@@ -2607,7 +2607,7 @@
         "tools",
         "utils"
       ],
-      "Hash": "c040606810e1b49dc05e5c22fe7179b6"
+      "Hash": "c9f03c12df69ffd42384b4763560cc92"
     },
     "utf8": {
       "Package": "utf8",
