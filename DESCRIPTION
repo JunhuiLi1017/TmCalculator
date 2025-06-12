@@ -1,8 +1,8 @@
 Package: TmCalculator
 Type: Package
 Title: Melting Temperature of Nucleic Acid Sequences
-Version: 1.1.0
-Date: 2025-06-10
+Version: 1.1.1
+Date: 2025-06-12
 Author: Junhui Li
 Maintainer: Junhui Li <junhuili@cau.edu.cn>
 Description: A comprehensive R package for calculating melting temperatures of nucleic acid sequences. 
