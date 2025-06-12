@@ -254,4 +254,6 @@ result <- tm_calculate(
   salt_corr_method = "Owczarzy2008"
 )
 
+fasta_file <- system.file("extdata", "BSgenome.Hsapiens.UCSC.hg38.fasta", package = "TmCalculator")
+gr_tm <- tm_calculate(fasta_file)
 }

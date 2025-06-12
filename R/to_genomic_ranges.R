@@ -156,7 +156,7 @@ vec_to_genomic_ranges <- function(input_seq) {
             strand = parts[3]
           )
           names(gr) <- x
-          genome(gr) <- strsplit(parts[4], "\\.")[[1]][4]
+          GenomeInfoDb::genome(gr) <- strsplit(parts[4], "\\.")[[1]][4]
         # if the name matches the pattern "chr:start-end:strand", parse the name
         } else if (grepl("^[^:]+:[0-9]+-[0-9]+:[+-\\*]:[^:]+$", sub_seq_name)) {
           parts <- strsplit(sub_seq_name, ":")[[1]]
@@ -167,7 +167,7 @@ vec_to_genomic_ranges <- function(input_seq) {
             strand = parts[3]
           )
           names(gr) <- x
-          genome(gr) <- strsplit(parts[4], "\\.")[[1]][4]
+          GenomeInfoDb::genome(gr) <- strsplit(parts[4], "\\.")[[1]][4]
         } else if (grepl("^[^:]+:[0-9]+-[0-9]+:[+-\\*]$", sub_seq_name)) {
           parts <- strsplit(sub_seq_name, ":")[[1]]
           range_parts <- as.integer(strsplit(parts[2], "-")[[1]])

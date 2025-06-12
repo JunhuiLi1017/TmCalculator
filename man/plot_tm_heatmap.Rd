@@ -81,9 +81,7 @@ fasta_file <- system.file("extdata", "BSgenome.Hsapiens.UCSC.hg38.fasta", packag
 gr_tm <- tm_calculate(fasta_file)
 
 # plot with zoom
-plot_tm_heatmap(gr_tm, genome_assembly = "hg38", plot_type = "faceted", zoom = "chr1:1000-2000000")
-
-# plot with multiple chromosomes
-plot_tm_heatmap(gr_tm, genome_assembly = "hg38", plot_type = "faceted", chromosome_to_plot = c("chr1", "chr2"))
+plot_tm_heatmap(gr_tm$tm$Tm, genome_assembly = "hg38", chromosome_to_plot = c("chr1"),
+plot_type = "faceted", zoom = "chr1:1000-2000000")
 
 }
