@@ -67,7 +67,7 @@
 #' gr_tm <- tm_calculate(fasta_file)
 #' 
 #' # plot with zoom
-#' plot_tm_heatmap(gr_tm, genome_assembly = "hg38", chromosome_to_plot = c("chr1"),
+#' plot_tm_heatmap(gr_tm$tm$Tm, genome_assembly = "hg38", chromosome_to_plot = c("chr1"),
 #' plot_type = "faceted", zoom = "chr1:1000-2000000")
 #' 
 #' @importFrom GenomeInfoDb seqinfo genome seqlengths seqlevels seqlevelsInUse
@@ -261,7 +261,9 @@ plot_tm_heatmap <- function(gr,
     gr_df_list <- c(gr_df_list_zoomed, list(gr_df_non_zoomed))
     gr_df_list <- gr_df_list[!sapply(gr_df_list, is.null)] # Remove NULL entries
     gr_df <- do.call(rbind, gr_df_list)
-    
+    if (is.null(gr_df)) {
+      stop("No data points found in the specified zoom region.")
+    }
   } else {
     gr_df <- as.data.frame(gr) %>%
       dplyr::arrange(seqnames, start) %>%

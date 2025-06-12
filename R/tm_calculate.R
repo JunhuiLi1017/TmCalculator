@@ -213,6 +213,8 @@
 #'   salt_corr_method = "Owczarzy2008"
 #' )
 #' 
+#' fasta_file <- system.file("extdata", "BSgenome.Hsapiens.UCSC.hg38.fasta", package = "TmCalculator")
+#' gr_tm <- tm_calculate(fasta_file)
 #' @export tm_calculate
 tm_calculate <- function(input_seq,
                         method = c("tm_nn", "tm_gc", "tm_wallace"),

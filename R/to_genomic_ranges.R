@@ -142,7 +142,7 @@ vec_to_genomic_ranges <- function(input_seq) {
       sub_seq_name <- seq_name[x]
       # if the name is not null, parse the name
       if (!is.null(sub_seq_name)) {        # if the name matches the pattern "chr:start-end:strand:name", parse the name
-        if (grepl("^[^:]+:[0-9]+-[0-9]+:[+-\\*]:[^:]+$", sub_seq_name)) {
+        if (grepl("^[^:]+:[0-9]+-[0-9]+:[+-\\*]:[^:]+:[^:]$", sub_seq_name)) {
           parts <- strsplit(sub_seq_name, ":")[[1]]
           range_parts <- as.integer(strsplit(parts[2], "-")[[1]])
           # Validate start and end positions
@@ -154,8 +154,19 @@ vec_to_genomic_ranges <- function(input_seq) {
             ranges = IRanges(start = range_parts[1], end = range_parts[2]),
             strand = parts[3]
           )
-          names(gr) <- parts[4]
+          names(gr) <- x
+          genome(gr) <- strsplit(parts[4], "\\.")[[1]][4]
         # if the name matches the pattern "chr:start-end:strand", parse the name
+        } else if (grepl("^[^:]+:[0-9]+-[0-9]+:[+-\\*]:[^:]+$", sub_seq_name)) {
+          parts <- strsplit(sub_seq_name, ":")[[1]]
+          range_parts <- as.integer(strsplit(parts[2], "-")[[1]])
+          gr <- GenomicRanges::GRanges(
+            seqnames = parts[1],
+            ranges = IRanges(start = range_parts[1], end = range_parts[2]),
+            strand = parts[3]
+          )
+          names(gr) <- x
+          genome(gr) <- strsplit(parts[4], "\\.")[[1]][4]
         } else if (grepl("^[^:]+:[0-9]+-[0-9]+:[+-\\*]$", sub_seq_name)) {
           parts <- strsplit(sub_seq_name, ":")[[1]]
           range_parts <- as.integer(strsplit(parts[2], "-")[[1]])
@@ -182,7 +193,7 @@ vec_to_genomic_ranges <- function(input_seq) {
             ranges = IRanges(start = 1, end = nchar(input_seq[x])),
             strand = "*"
           )
-          names(gr) <- sub_seq_name
+          names(gr) <- x
         }
       } else {
         gr <- GRanges(
