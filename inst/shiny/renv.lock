@@ -757,15 +757,16 @@
     },
     "TmCalculator": {
       "Package": "TmCalculator",
-      "Version": "1.1.0",
+      "Version": "1.1.1",
       "Source": "GitHub",
       "Repository": "CRAN",
       "RemoteType": "github",
       "RemoteHost": "api.github.com",
       "RemoteRepo": "TmCalculator",
       "RemoteUsername": "JunhuiLi1017",
+      "RemotePkgRef": "JunhuiLi1017/TmCalculator@dev",
       "RemoteRef": "dev",
-      "RemoteSha": "fd608f978ebb33c2067c39e5e777bcbb3b14b6fb",
+      "RemoteSha": "90edc43629bdc4f57bbba7828071451180dbcf55",
       "Requirements": [
         "BSgenome",
         "Biostrings",
@@ -785,7 +786,7 @@
         "shinydashboard",
         "viridis"
       ],
-      "Hash": "2736a50e39bbaa0fe3c83968ab6d32ae"
+      "Hash": "df23afda6fef3007655f7ce3961818c5"
     },
     "UCSC.utils": {
       "Package": "UCSC.utils",
