@@ -396,6 +396,11 @@ server <- function(input, output, session) {
 
   # Calculate Tm when button is clicked
   observeEvent(input$calculate, {
+    # Create progress object
+    progress <- shiny::Progress$new()
+    progress$set(message = "Calculating Tm values", value = 0)
+    on.exit(progress$close())
+
     tryCatch({
       # Get sequences based on input type
       primers <- NULL
@@ -419,6 +424,9 @@ server <- function(input, output, session) {
           templates <- input$fasta_file_complement$datapath
         }
       }
+
+      # Update progress
+      progress$set(message = "Processing sequences", value = 0.2)
 
       # Calculate Tm using tm_calculate
       calculated_result <- tm_calculate(
@@ -452,6 +460,9 @@ server <- function(input, output, session) {
         formamide_factor = as.numeric(input$formamide_factor)
       )
 
+      # Update progress
+      progress$set(message = "Preparing results", value = 0.8)
+
       # Store result in reactiveVal
       result(calculated_result)
 
@@ -466,6 +477,11 @@ server <- function(input, output, session) {
         current_gr <- result()$tm$Tm
         req(current_gr) # Ensure the GRanges object is not NULL
 
+        # Create progress object for plotting
+        plot_progress <- shiny::Progress$new()
+        plot_progress$set(message = "Generating plot", value = 0)
+        on.exit(plot_progress$close())
+
         # Parse colors and shapes for karyotype plot
         karyotype_colors_parsed <- parse_named_vector(input$karyotype_colors, type = "character")
         karyotype_shapes_parsed <- parse_named_vector(input$karyotype_shapes, type = "numeric")
@@ -475,21 +491,23 @@ server <- function(input, output, session) {
         plot_genome_assembly_heatmap <- if (input$heatmap_genome_assembly != "") input$heatmap_genome_assembly else NULL
         plot_genome_assembly_genome_tracks <- if (input$genome_tracks_genome_assembly != "") input$genome_tracks_genome_assembly else NULL
 
+        # Update plot progress
+        plot_progress$set(message = "Rendering plot", value = 0.5)
 
-        switch(input$plot_type,
+        p <- switch(input$plot_type,
           "karyotype" = {
             plot_tm_karyotype(
               gr = current_gr,
               chromosomes = input$karyotype_chromosomes,
               genome_assembly = plot_genome_assembly_karyotype,
-              colors = karyotype_colors_parsed, # Pass parsed colors
-              shapes = karyotype_shapes_parsed, # Pass parsed shapes
+              colors = karyotype_colors_parsed,
+              shapes = karyotype_shapes_parsed,
               plot_type = as.numeric(input$karyotype_plot_type),
               point_cex = input$karyotype_point_cex,
               xaxis_cex = input$karyotype_xaxis_cex,
               yaxis_cex = input$karyotype_yaxis_cex,
-              chr_cex = input$karyotype_chr_cex, # New parameter
-              tick_dist = input$karyotype_tick_dist # New parameter
+              chr_cex = input$karyotype_chr_cex,
+              tick_dist = input$karyotype_tick_dist
             )
           },
           "heatmap" = {
@@ -514,120 +532,15 @@ server <- function(input, output, session) {
             )
           }
         )
+
+        # Update plot progress
+        plot_progress$set(message = "Finalizing plot", value = 0.9)
+
+        return(p)
       })
 
-      # Update download handler for plot
-      output$download_plot <- downloadHandler(
-        filename = function() {
-          paste("tm_plot_", input$plot_type, "_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".png", sep = "")
-        },
-        content = function(file) {
-          # Make sure to re-evaluate inputs and data for the download
-          req(result())
-          current_gr <- result()$tm$Tm
-          req(current_gr)
-
-          # Parse colors and shapes for karyotype plot download
-          karyotype_colors_parsed <- parse_named_vector(input$karyotype_colors, type = "character")
-          karyotype_shapes_parsed <- parse_named_vector(input$karyotype_shapes, type = "numeric")
-
-          # Determine genome assembly for plotting functions from input for download
-          plot_genome_assembly_karyotype <- if (input$karyotype_genome_assembly != "") input$karyotype_genome_assembly else NULL
-          plot_genome_assembly_heatmap <- if (input$heatmap_genome_assembly != "") input$heatmap_genome_assembly else NULL
-          plot_genome_assembly_genome_tracks <- if (input$genome_tracks_genome_assembly != "") input$genome_tracks_genome_assembly else NULL
-
-          # Generate the plot
-          p <- switch(input$plot_type,
-            "karyotype" = {
-              plot_tm_karyotype(
-                gr = current_gr,
-                chromosomes = input$karyotype_chromosomes,
-                genome_assembly = plot_genome_assembly_karyotype,
-                colors = karyotype_colors_parsed,
-                shapes = karyotype_shapes_parsed,
-                plot_type = as.numeric(input$karyotype_plot_type),
-                point_cex = input$karyotype_point_cex,
-                xaxis_cex = input$karyotype_xaxis_cex,
-                yaxis_cex = input$karyotype_yaxis_cex,
-                chr_cex = input$karyotype_chr_cex,
-                tick_dist = input$karyotype_tick_dist
-              )
-            },
-            "heatmap" = {
-              plot_tm_heatmap(
-                gr = current_gr,
-                genome_assembly = plot_genome_assembly_heatmap,
-                chromosome_to_plot = input$heatmap_chromosomes,
-                plot_type = input$heatmap_plot_type,
-                color_palette = input$heatmap_color_palette,
-                title_name = input$heatmap_title,
-                zoom = if (input$heatmap_zoom != "") input$heatmap_zoom else NULL
-              )
-            },
-            "genome_tracks" = {
-              plot_tm_genome_tracks(
-                gr = current_gr,
-                chromosome_to_plot = input$genome_tracks_chromosomes,
-                genome_assembly = plot_genome_assembly_genome_tracks,
-                color_palette = input$genome_tracks_color_palette,
-                show_ideogram = input$genome_tracks_show_ideogram,
-                zoom = if (input$genome_tracks_zoom != "") input$genome_tracks_zoom else NULL
-              )
-            }
-          )
-          # For karyoploteR plots, direct ggsave might not work without a ggplot object.
-          # We'll need to capture the plot generated by karyoploteR.
-          # For ggbio plots, they return ggplot objects, so ggsave will work.
-          if (input$plot_type == "karyotype") {
-            # KaryoploteR plots are drawn directly to the device.
-            # We need to open a graphics device, draw the plot, then close it.
-            png(file, width = 1000, height = 800, res = 100) # Adjust dimensions as needed
-            plot_tm_karyotype(
-                gr = current_gr,
-                chromosomes = input$karyotype_chromosomes,
-                genome_assembly = plot_genome_assembly_karyotype,
-                colors = karyotype_colors_parsed,
-                shapes = karyotype_shapes_parsed,
-                plot_type = as.numeric(input$karyotype_plot_type),
-                point_cex = input$karyotype_point_cex,
-                xaxis_cex = input$karyotype_xaxis_cex,
-                yaxis_cex = input$karyotype_yaxis_cex,
-                chr_cex = input$karyotype_chr_cex,
-                tick_dist = input$karyotype_tick_dist
-              )
-            dev.off()
-          } else {
-            # For ggbio plots (heatmap and genome_tracks), the functions return a ggplot object
-            # which can be passed to ggsave.
-            ggsave(file, plot = p, device = "png", width = 10, height = 8, units = "in")
-          }
-        }
-      )
-
-      # Enable download button for results
-      output$download_results <- downloadHandler(
-        filename = function() {
-          paste("tm_results_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".txt", sep = "")
-        },
-        content = function(file) {
-          req(result()) # Ensure result is available
-          writeLines(capture.output({
-            cat("Method:", input$method, "\n\n")
-            if (inherits(result()$tm, "GRanges")) {
-                cat("GRanges Tm Results:\n")
-                print(result()$tm)
-            } else if (is.list(result()$tm)) {
-                # For cases where Tm is a list (e.g., from tm_nn on multiple sequences)
-                for (i in seq_along(result()$tm)) {
-                    cat("Sequence ", i, " Tm: ", result()$tm[[i]]$Tm, "\n", sep="")
-                    # Add more details if needed, e.g., print(result()$tm[[i]])
-                }
-            } else {
-                cat("Tm Result:", result()$tm, "\n")
-            }
-          }), file)
-        }
-      )
+      # Update progress
+      progress$set(message = "Calculation complete", value = 1)
 
     }, error = function(e) {
       showNotification(paste("Error:", e$message), type = "error")
