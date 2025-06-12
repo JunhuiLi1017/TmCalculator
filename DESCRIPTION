@@ -37,10 +37,10 @@ Imports:
     ggplot2,
     karyoploteR,
     viridis,
-    rlang
+    rlang,
+    usethis
 Suggests: 
     testthat (>= 3.0.0),
-    usethis,
     knitr,
     rmarkdown,
     devtools,
