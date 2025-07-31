@@ -59,6 +59,7 @@
 #' @rawNamespace import(shiny, except=c(dataTableOutput, renderDataTable))
 #' @import  shiny
 #' @import  shinydashboard
+#' @import  plotly
 #' @export
 #'
 TmCalculator_shiny <- function() {

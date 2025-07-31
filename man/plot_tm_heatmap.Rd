@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_tm_heatmap.R
 \name{plot_tm_heatmap}
 \alias{plot_tm_heatmap}
-\title{Plot Tm Values on Genomic Coordinates}
+\title{Plot Tm values as a heatmap using ggbio}
 \usage{
 plot_tm_heatmap(
   gr,
@@ -15,22 +15,23 @@ plot_tm_heatmap(
 )
 }
 \arguments{
-\item{gr}{A GRanges object containing the genomic coordinates and Tm values.
-The Tm values should be in a metadata column named "Tm".}
+\item{gr}{A GRanges object. It MUST contain a metadata column named 'Tm'
+with numeric melting temperature values.}
 
-\item{genome_assembly}{Character string specifying the genome assembly
-(e.g., "hg19", "hg38", "mm10") for setting chromosome lengths.}
+\item{genome_assembly}{A character string indicating the genome assembly (e.g., "hg19", "mm10").
+This is used by ggbio for correct chromosome display.}
 
-\item{chromosome_to_plot}{Character string specifying the chromosome to plot.
-If NULL (default), all chromosomes will be plotted.
-Example: "chr1" for plotting chr1 only.}
+\item{chromosome_to_plot}{A character vector specifying which chromosomes to visualize.
+These chromosomes must exist in your GRanges object.}
 
-\item{plot_type}{Character string specifying the plot type: "karyogram" for
-integrated ideogram view or "faceted" for separate chromosome panels.
-Default is "karyogram".}
+\item{plot_type}{A character string specifying the type of plot to generate:
+\itemize{
+  \item "karyogram" (default): A single plot with all chromosomes arranged in a karyogram
+  \item "faceted": Separate plots for each chromosome
+}}
 
-\item{color_palette}{Character string specifying the viridis color palette to use.
-Default is "viridis". Available options are:
+\item{color_palette}{A character string specifying the viridis color palette to use.
+Available options are:
 \itemize{
   \item "viridis" (default): A perceptually uniform color map that works well for most people
   \item "magma": A perceptually uniform color map with a dark purple to bright yellow range
@@ -40,9 +41,9 @@ Default is "viridis". Available options are:
 }
 All palettes are colorblind-friendly and perceptually uniform.}
 
-\item{title_name}{Character string for the plot title. If NULL, a default title will be used.}
+\item{title_name}{A character string for the plot title.}
 
-\item{zoom}{A character string vector specifying the genomic region to zoom into.
+\item{zoom}{A character string specifying the genomic region to zoom into.
 If NULL (default), the entire range of each chromosome will be shown.
 Example: c("chr1:1000000-2000000", "chr2:1000000-2000000") for zooming into chr1:1000000-2000000 and chr2:1000000-2000000}
 }
@@ -50,9 +51,8 @@ Example: c("chr1:1000000-2000000", "chr2:1000000-2000000") for zooming into chr1
 A ggplot object displaying Tm values across genomic coordinates.
 }
 \description{
-This function creates a plot of Tm values across genomic coordinates using
-ggbio and ggplot2. It can display the data either as a single integrated plot
-with ideograms or as faceted plots by chromosome.
+This function generates a heatmap visualization of Tm values across chromosomes
+using the ggbio package. It supports both karyogram and faceted plot types.
 }
 \examples{
 \dontrun{
@@ -76,12 +76,5 @@ plot_tm_heatmap(gr_tm, genome_assembly = "hg19", plot_type = "faceted")
 plot_tm_heatmap(gr_tm, genome_assembly = "hg19", plot_type = "faceted", zoom = "chr1:100-200")
 
 }
-# calculate Tm values from a fasta file
-fasta_file <- system.file("extdata", "BSgenome.Hsapiens.UCSC.hg38.fasta", package = "TmCalculator")
-gr_tm <- tm_calculate(fasta_file)
-
-# plot with zoom
-plot_tm_heatmap(gr_tm$tm$Tm, genome_assembly = "hg38", chromosome_to_plot = c("chr1"),
-plot_type = "faceted", zoom = "chr1:1000-2000000")
 
 }

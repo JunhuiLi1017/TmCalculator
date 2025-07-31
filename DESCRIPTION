@@ -39,7 +39,7 @@ Imports:
     karyoploteR,
     viridis,
     rlang,
-    usethis
+    plotly
 Suggests: 
     testthat (>= 3.0.0),
     knitr,

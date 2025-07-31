@@ -80,7 +80,7 @@
 #' @importFrom dplyr %>%
 #' @importFrom viridis viridis
 #' @importFrom grDevices colorRampPalette dev.cur dev.new
-#' @importFrom graphics layout par text
+#' @importFrom graphics par text
 #' @importFrom GenomeInfoDb seqlengths seqlevels seqlevelsInUse genome
 #' @export
 

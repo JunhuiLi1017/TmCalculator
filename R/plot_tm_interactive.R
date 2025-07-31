@@ -2,7 +2,14 @@
 #'
 #' These functions convert the standard Tm plots to interactive plotly versions
 #' that can be used in Shiny applications or R Markdown documents.
-#'
+#' @param gr A GRanges object containing the Tm values.
+#' @param genome_assembly A string specifying the genome assembly.
+#' @param chromosome_to_plot A string specifying the chromosome to plot.
+#' @param plot_type A string specifying the plot type.
+#' @param color_palette A string specifying the color palette.
+#' @param title_name A string specifying the title name.
+#' @param zoom A string specifying the zoom level.
+
 #' @importFrom plotly ggplotly plot_ly layout
 #' @importFrom ggplot2 ggplot aes geom_rect scale_fill_viridis_c scale_y_continuous labs theme_bw theme element_text element_blank element_line
 #' @importFrom viridis viridis
@@ -44,7 +51,7 @@ plot_tm_heatmap_interactive <- function(gr,
       hovermode = "closest",
       showlegend = TRUE,
       legend = list(
-        title = list(text = "Tm (°C)"),
+        title = list(text = "Tm (\u00B0C)"),
         orientation = "v",
         y = 0.5
       )
@@ -53,6 +60,25 @@ plot_tm_heatmap_interactive <- function(gr,
   return(p_interactive)
 }
 
+#' Convert Tm karyotype plots to interactive plotly versions
+#'
+#' These functions convert the standard Tm karyotype plots to interactive plotly versions
+#' that can be used in Shiny applications or R Markdown documents.
+#' @param gr A GRanges object containing the Tm values.
+#' @param chromosomes A vector of strings specifying the chromosomes to plot.
+#' @param genome_assembly A string specifying the genome assembly.  
+#' @param colors A vector of strings specifying the colors for the chromosomes.
+#' @param shapes A vector of strings specifying the shapes for the chromosomes.
+#' @param plot_type A string specifying the plot type.
+#' @param point_cex A numeric value specifying the point size.
+#' @param xaxis_cex A numeric value specifying the x-axis label size.
+#' @param yaxis_cex A numeric value specifying the y-axis label size.
+#' @param chr_cex A numeric value specifying the chromosome label size.
+#' @param tick_dist A numeric value specifying the tick distance.
+#' @param zoom A string specifying the zoom level.
+#' 
+#' @return A plotly object.
+#' 
 #' @rdname plot_tm_interactive
 #' @export
 plot_tm_karyotype_interactive <- function(gr,
@@ -99,7 +125,7 @@ plot_tm_karyotype_interactive <- function(gr,
       text = ~paste(
         "Chromosome:", chromosome,
         "\nPosition:", position,
-        "\nTm:", round(Tm, 2), "°C",
+        "\nTm:", round(Tm, 2), "(\u00B0C)",
         "\nRange:", start, "-", end
       ),
       hoverinfo = "text"
@@ -114,7 +140,7 @@ plot_tm_karyotype_interactive <- function(gr,
         tickfont = list(size = xaxis_cex * 12)
       ),
       yaxis = list(
-        title = "Tm (°C)",
+        title = "Tm (\u00B0C)",
         tickfont = list(size = yaxis_cex * 12)
       ),
       showlegend = TRUE,
@@ -127,12 +153,24 @@ plot_tm_karyotype_interactive <- function(gr,
   return(p)
 }
 
+#' Convert Tm genome tracks plots to interactive plotly versions
+#'
+#' These functions convert the standard Tm genome tracks plots to interactive plotly versions
+#' that can be used in Shiny applications or R Markdown documents.
+#' @param gr A GRanges object containing the Tm values.
+#' @param chromosome_to_plot A string specifying the chromosome to plot.
+#' @param genome_assembly A string specifying the genome assembly.
+#' @param tm_track_title A string specifying the title name.
+#' @param color_palette A string specifying the color palette.
+#' @param show_ideogram A logical value specifying whether to show the ideogram.
+#' @param zoom A string specifying the zoom level.
+#' 
 #' @rdname plot_tm_interactive
 #' @export
 plot_tm_genome_tracks_interactive <- function(gr,
                                             chromosome_to_plot,
                                             genome_assembly = NULL,
-                                            tm_track_title = "Melting Temperature (°C)",
+                                            tm_track_title = "Melting Temperature (\u00B0C)",
                                             color_palette = c("viridis", "magma", "plasma", "inferno", "cividis"),
                                             show_ideogram = TRUE,
                                             zoom = NULL) {
@@ -171,7 +209,7 @@ plot_tm_genome_tracks_interactive <- function(gr,
       ),
       text = ~paste(
         "Position:", position,
-        "\nTm:", round(Tm, 2), "°C",
+        "\nTm:", round(Tm, 2), "(\u00B0C)",
         "\nRange:", start, "-", end
       ),
       hoverinfo = "text"
