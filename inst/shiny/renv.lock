@@ -766,7 +766,7 @@
       "RemoteUsername": "JunhuiLi1017",
       "RemotePkgRef": "JunhuiLi1017/TmCalculator@dev",
       "RemoteRef": "dev",
-      "RemoteSha": "2fcd638e47f3be0118e7912508448a672133cfdf",
+      "RemoteSha": "ad1605fb1a99f323b10a74eaf832ae81cf9ce0f2",
       "Requirements": [
         "BSgenome",
         "Biostrings",
@@ -784,9 +784,10 @@
         "seqinr",
         "shiny",
         "shinydashboard",
+        "usethis",
         "viridis"
       ],
-      "Hash": "f809f94abd03e80e7da54be2b9ff28e5"
+      "Hash": "c427dba2d1cec150092e931b79906413"
     },
     "UCSC.utils": {
       "Package": "UCSC.utils",
@@ -1098,6 +1099,16 @@
       ],
       "Hash": "16850760556401a2eeb27d39bd11c9cb"
     },
+    "clipr": {
+      "Package": "clipr",
+      "Version": "0.8.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "utils"
+      ],
+      "Hash": "3f038e5ac7f41d4ac41ce658c85e3042"
+    },
     "cluster": {
       "Package": "cluster",
       "Version": "2.1.6",
@@ -1165,6 +1176,20 @@
       ],
       "Hash": "859d96e65ef198fd43e82b9628d593ef"
     },
+    "credentials": {
+      "Package": "credentials",
+      "Version": "2.0.2",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "askpass",
+        "curl",
+        "jsonlite",
+        "openssl",
+        "sys"
+      ],
+      "Hash": "09fd631e607a236f8cc7f9604db32cb8"
+    },
     "curl": {
       "Package": "curl",
       "Version": "6.2.3",
@@ -1225,6 +1250,19 @@
         "graphics"
       ],
       "Hash": "24754fce82729ff85317dd195b6646a8"
+    },
+    "desc": {
+      "Package": "desc",
+      "Version": "1.4.3",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R",
+        "R6",
+        "cli",
+        "utils"
+      ],
+      "Hash": "99b79fcbd6c4d1ce087f5c5c758b384f"
     },
     "dichromat": {
       "Package": "dichromat",
@@ -1440,6 +1478,21 @@
       ],
       "Hash": "4b29bf698d0c7bdb9f1e4976e7ade41d"
     },
+    "gert": {
+      "Package": "gert",
+      "Version": "2.1.5",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "askpass",
+        "credentials",
+        "openssl",
+        "rstudioapi",
+        "sys",
+        "zip"
+      ],
+      "Hash": "b886f9838f82444c47a9962adc5ab8e8"
+    },
     "ggbio": {
       "Package": "ggbio",
       "Version": "1.52.0",
@@ -1529,6 +1582,34 @@
         "utils"
       ],
       "Hash": "7970feac45e807dabb5f53add546afcc"
+    },
+    "gh": {
+      "Package": "gh",
+      "Version": "1.5.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R",
+        "cli",
+        "gitcreds",
+        "glue",
+        "httr2",
+        "ini",
+        "jsonlite",
+        "lifecycle",
+        "rlang"
+      ],
+      "Hash": "d92acb7afad09df6839e4e456e538d03"
+    },
+    "gitcreds": {
+      "Package": "gitcreds",
+      "Version": "0.1.2",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R"
+      ],
+      "Hash": "ab08ac61f3e1be454ae21911eb8bc2fe"
     },
     "glue": {
       "Package": "glue",
@@ -1710,6 +1791,13 @@
         "withr"
       ],
       "Hash": "ade531519694081d91036b509eb30594"
+    },
+    "ini": {
+      "Package": "ini",
+      "Version": "0.3.1",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "6154ec2223172bce8162d4153cda21f7"
     },
     "interp": {
       "Package": "interp",
@@ -2276,6 +2364,16 @@
       ],
       "Hash": "b3d390424f41d04174cccf84d49676c2"
     },
+    "rprojroot": {
+      "Package": "rprojroot",
+      "Version": "2.0.4",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R"
+      ],
+      "Hash": "4c8415e0ec1e29f3f4f6fc108bef0144"
+    },
     "rsconnect": {
       "Package": "rsconnect",
       "Version": "1.3.1",
@@ -2609,6 +2707,38 @@
       ],
       "Hash": "c9f03c12df69ffd42384b4763560cc92"
     },
+    "usethis": {
+      "Package": "usethis",
+      "Version": "3.1.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R",
+        "cli",
+        "clipr",
+        "crayon",
+        "curl",
+        "desc",
+        "fs",
+        "gert",
+        "gh",
+        "glue",
+        "jsonlite",
+        "lifecycle",
+        "purrr",
+        "rappdirs",
+        "rlang",
+        "rprojroot",
+        "rstudioapi",
+        "stats",
+        "tools",
+        "utils",
+        "whisker",
+        "withr",
+        "yaml"
+      ],
+      "Hash": "0d7f5ca181f9b1e68b217bd93b6cc703"
+    },
     "utf8": {
       "Package": "utf8",
       "Version": "1.2.5",
@@ -2655,6 +2785,13 @@
         "R"
       ],
       "Hash": "c826c7c4241b6fc89ff55aaea3fa7491"
+    },
+    "whisker": {
+      "Package": "whisker",
+      "Version": "0.4.1",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "c6abfa47a46d281a7d5159d0a8891e88"
     },
     "withr": {
       "Package": "withr",
@@ -2712,6 +2849,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "51dab85c6c98e50a18d7551e9d49f76c"
+    },
+    "zip": {
+      "Package": "zip",
+      "Version": "2.3.3",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "6ebe4b1dc74c3e50e74e316323629583"
     },
     "zlibbioc": {
       "Package": "zlibbioc",

@@ -48,7 +48,7 @@
 #' @examples
 #' \dontrun{
 #' # Launch the TmCalculator Shiny application
-#' TmCalculatorShinyApp()
+#' TmCalculator_shiny()
 #' }
 #'
 #' @seealso \code{\link{tm_calculate}} for the core Tm calculation function
@@ -61,6 +61,6 @@
 #' @import  shinydashboard
 #' @export
 #'
-TmCalculatorShinyApp <- function() {
+TmCalculator_shiny <- function() {
   runApp(appDir = system.file('shiny', package = 'TmCalculator'))
 }

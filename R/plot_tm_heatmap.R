@@ -1,31 +1,31 @@
-#' Plot Tm Values on Genomic Coordinates
+#' Plot Tm values as a heatmap using ggbio
 #'
-#' This function creates a plot of Tm values across genomic coordinates using
-#' ggbio and ggplot2. It can display the data either as a single integrated plot
-#' with ideograms or as faceted plots by chromosome.
+#' This function generates a heatmap visualization of Tm values across chromosomes
+#' using the ggbio package. It supports both karyogram and faceted plot types.
 #'
-#' @param gr A GRanges object containing the genomic coordinates and Tm values.
-#'           The Tm values should be in a metadata column named "Tm".
-#' @param genome_assembly Character string specifying the genome assembly
-#'                        (e.g., "hg19", "hg38", "mm10") for setting chromosome lengths.
-#' @param chromosome_to_plot Character string specifying the chromosome to plot.
-#'                          If NULL (default), all chromosomes will be plotted.
-#'                          Example: "chr1" for plotting chr1 only.
-#' @param plot_type Character string specifying the plot type: "karyogram" for
-#'                  integrated ideogram view or "faceted" for separate chromosome panels.
-#'                  Default is "karyogram".
-#' @param color_palette Character string specifying the viridis color palette to use.
-#'                      Default is "viridis". Available options are:
-#'                      \itemize{
-#'                        \item "viridis" (default): A perceptually uniform color map that works well for most people
-#'                        \item "magma": A perceptually uniform color map with a dark purple to bright yellow range
-#'                        \item "plasma": A perceptually uniform color map with a dark purple to bright yellow range
-#'                        \item "inferno": A perceptually uniform color map with a dark purple to bright yellow range
-#'                        \item "cividis": A perceptually uniform color map optimized for color vision deficiency
-#'                      }
-#'                      All palettes are colorblind-friendly and perceptually uniform.
-#' @param title_name Character string for the plot title. If NULL, a default title will be used.
-#' @param zoom A character string vector specifying the genomic region to zoom into.
+#' @param gr A GRanges object. It MUST contain a metadata column named 'Tm'
+#'           with numeric melting temperature values.
+#' @param genome_assembly A character string indicating the genome assembly (e.g., "hg19", "mm10").
+#'                        This is used by ggbio for correct chromosome display.
+#' @param chromosome_to_plot A character vector specifying which chromosomes to visualize.
+#'                          These chromosomes must exist in your GRanges object.
+#' @param plot_type A character string specifying the type of plot to generate:
+#'                  \itemize{
+#'                    \item "karyogram" (default): A single plot with all chromosomes arranged in a karyogram
+#'                    \item "faceted": Separate plots for each chromosome
+#'                  }
+#' @param color_palette A character string specifying the viridis color palette to use.
+#'                     Available options are:
+#'                     \itemize{
+#'                       \item "viridis" (default): A perceptually uniform color map that works well for most people
+#'                       \item "magma": A perceptually uniform color map with a dark purple to bright yellow range
+#'                       \item "plasma": A perceptually uniform color map with a dark purple to bright yellow range
+#'                       \item "inferno": A perceptually uniform color map with a dark purple to bright yellow range
+#'                       \item "cividis": A perceptually uniform color map optimized for color vision deficiency
+#'                     }
+#'                     All palettes are colorblind-friendly and perceptually uniform.
+#' @param title_name A character string for the plot title.
+#' @param zoom A character string specifying the genomic region to zoom into.
 #'            If NULL (default), the entire range of each chromosome will be shown.
 #'            Example: c("chr1:1000000-2000000", "chr2:1000000-2000000") for zooming into chr1:1000000-2000000 and chr2:1000000-2000000
 #'
@@ -39,6 +39,7 @@
 #' @importFrom dplyr arrange mutate group_by ungroup n
 #' @importFrom GenomeInfoDb seqlengths seqlevels seqlevelsInUse genome
 #' @importFrom rlang .data
+#' @importFrom plotly ggplotly layout
 #'
 #' @examples
 #' \dontrun{
@@ -68,7 +69,7 @@
 #' 
 #' # plot with zoom
 #' plot_tm_heatmap(gr_tm$tm$Tm, genome_assembly = "hg38", chromosome_to_plot = c("chr1"),
-#' plot_type = "faceted", zoom = "chr1:1000-2000000")
+#' plot_type = "faceted", zoom = "chr1:12000000-20000000")
 #' 
 #' @importFrom GenomeInfoDb seqinfo genome seqlengths seqlevels seqlevelsInUse
 #' @importFrom GenomicRanges makeGRangesFromDataFrame mcols
@@ -316,6 +317,7 @@ plot_tm_heatmap <- function(gr,
         plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"),
         legend.position = "right"
       )
+    p <- p@ggplot
   } else { # faceted plot
     p <- ggplot2::ggplot(gr_df, ggplot2::aes(xmin = .data$start, xmax = .data$end, fill = .data$Tm)) +
       ggplot2::geom_rect(ggplot2::aes(ymin = .data$y_pos - 0.4, ymax = .data$y_pos + 0.4), 
@@ -338,5 +340,15 @@ plot_tm_heatmap <- function(gr,
       )
   }
   
-  return(p)
+  p_interactive <- plotly::ggplotly(p) %>%
+    plotly::layout(
+      hovermode = "closest",
+      showlegend = TRUE,
+      legend = list(
+        title = list(text = "Tm (°C)"),
+        orientation = "v",
+        y = 0.5
+      )
+    )
+  return(p_interactive)
 }

@@ -2,9 +2,9 @@ Package: TmCalculator
 Type: Package
 Title: Melting Temperature of Nucleic Acid Sequences
 Version: 1.1.0
-Date: 2025-06-12
+Date: 2025-07-30
 Author: Junhui Li
-Maintainer: Junhui Li <junhuili@cau.edu.cn>
+Maintainer: Junhui Li <junhui.li11@umassmed.edu>
 Description: A comprehensive R package for calculating melting temperatures of nucleic acid sequences. 
     Implements three calculation methods:
     1. Wallace rule (Thein & Wallace, 1986)
