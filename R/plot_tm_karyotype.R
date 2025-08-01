@@ -279,8 +279,30 @@ plot_tm_karyotype <- function(gr,
     }
   }
   
-  # Add base numbers
-  kpAddBaseNumbers(kp, tick.dist = tick_dist, cex = xaxis_cex)
+  # Add base numbers with proper scipen handling
+  tryCatch({
+    # Store current scipen setting
+    old_scipen <- getOption("scipen")
+    # Set scipen to a safe value
+    options(scipen = 999)
+    
+    kpAddBaseNumbers(kp, tick.dist = tick_dist, cex = xaxis_cex)
+    
+    # Restore original scipen setting
+    options(scipen = old_scipen)
+  }, error = function(e) {
+    # If kpAddBaseNumbers fails due to scipen issue, skip it
+    if (grepl("invalid 'scipen'", e$message)) {
+      warning("Skipping base numbers due to karyoploteR scipen issue")
+    } else {
+      stop(e)
+    }
+  }, finally = {
+    # Ensure scipen is restored even if there's an error
+    if (exists("old_scipen")) {
+      options(scipen = old_scipen)
+    }
+  })
   
   invisible(NULL)
 }

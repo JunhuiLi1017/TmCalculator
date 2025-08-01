@@ -1,10 +1,14 @@
 Package: TmCalculator
 Type: Package
-Title: Melting Temperature of Nucleic Acid Sequences
+Title: A Calculator for Melting Temperature of Nucleic Acid Sequences
 Version: 1.1.0
 Date: 2025-07-30
-Author: Junhui Li
-Maintainer: Junhui Li <junhui.li11@umassmed.edu>
+Authors@R: c(
+    person("Junhui", "Li", , "junhui.li11@umassmed.edu", role = c("cre"),
+           comment = c(ORCID = "0000-0003-3973-1700")),
+    person("Junhui", "Li", , "junhui.li11@umassmed.edu", role = c("aut")),
+    person("Lihua", "Julie Zhu", , role = c("aut"))
+  )
 Description: A comprehensive R package for calculating melting temperatures of nucleic acid sequences. 
     Implements three calculation methods:
     1. Wallace rule (Thein & Wallace, 1986)
@@ -15,7 +19,7 @@ Description: A comprehensive R package for calculating melting temperatures of n
        Sugimoto, 1995; Allawi, 1997; Santalucia, 2005)
     Includes corrections for:
     - Salt ions (SantaLucia, 1996, 1998; Owczarzy, 2004, 2008)
-    - Chemical compounds (DMSO, formamide)
+    - Chemical compounds (dimethyl sulfoxide, formamide)
     Supports both direct sequence input and FASTA file input.
 BugReports: https://github.com/JunhuiLi1017/TmCalculator/issues
 License: MIT + file LICENSE

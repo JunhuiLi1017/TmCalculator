@@ -180,4 +180,4 @@ thermodynamic_nn_params <- list(
 )
 
 # Export the tables
-usethis::use_data(thermodynamic_nn_params, overwrite = TRUE) 
+save(thermodynamic_nn_params, file = "data/thermodynamic_nn_params.RData",version=2)

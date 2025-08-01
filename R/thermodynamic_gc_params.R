@@ -39,4 +39,5 @@ rownames(thermodynamic_gc_params) <- c(
   "Primer3Plus", "vonAhsen2001"
 ) 
 
-usethis::use_data(thermodynamic_gc_params, overwrite = TRUE) 
+# Save data to package data directory
+save(thermodynamic_gc_params, file = "data/thermodynamic_gc_params.RData",version=2)
