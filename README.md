@@ -15,6 +15,6 @@ Please see the vignetts for the details.
 ## 3. launch an R shiny application
 
 using R function
-  `TmCalculatorShiny()`
+  `TmCalculator_shiny()`
 
 or visit the website <a href="https://junhuili1017.shinyapps.io/TmCalculator/"> here</a>

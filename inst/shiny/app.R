@@ -1,6 +1,7 @@
 library(shiny)
 library(TmCalculator)
 library(shinydashboard)
+library(plotly)
 library(GenomicRanges) # Required for GRanges object manipulation
 
 # Ensure the package is properly loaded
