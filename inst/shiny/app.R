@@ -310,7 +310,15 @@ ui <- dashboardPage(
                       )
                     )
                   ),
-                  plotOutput("plot_output"),
+                  # Use conditional rendering for different plot types
+                  conditionalPanel(
+                    condition = "input.plot_type == 'heatmap'",
+                    plotlyOutput("plotly_output")
+                  ),
+                  conditionalPanel(
+                    condition = "input.plot_type != 'heatmap'",
+                    plotOutput("plot_output")
+                  ),
                   downloadButton("download_plot", "Download Plot")
                 )
               )
@@ -474,6 +482,7 @@ server <- function(input, output, session) {
       # Create plot based on selected type
       output$plot_output <- renderPlot({
         req(result()) # Ensure result is available before plotting
+        req(input$plot_type != "heatmap") # Only for non-heatmap plots
         current_gr <- result()$tm$Tm
         req(current_gr) # Ensure the GRanges object is not NULL
 
@@ -488,13 +497,12 @@ server <- function(input, output, session) {
 
         # Determine genome assembly for plotting functions from input
         plot_genome_assembly_karyotype <- if (input$karyotype_genome_assembly != "") input$karyotype_genome_assembly else NULL
-        plot_genome_assembly_heatmap <- if (input$heatmap_genome_assembly != "") input$heatmap_genome_assembly else NULL
         plot_genome_assembly_genome_tracks <- if (input$genome_tracks_genome_assembly != "") input$genome_tracks_genome_assembly else NULL
 
         # Update plot progress
         plot_progress$set(message = "Rendering plot", value = 0.5)
 
-        p <- switch(input$plot_type,
+        switch(input$plot_type,
           "karyotype" = {
             plot_tm_karyotype(
               gr = current_gr,
@@ -510,17 +518,6 @@ server <- function(input, output, session) {
               tick_dist = input$karyotype_tick_dist
             )
           },
-          "heatmap" = {
-            plot_tm_heatmap(
-              gr = current_gr,
-              genome_assembly = plot_genome_assembly_heatmap,
-              chromosome_to_plot = input$heatmap_chromosomes,
-              plot_type = input$heatmap_plot_type,
-              color_palette = input$heatmap_color_palette,
-              title_name = input$heatmap_title,
-              zoom = if (input$heatmap_zoom != "") input$heatmap_zoom else NULL
-            )
-          },
           "genome_tracks" = {
             plot_tm_genome_tracks(
               gr = current_gr,
@@ -531,6 +528,38 @@ server <- function(input, output, session) {
               zoom = if (input$genome_tracks_zoom != "") input$genome_tracks_zoom else NULL
             )
           }
+        )
+
+        # Update plot progress
+        plot_progress$set(message = "Finalizing plot", value = 0.9)
+      })
+
+      # Create plotly output for heatmap
+      output$plotly_output <- renderPlotly({
+        req(result()) # Ensure result is available before plotting
+        req(input$plot_type == "heatmap") # Only for heatmap plots
+        current_gr <- result()$tm$Tm
+        req(current_gr) # Ensure the GRanges object is not NULL
+
+        # Create progress object for plotting
+        plot_progress <- shiny::Progress$new()
+        plot_progress$set(message = "Generating plot", value = 0)
+        on.exit(plot_progress$close())
+
+        # Determine genome assembly for plotting functions from input
+        plot_genome_assembly_heatmap <- if (input$heatmap_genome_assembly != "") input$heatmap_genome_assembly else NULL
+
+        # Update plot progress
+        plot_progress$set(message = "Rendering plot", value = 0.5)
+
+        p <- plot_tm_heatmap(
+          gr = current_gr,
+          genome_assembly = plot_genome_assembly_heatmap,
+          chromosome_to_plot = input$heatmap_chromosomes,
+          plot_type = input$heatmap_plot_type,
+          color_palette = input$heatmap_color_palette,
+          title_name = input$heatmap_title,
+          zoom = if (input$heatmap_zoom != "") input$heatmap_zoom else NULL
         )
 
         # Update plot progress
