@@ -406,9 +406,11 @@ tm_nn <- function(gr_seq,
                         "RNA_DE_Turner_2010" = "Turner D H (2010) <doi:10.1093/nar/gkp892>")
 
   # Create result list with proper structure
+  df_gr <- as.data.frame(gr_seq)
   result_list <- list(
-    Tm = gr_seq,
-    Options = list("Ambiguous" = ambiguous,
+    gr = gr_seq,
+    df = df_gr,
+    options = list("Ambiguous" = ambiguous,
                   "Shift" = shift,
                   "Thermodynamic NN values" = paste0(nn_table, ": ", nn_table_list[[nn_table]]), 
                   "Thermodynamic values for terminal mismatches" = paste0(tmm_table,": ",nn_table_list[[tmm_table]]), 
@@ -432,6 +434,6 @@ tm_nn <- function(gr_seq,
  
   # Set class and attributes
   class(result_list) <- c("TmCalculator", "list")
-  attr(result_list, "nonhidden") <- "Tm"
+  attr(result_list, "nonhidden") <- "gr"
   return(result_list)
 }

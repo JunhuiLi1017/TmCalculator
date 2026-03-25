@@ -76,7 +76,7 @@ to_genomic_ranges <- function(input_seq, complement_seq = NULL) {
   } else if (is.character(input_seq)) {
     input_gr <- vec_to_genomic_ranges(input_seq)
   } else {
-    stop("Input sequence must be a character string (e.g., c('ATGCG', 'GCTAG') ), a character vector of genomic coordinate (e.g., 'chr1:100-200:+:BSgenome.Hsapiens.UCSC.hg38'), or a FASTA file")
+    stop("Input sequence must be a character string (e.g., c('ATGCG', 'GCTAG') ), a character vector of genomic coordinate (e.g., 'chr1:100100-100200:+:BSgenome.Hsapiens.UCSC.hg38'), or a FASTA file")
   }
   
   # Process complementary sequences if provided
@@ -317,6 +317,9 @@ coor_to_genomic_ranges <- function(input_seq){
       
       # Fetch the sequence
       sub_genomic_range$sequence <- Biostrings::getSeq(genome, sub_genomic_range)
+      #if (grepl("^N+$", as.character(sub_genomic_range$sequence))){
+      #  stop("The sequence is fully masked with Ns. Please provide a different region")
+      #}
       sub_genomic_range$genome <- ref_genome_pkg_name
       
       return(sub_genomic_range)

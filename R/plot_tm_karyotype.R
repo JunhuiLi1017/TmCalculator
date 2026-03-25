@@ -286,7 +286,7 @@ plot_tm_karyotype <- function(gr,
     # Set scipen to a safe value
     options(scipen = 999)
     
-    kpAddBaseNumbers(kp, tick.dist = tick_dist, cex = xaxis_cex)
+  kpAddBaseNumbers(kp, tick.dist = tick_dist, cex = xaxis_cex)
     
     # Restore original scipen setting
     options(scipen = old_scipen)

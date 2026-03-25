@@ -58,8 +58,8 @@ check_filter_seq <- function(seq_list, method) {
     return(c2s(filtered_seq))
   })
   
-  if(length(result) == 0) {
-    stop("No valid sequences after filtering")
+  if(any(nchar(result) < 2)) {
+    stop("Invalid region or sequence in your input: too many Ns or region contains only Ns")
   }
   
   return(result)

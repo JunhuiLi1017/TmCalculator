@@ -132,6 +132,9 @@ tm_gc <- function(gr_seq,
   seq_tm <- sapply(seq_along(gr_seq), function(i) {
     filtered_seq <- gr_seq$sequence[i]
     n_seq <- nchar(filtered_seq)
+    if (is.na(n_seq) || n_seq == 0) {
+      return(NA_real_)
+    }
     pt_gc <- gc(filtered_seq, ambiguous = ambiguous)
     tm <- gc_coef[1] + gc_coef[2]*pt_gc - gc_coef[3]/n_seq
     if (mismatch == TRUE) {

@@ -99,12 +99,12 @@
 #' @param input_seq Input sequence(s) in 5' to 3' direction. Can be provided as either:
 #'   - A character string (e.g., "ATGCG")
 #'   - A path to a FASTA file containing the sequence(s)
-#'   - A character vector where each element is a string in the format "chr:start-end:strand:species" #' (e.g., "chr1:100-200:+:hg38"). Strand is "+" for positive (default if not provided) or "-" for negative.
+#'   - A character vector where each element is a string in the format "chr:start-end:strand:species" (e.g., "chr1:100-200:+:BSgenome.Hsapiens.UCSC.hg38"). Strand is "+" for positive (default if not provided) or "-" for negative.
 #'     - chr: Chromosome ID
 #'     - start: Start position
 #'     - end: End position
 #'     - strand: positive or negtive strand
-#'     - species:  Species name for reference genome (e.g., "hg38"), the function will  attempt to load the appropriate BSgenome from genome package.
+#'     - species:  Species name for reference genome (e.g., "BSgenome.Hsapiens.UCSC.hg38"), see \code{BSgenome::available.genomes()} for all available genomes. please make sure the genome package is installed, otherwise the function will stop.
 #' 
 #' @param complement_seq Complementary sequence(s) in 3' to 5' direction. If not provided,
 #'   the function will automatically generate it from input_seq. This is the template/target
@@ -200,17 +200,24 @@
 #'   - Tm: A list of sequences with updated Tm attributes
 #'   - Options: A list containing calculation parameters and method information
 #' 
-#' @examples
-#' # Calculate Tm using all methods
-#' input_seq <- c("ATGCGATGCG")
+#' @encoding UTF-8
+#' @author Junhui Li
 #' 
-#' # Calculate Tm with specific method parameters
+#' @export
+#' 
+#' @importFrom BSgenome available.genomes
+#' @importFrom GenomeInfoDb genome
+#' 
+#' @examples
+#' \dontrun{
+#' input_seq <- c("chr1:1000100-1000150:+:BSgenome.Hsapiens.UCSC.hg38")
 #' result <- tm_calculate(
 #'   input_seq,
 #'   method = "tm_nn",
 #'   nn_table = "DNA_NN_SantaLucia_2004",
 #'   salt_corr_method = "Owczarzy2008"
 #' )
+#' }
 #' 
 #' @export tm_calculate
 tm_calculate <- function(input_seq,
@@ -268,12 +275,9 @@ tm_calculate <- function(input_seq,
   gr$sequence <- check_filter_seq(gr$sequence, method)
   gr$complement <- check_filter_seq(gr$complement, method)
 
-  # Initialize result list
-  result <- list()
-  
   # Calculate Tm using each selected method
   if ("tm_nn" %in% method) {
-    result$tm <- tm_nn(
+    result <- tm_nn(
       gr_seq = gr,
       ambiguous = ambiguous,
       shift = shift,
@@ -298,7 +302,7 @@ tm_calculate <- function(input_seq,
   }
   
   if ("tm_gc" %in% method) {
-    result$tm <- tm_gc(
+    result <- tm_gc(
       gr_seq = gr,
       ambiguous = ambiguous,
       userset = userset,
@@ -318,7 +322,7 @@ tm_calculate <- function(input_seq,
   }
   
   if ("tm_wallace" %in% method) {
-    result$tm <- tm_wallace(
+    result <- tm_wallace(
       gr_seq = gr,
       ambiguous = ambiguous
     )

@@ -289,7 +289,7 @@ plot_tm_heatmap <- function(gr,
       ggplot2::scale_fill_viridis_c(
         option = color_palette,
         name   = "Tm (\u00B0C)"
-      ) +
+      ) + 
       ggplot2::labs(
         title = title_name,
         x     = "Genomic Position",
