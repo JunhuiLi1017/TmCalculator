@@ -18,13 +18,7 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Junhui Li \email{junhui.li11@umassmed.edu} (\href{https://orcid.org/0000-0003-3973-1700}{ORCID})
-
-Authors:
-\itemize{
-  \item Junhui Li \email{junhui.li11@umassmed.edu}
-  \item Lihua Julie Zhu
-}
+\strong{Maintainer}: Junhui Li \email{ljh.biostat@gmail.com} (\href{https://orcid.org/0000-0003-3973-1700}{ORCID})
 
 }
 \keyword{internal}

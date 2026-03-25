@@ -357,14 +357,14 @@ tm_nn <- function(gr_seq,
     }
     R <- 1.987
     if(!is.null(salt_corr_method)){
-      corr_salt <- salt_correct(Na = Na, 
-      K = K,
-      Tris = Tris,
-      Mg = Mg,
-      dNTPs = dNTPs,
-      method = salt_corr_method,
-      input_seq = my_seq,
-      ambiguous = ambiguous)
+      corr_salt <- salt_correction(Na = Na, 
+                                   K = K,
+                                   Tris = Tris,
+                                   Mg = Mg,
+                                   dNTPs = dNTPs,
+                                   method = salt_corr_method,
+                                   input_seq = my_seq,
+                                   ambiguous = ambiguous)
       if(salt_corr_method == "SantaLucia1998-2"){
         delta_s <- corr_salt+delta_s
       }

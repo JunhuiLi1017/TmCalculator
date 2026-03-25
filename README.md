@@ -15,6 +15,4 @@ Please see the vignetts for the details.
 ## 3. launch an R shiny application
 
 using R function
-  `TmCalculator_shiny()`
-
-or visit the website <a href="https://junhuili1017.shinyapps.io/TmCalculator/"> here</a>
+  `TmCalculatorShiny::TmCalculator_shiny()`

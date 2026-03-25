@@ -243,8 +243,7 @@ making it more efficient than calling each method separately.
 
 \examples{
 # Calculate Tm using all methods
-input_seq <- c("ATGCGATGCG", "ATGCGATGCGCCCGGAGATAG")
-result <- tm_calculate(input_seq)
+input_seq <- c("ATGCGATGCG")
 
 # Calculate Tm with specific method parameters
 result <- tm_calculate(
@@ -254,6 +253,4 @@ result <- tm_calculate(
   salt_corr_method = "Owczarzy2008"
 )
 
-fasta_file <- system.file("extdata", "BSgenome.Hsapiens.UCSC.hg38.fasta", package = "TmCalculator")
-gr_tm <- tm_calculate(fasta_file)
 }

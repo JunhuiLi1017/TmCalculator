@@ -264,33 +264,46 @@ plot_tm_heatmap <- function(gr,
   
   # Create plot based on type
   if (plot_type == "karyogram") {
-    p <- ggplot2::ggplot(gr_plot) +
-      ggbio::layout_karyogram() +
+    # Use pure ggplot2 to avoid GGbio S4 class issues
+    p <- ggplot2::ggplot(
+      gr_df,
+      ggplot2::aes(xmin = .data$start, xmax = .data$end, fill = .data$Tm)
+    ) +
       ggplot2::geom_rect(
-        data = gr_df,
-        ggplot2::aes(xmin = .data$start, xmax = .data$end, 
-                     ymin = .data$y_pos - 0.4, ymax = .data$y_pos + 0.4, 
-                     fill = .data$Tm),
+        ggplot2::aes(
+          ymin = .data$y_pos - 0.4,
+          ymax = .data$y_pos + 0.4
+        ),
         color = "black",
         linewidth = 0.1
       ) +
-      ggplot2::scale_fill_viridis_c(option = color_palette, name = "Tm (\u00B0C)") +
+      ggplot2::facet_grid(
+        seqnames ~ .,
+        scales = "free_x",
+        space  = "free_y"
+      ) +
       ggplot2::scale_y_continuous(
         breaks = gr_df[["y_pos"]],
         labels = gr_df[["seq_id"]]
-      ) + 
+      ) +
+      ggplot2::scale_fill_viridis_c(
+        option = color_palette,
+        name   = "Tm (\u00B0C)"
+      ) +
       ggplot2::labs(
         title = title_name,
-        y = "Sequence ID"
+        x     = "Genomic Position",
+        y     = "Sequence ID"
       ) +
       ggplot2::theme_bw() +
       ggplot2::theme(
-        panel.grid.major.y = ggplot2::element_blank(),
-        panel.grid.minor.y = ggplot2::element_blank(),
-        plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"),
-        legend.position = "right"
+        strip.text.y        = ggplot2::element_text(angle = 0),
+        axis.ticks.y        = ggplot2::element_line(),
+        panel.grid.major.y  = ggplot2::element_blank(),
+        panel.grid.minor.y  = ggplot2::element_blank(),
+        plot.title          = ggplot2::element_text(hjust = 0.5, face = "bold"),
+        legend.position     = "right"
       )
-    p <- p@ggplot
   } else { # faceted plot
     p <- ggplot2::ggplot(gr_df, ggplot2::aes(xmin = .data$start, xmax = .data$end, fill = .data$Tm)) +
       ggplot2::geom_rect(ggplot2::aes(ymin = .data$y_pos - 0.4, ymax = .data$y_pos + 0.4), 

@@ -183,7 +183,7 @@ plot_tm_heatmap(gr_tm, genome_assembly = "hg19", plot_type = "faceted")
 ## launch the shiny application
 
 ```{r launch_shiny, eval = FALSE}
-TmCalculatorShinyApp()
+TmCalculatorShiny::TmCalculator_shiny()
 ```
 
 # Conclusion

@@ -139,7 +139,7 @@ tm_gc <- function(gr_seq,
       tm <- tm - gc_coef[4]*(mismatch_count*100/n_seq)
     }
     if (!is.null(salt_corr_method)) {
-      corr_salt <- salt_correct(Na = Na, 
+      corr_salt <- salt_correction(Na = Na, 
                                    K = K, 
                                    Tris = Tris, 
                                    Mg = Mg, 
