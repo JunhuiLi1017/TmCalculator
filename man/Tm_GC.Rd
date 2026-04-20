@@ -15,11 +15,11 @@ tm_gc(
   Tris = 0,
   Mg = 0,
   dNTPs = 0,
-  salt_corr_method = c("Schildkraut2010", "Wetmur1991", "SantaLucia1996",
-    "SantaLucia1998-1", "Owczarzy2004", "Owczarzy2008"),
+  salt_method = c("Schildkraut2010", "Wetmur1991", "SantaLucia1996", "SantaLucia1998-1",
+    "Owczarzy2004", "Owczarzy2008"),
   mismatch = TRUE,
   DMSO = 0,
-  formamide_value_unit = list(value = 0, unit = "percent"),
+  formamide_unit = list(value = 0, unit = "percent"),
   dmso_factor = 0.75,
   formamide_factor = 0.65
 )
@@ -54,7 +54,7 @@ distributing their contribution to GC content based on their possible nucleotide
 
 \item{dNTPs}{Millimolar concentration of deoxynucleotide triphosphates. Default: 0}
 
-\item{salt_corr_method}{Salt correction method. Options are:
+\item{salt_method}{Salt correction method. Options are:
 - "Schildkraut2010": Schildkraut & Lifson 1965
 - "Wetmur1991": Wetmur 1991
 - "SantaLucia1996": SantaLucia 1996
@@ -67,7 +67,7 @@ Note: "SantaLucia1998-2" is not available for this function.}
 
 \item{DMSO}{Percent DMSO concentration in the reaction mixture. Default: 0}
 
-\item{formamide_value_unit}{List containing formamide concentration value and unit. Default: list(value = 0, unit = "percent")
+\item{formamide_unit}{Formamide concentration as `list(value, unit)`. Default: list(value = 0, unit = "percent")
 - value: Numeric value of formamide concentration
 - unit: Either "percent" or "molar"}
 

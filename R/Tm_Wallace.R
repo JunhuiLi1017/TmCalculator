@@ -37,17 +37,22 @@ tm_wallace <- function(gr_seq, ambiguous = FALSE) {
   seq_tm <- sapply(seq_along(gr_seq), function(i) {
     filter_seq <- gr_seq$sequence[i]
     n_seq <- length(s2c(filter_seq))
-    n_gc <- n_seq * gc(filter_seq, ambiguous = ambiguous) / 100
+    pt_gc <- gc(filter_seq, ambiguous = ambiguous)
+    n_gc <- n_seq * pt_gc / 100
     n_at <- n_seq - n_gc
     tm <- 4 * n_gc + 2 * n_at
-    return(tm)
+    return(list(tm=tm,gc=pt_gc))
   })
-  gr_seq$Tm <- seq_tm
 
+  gr_seq$GC <- unlist(seq_tm[2,])
+  gr_seq$Tm <- unlist(seq_tm[1,])
+  
   # Create result list with proper structure
+  df_gr <- as.data.frame(gr_seq)
   result_list <- list(
-    Tm = gr_seq,
-    Options = list(
+    gr = gr_seq,
+    df = df_gr,
+    options = list(
       Ambiguous = ambiguous,
       Method = "tm_wallace (Thein & Wallace 1986)"
     )
@@ -55,7 +60,7 @@ tm_wallace <- function(gr_seq, ambiguous = FALSE) {
 
   # Set class and attributes
   class(result_list) <- c("TmCalculator", "list")
-  attr(result_list, "nonhidden") <- "Tm"
+  attr(result_list, "nonhidden") <- "gr"
 
   return(result_list)
 }

@@ -6,7 +6,7 @@
 \usage{
 chem_correct(
   DMSO = 0,
-  formamide_value_unit = list(value = 0, unit = "percent"),
+  formamide_unit = list(value = 0, unit = "percent"),
   dmso_factor = 0.75,
   formamide_factor = 0.65,
   pt_gc = NULL
@@ -16,7 +16,7 @@ chem_correct(
 \item{DMSO}{Percent DMSO concentration in the reaction mixture. Default: 0
 DMSO can lower the melting temperature of nucleic acid duplexes.}
 
-\item{formamide_value_unit}{A list containing formamide concentration information:
+\item{formamide_unit}{A list containing formamide concentration information:
 - value: numeric value of formamide concentration
 - unit: character string specifying the unit ("percent" or "molar")
 Default: list(value=0, unit="percent")}
@@ -37,10 +37,10 @@ Apply corrections to melting temperature calculations based on the presence of D
 These corrections are rough approximations and should be used with caution.
 }
 \details{
-When formamide_value_unit$unit = "percent":
+When formamide_unit$unit = "percent":
 Correction = - factor * percentage_of_formamide
 
-When formamide_value_unit$unit = "molar":
+When formamide_unit$unit = "molar":
 Correction = (0.453 * GC/100 - 2.88) * formamide
 }
 \examples{
@@ -48,10 +48,10 @@ Correction = (0.453 * GC/100 - 2.88) * formamide
 chem_correct(DMSO = 3)
 
 # Formamide correction (percent)
-chem_correct(formamide_value_unit = list(value = 1.25, unit = "percent"), pt_gc = 50)
+chem_correct(formamide_unit = list(value = 1.25, unit = "percent"), pt_gc = 50)
 
 # Formamide correction (molar)
-chem_correct(formamide_value_unit = list(value = 1.25, unit = "molar"), pt_gc = 50)
+chem_correct(formamide_unit = list(value = 1.25, unit = "molar"), pt_gc = 50)
 
 }
 \references{

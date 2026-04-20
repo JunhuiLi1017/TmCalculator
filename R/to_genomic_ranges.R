@@ -260,7 +260,7 @@ fa_to_genomic_ranges <- function(input_seq) {
 #'   - start: Start position (integer)
 #'   - end: End position (integer)
 #'   - strand: "+" for positive strand or "-" for negative strand
-#'   - species: Species name for reference genome (e.g., "hg38")
+#'   - species: Species name for reference genome (e.g., "BSgenome.Hsapiens.UCSC.hg38"), see \code{BSgenome::available.genomes()} for Bioconductor genomes or use any locally installed \code{BSgenome.*} package. Please make sure the genome package is installed, otherwise the function will stop.
 #'   - name: (optional) Custom name for the sequence
 #' 
 #' @return A GenomicRanges object containing:
@@ -278,10 +278,24 @@ fa_to_genomic_ranges <- function(input_seq) {
 #' gr <- coor_to_genomic_ranges(coords)
 #' }
 #' 
+#' @importFrom Biostrings getSeq
+#' @importFrom GenomicRanges GRanges
+#' @importFrom seqinr read.fasta
+#' @importFrom BSgenome available.genomes
+#' @importFrom IRanges IRanges
+#' @importFrom S4Vectors mcols
+#' @importFrom GenomeInfoDb genome
+#' @importFrom utils installed.packages
+#' 
+#' @encoding UTF-8
+#' @author Junhui Li
 #' @export
 
 coor_to_genomic_ranges <- function(input_seq){
-  all_genomes <- BSgenome::available.genomes()
+  # Include both Bioconductor-listed and locally installed BSgenome packages.
+  local_genomes <- rownames(installed.packages())
+  local_genomes <- local_genomes[grepl("^BSgenome\\.", local_genomes)]
+  all_genomes <- unique(c(BSgenome::available.genomes(), local_genomes))
   suppressWarnings({
     genomic_range_object <- do.call(c,sapply(seq_along(input_seq), function(i){
       x <- input_seq[i] # Get the current input string using the index 'i'
@@ -296,14 +310,19 @@ coor_to_genomic_ranges <- function(input_seq){
       
       # --- Validation and loading of genome package ---
       if (!ref_genome_pkg_name %in% all_genomes) {
-        stop(sprintf("Genome package %s not found. Please make sure the genome package name is correct. See BSgenome::available.genomes() for all available genomes.", ref_genome_pkg_name))
+        stop(
+          sprintf(
+            "Genome package %s not found. Use BSgenome::available.genomes() or install a local BSgenome.* package first.",
+            ref_genome_pkg_name
+          )
+        )
       }
       if (!requireNamespace(ref_genome_pkg_name, quietly = TRUE)) {
-        stop(sprintf("Genome package %s not found. Please install it first using BiocManager::install(\"%s\").", ref_genome_pkg_name, ref_genome_pkg_name))
+        stop(sprintf("Genome package %s not found. Please install it first.", ref_genome_pkg_name))
       }
-      #suppressPackageStartupMessages(
-        library(ref_genome_pkg_name, character.only = TRUE)
-      #)
+      suppressPackageStartupMessages(
+        suppressWarnings(library(ref_genome_pkg_name, character.only = TRUE))
+      )
       
       genome <- get(ref_genome_pkg_name)
       

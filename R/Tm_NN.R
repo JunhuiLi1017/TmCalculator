@@ -81,7 +81,7 @@
 #' 
 #' @param dNTPs Millimolar concentration of deoxynucleotide triphosphates. Default: 0
 #' 
-#' @param salt_corr_method Method for calculating salt concentration corrections to the melting temperature.
+#' @param salt_method Salt correction method. Options are:
 #'   Available options:
 #'   - "Schildkraut2010": Updated salt correction method
 #'   - "Wetmur1991": Classic salt correction method
@@ -95,7 +95,7 @@
 #' @param DMSO Percent DMSO concentration in the reaction mixture. Default: 0
 #'   DMSO can lower the melting temperature of nucleic acid duplexes.
 #' 
-#' @param formamide_value_unit A list containing formamide concentration information:
+#' @param formamide_unit Formamide concentration as `list(value, unit)`. Default: list(value = 0, unit = "percent")
 #'   - value: numeric value of formamide concentration
 #'   - unit: character string specifying the unit ("percent" or "molar")
 #'   Default: list(value=0, unit="percent")
@@ -198,21 +198,21 @@ tm_nn <- function(gr_seq,
                   Tris = 0,
                   Mg = 0,
                   dNTPs = 0,
-                  salt_corr_method = c("Schildkraut2010",
+                  salt_method = c("Schildkraut2010",
                                   "Wetmur1991",
                                   "SantaLucia1996",
                                   "SantaLucia1998-1",
                                   "Owczarzy2004",
                                   "Owczarzy2008"),
                   DMSO = 0,
-                  formamide_value_unit = list(value = 0, unit = "percent"),
+                  formamide_unit = list(value = 0, unit = "percent"),
                   dmso_factor = 0.75,
                   formamide_factor = 0.65) {
   nn_table <- match.arg(nn_table)
   tmm_table <- match.arg(tmm_table)
   imm_table <- match.arg(imm_table)
   de_table <- match.arg(de_table)
-  salt_corr_method <- match.arg(salt_corr_method)
+  salt_method <- match.arg(salt_method)
   
   # Get thermodynamic parameters
   nn_table_list <- thermodynamic_nn_params[[nn_table]]
@@ -356,24 +356,24 @@ tm_nn <- function(gr_seq,
       delta_s <- nn_table_list['sym', d_s]
     }
     R <- 1.987
-    if(!is.null(salt_corr_method)){
+    if(!is.null(salt_method)){
       corr_salt <- salt_correction(Na = Na, 
                                    K = K,
                                    Tris = Tris,
                                    Mg = Mg,
                                    dNTPs = dNTPs,
-                                   method = salt_corr_method,
+                                   method = salt_method,
                                    input_seq = my_seq,
                                    ambiguous = ambiguous)
-      if(salt_corr_method == "SantaLucia1998-2"){
+      if(salt_method == "SantaLucia1998-2"){
         delta_s <- corr_salt+delta_s
       }
       tm <- (1000 * delta_h) / (delta_s + (R * (log(k)))) - 273.15
-      if (salt_corr_method %in% c("Schildkraut2010", "Wetmur1991",
+      if (salt_method %in% c("Schildkraut2010", "Wetmur1991",
                           "SantaLucia1996", "SantaLucia1998-1")) {
         tm <- tm + corr_salt
       }
-      if(salt_corr_method %in% c("Owczarzy2004","Owczarzy2008")){
+      if(salt_method %in% c("Owczarzy2004","Owczarzy2008")){
         tm <- (1 / (1 / (tm + 273.15) + corr_salt) - 273.15)
       }
     } else {
@@ -382,15 +382,18 @@ tm_nn <- function(gr_seq,
     pt_gc <- gc(my_seq, ambiguous = ambiguous)
     corr_chem <- chem_correct(
       DMSO = DMSO,
-      formamide_value_unit = formamide_value_unit,
+      formamide_unit = formamide_unit,
       dmso_factor = dmso_factor,
       formamide_factor = formamide_factor,
       pt_gc = pt_gc
     )
     tm <- tm + corr_chem
-    return(tm)
+    return(list(tm=tm,gc=pt_gc))
   })
-  gr_seq$Tm <- seq_tm
+  
+  
+  gr_seq$GC <- unlist(seq_tm[2,])
+  gr_seq$Tm <- unlist(seq_tm[1,])
   
   nn_table_list <- list("DNA_NN_Breslauer_1986" = "Breslauer K J (1986) <doi:10.1073/pnas.83.11.3746>",
                         "DNA_NN_Sugimoto_1996" = "Sugimoto N (1996) <doi:10.1093/nar/24.22.4501>",
@@ -424,12 +427,12 @@ tm_nn <- function(gr_seq,
                   "Tris" = Tris,
                   "Mg" = Mg,
                   "dNTPs" = dNTPs,
-                  "Salt correction method" = salt_corr_method,
+                  "Salt correction method" = salt_method,
                   "Percent of DMSO" = DMSO,
-                  "Formamide concentration" = formamide_value_unit$value,
-                  "Coeffecient of Tm decreases per percent DMSO" = dmso_factor,
-                  "Method for formamide concentration" = formamide_value_unit$unit,
-                  "Coefficient of Tm decrease per percent formamide" = formamide_factor)
+                  "Formamide concentration" = formamide_unit$value,
+                  "DMSO factor" = dmso_factor,
+                  "Formamide concentration unit" = formamide_unit$unit,
+                  "Formamide factor" = formamide_factor)
   )
  
   # Set class and attributes

@@ -22,10 +22,10 @@ tm_nn(
   Tris = 0,
   Mg = 0,
   dNTPs = 0,
-  salt_corr_method = c("Schildkraut2010", "Wetmur1991", "SantaLucia1996",
-    "SantaLucia1998-1", "Owczarzy2004", "Owczarzy2008"),
+  salt_method = c("Schildkraut2010", "Wetmur1991", "SantaLucia1996", "SantaLucia1998-1",
+    "Owczarzy2004", "Owczarzy2008"),
   DMSO = 0,
-  formamide_value_unit = list(value = 0, unit = "percent"),
+  formamide_unit = list(value = 0, unit = "percent"),
   dmso_factor = 0.75,
   formamide_factor = 0.65
 )
@@ -108,7 +108,7 @@ This is typically the template concentration.}
 
 \item{dNTPs}{Millimolar concentration of deoxynucleotide triphosphates. Default: 0}
 
-\item{salt_corr_method}{Method for calculating salt concentration corrections to the melting temperature.
+\item{salt_method}{Salt correction method. Options are:
 Available options:
 - "Schildkraut2010": Updated salt correction method
 - "Wetmur1991": Classic salt correction method
@@ -122,7 +122,7 @@ Note: Setting to NA disables salt correction}
 \item{DMSO}{Percent DMSO concentration in the reaction mixture. Default: 0
 DMSO can lower the melting temperature of nucleic acid duplexes.}
 
-\item{formamide_value_unit}{A list containing formamide concentration information:
+\item{formamide_unit}{Formamide concentration as `list(value, unit)`. Default: list(value = 0, unit = "percent")
 - value: numeric value of formamide concentration
 - unit: character string specifying the unit ("percent" or "molar")
 Default: list(value=0, unit="percent")}

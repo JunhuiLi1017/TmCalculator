@@ -32,7 +32,7 @@
 #' 
 #' @param dNTPs Millimolar concentration of deoxynucleotide triphosphates. Default: 0
 #' 
-#' @param salt_corr_method Salt correction method. Options are:
+#' @param salt_method Salt correction method. Options are:
 #'   - "Schildkraut2010": Schildkraut & Lifson 1965
 #'   - "Wetmur1991": Wetmur 1991
 #'   - "SantaLucia1996": SantaLucia 1996
@@ -45,7 +45,7 @@
 #' 
 #' @param DMSO Percent DMSO concentration in the reaction mixture. Default: 0
 #' 
-#' @param formamide_value_unit List containing formamide concentration value and unit. Default: list(value = 0, unit = "percent")
+#' @param formamide_unit Formamide concentration as `list(value, unit)`. Default: list(value = 0, unit = "percent")
 #'   - value: Numeric value of formamide concentration
 #'   - unit: Either "percent" or "molar"
 #' 
@@ -99,7 +99,7 @@ tm_gc <- function(gr_seq,
                   Tris = 0,
                   Mg = 0,
                   dNTPs = 0,
-                  salt_corr_method = c("Schildkraut2010",
+                  salt_method = c("Schildkraut2010",
                                     "Wetmur1991",
                                     "SantaLucia1996",
                                     "SantaLucia1998-1",
@@ -107,22 +107,22 @@ tm_gc <- function(gr_seq,
                                     "Owczarzy2008"),
                   mismatch = TRUE,
                   DMSO = 0,
-                  formamide_value_unit = list(value = 0, unit = "percent"),
+                  formamide_unit = list(value = 0, unit = "percent"),
                   dmso_factor = 0.75,
                   formamide_factor = 0.65) {
   variant <- match.arg(variant)
-  salt_corr_method <- match.arg(salt_corr_method)
+  salt_method <- match.arg(salt_method)
   
   if (is.null(userset)) {
     if (!variant %in% rownames(thermodynamic_gc_params)) {
       stop("only Chester1993, QuikChange, Schildkraut1965, Wetmur1991_MELTING, Wetmur1991_RNA, Wetmur1991_RNA/DNA, Primer3Plus and vonAhsen2001 are allowed in variant")
     } else {
       gc_coef <- thermodynamic_gc_params[variant,]
-      salt_corr_method <- thermodynamic_gc_params[variant,"salt_correction"]
+      salt_method <- thermodynamic_gc_params[variant,"salt_correction"]
     }
   } else {
     gc_coef <- as.numeric(userset)
-    salt_corr_method <- salt_corr_method
+    salt_method <- salt_method
   }
 
   # Filter sequence
@@ -132,42 +132,43 @@ tm_gc <- function(gr_seq,
   seq_tm <- sapply(seq_along(gr_seq), function(i) {
     filtered_seq <- gr_seq$sequence[i]
     n_seq <- nchar(filtered_seq)
-    if (is.na(n_seq) || n_seq == 0) {
-      return(NA_real_)
-    }
     pt_gc <- gc(filtered_seq, ambiguous = ambiguous)
     tm <- gc_coef[1] + gc_coef[2]*pt_gc - gc_coef[3]/n_seq
     if (mismatch == TRUE) {
       mismatch_count <- sum(filtered_seq %in% 'X')
       tm <- tm - gc_coef[4]*(mismatch_count*100/n_seq)
     }
-    if (!is.null(salt_corr_method)) {
+    if (!is.null(salt_method)) {
       corr_salt <- salt_correction(Na = Na, 
                                    K = K, 
                                    Tris = Tris, 
                                    Mg = Mg, 
                                    dNTPs = dNTPs, 
-                                   method = salt_corr_method, 
+                                   method = salt_method, 
                                    input_seq = filtered_seq, 
                                    ambiguous = ambiguous)
       tm <- tm + corr_salt
     }
     if (!is.na(DMSO)) {
       corr_chem <- chem_correct(DMSO = DMSO, 
-                                   formamide_value_unit = formamide_value_unit, 
+                                   formamide_unit = formamide_unit, 
                                    dmso_factor = dmso_factor, 
                                    formamide_factor = formamide_factor, 
                                    pt_gc = pt_gc)
       tm <- tm + corr_chem
     }
-    return(tm)
+    return(list(tm=tm,gc=pt_gc))
   })
-  gr_seq$Tm <- seq_tm
+  
+  gr_seq$GC <- unlist(seq_tm[2,])
+  gr_seq$Tm <- unlist(seq_tm[1,])
   
   # Create result list with proper structure
+  df_gr <- as.data.frame(gr_seq)
   result_list <- list(
-    Tm = gr_seq,
-    Options = list(
+    gr = gr_seq,
+    df = df_gr,
+    options = list(
       Ambiguous = ambiguous,
       Method = paste0(variant, " (", 
                      if (variant == "Chester1993") "Chester & Marshak 1993" else
@@ -183,19 +184,19 @@ tm_gc <- function(gr_seq,
       Tris = Tris,
       Mg = Mg,
       dNTPs = dNTPs,
-      "Salt correction" = salt_corr_method,
+      "Salt correction" = salt_method,
       Mismatch = mismatch,
       "Percent of DMSO" = DMSO,
-      "Formamide concentration" = formamide_value_unit$value,
-      "Method for formamide concentration" = formamide_value_unit$unit,
-      "Coeffecient of Tm decreases per percent DMSO" = dmso_factor,
-      "Coefficient of Tm decrease per percent formamide" = formamide_factor
+      "Formamide concentration" = formamide_unit$value,
+      "Formamide concentration unit" = formamide_unit$unit,
+      "DMSO factor" = dmso_factor,
+      "Formamide factor" = formamide_factor
     )
   )
   
   # Set class and attributes
   class(result_list) <- c("TmCalculator", "list")
-  attr(result_list, "nonhidden") <- "Tm"
+  attr(result_list, "nonhidden") <- "gr"
   
   return(result_list)
 }

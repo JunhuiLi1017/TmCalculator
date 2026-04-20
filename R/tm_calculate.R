@@ -57,7 +57,7 @@
 #' 
 #' \strong{Salt Correction Options:}
 #' \itemize{
-#'   \item \code{salt_corr_method}:
+#'   \item \code{salt_method}:
 #'     \itemize{
 #'       \item "Schildkraut2010" (default)
 #'       \item "Wetmur1991"
@@ -71,7 +71,7 @@
 #' 
 #' \strong{Formamide Unit Options:}
 #' \itemize{
-#'   \item \code{formamide_value_unit$unit}:
+#'   \item \code{formamide_unit$unit}:
 #'     \itemize{
 #'       \item "percent" (default)
 #'       \item "molar"
@@ -99,6 +99,7 @@
 #' @param input_seq Input sequence(s) in 5' to 3' direction. Can be provided as either:
 #'   - A character string (e.g., "ATGCG")
 #'   - A path to a FASTA file containing the sequence(s)
+#'   - A GRanges object with sequence and complement metadata should be provided if mismatch is TRUE
 #'   - A character vector where each element is a string in the format "chr:start-end:strand:species" (e.g., "chr1:100-200:+:BSgenome.Hsapiens.UCSC.hg38"). Strand is "+" for positive (default if not provided) or "-" for negative.
 #'     - chr: Chromosome ID
 #'     - start: Start position
@@ -161,7 +162,7 @@
 #' 
 #' @param dNTPs Millimolar concentration of deoxynucleotide triphosphates. Default: 0
 #' 
-#' @param salt_corr_method Method for calculating salt concentration corrections to the melting temperature.
+#' @param salt_method Salt correction method for Tm. Default: "Schildkraut2010"
 #'   Available options:
 #'   - "Schildkraut2010": Updated salt correction method
 #'   - "Wetmur1991": Classic salt correction method
@@ -174,14 +175,14 @@
 #' 
 #' @param DMSO Percent DMSO concentration in the reaction mixture. Default: 0
 #' 
-#' @param formamide_value_unit List containing formamide concentration value and unit. Default: list(value = 0, unit = "percent")
+#' @param formamide_unit Formamide concentration as `list(value, unit)`. Default: list(value = 0, unit = "percent")
 #'   - value: Numeric value of formamide concentration
 #'   - unit: Either "percent" or "molar"
 #' 
 #' @param dmso_factor Coefficient of Tm decreases per percent DMSO. Default: 0.75
 #'   Other published values are 0.5, 0.6 and 0.675.
 #' 
-#' @param formamide_factor Coefficient of Tm decrease per percent formamide. Default: 0.65
+#' @param formamide_factor Tm decrease per percent formamide. Default: 0.65
 #'   Several papers report factors between 0.6 and 0.72.
 #' 
 #' @param mismatch Logical. If TRUE, every '.' in the sequence is counted as a mismatch.
@@ -215,7 +216,7 @@
 #'   input_seq,
 #'   method = "tm_nn",
 #'   nn_table = "DNA_NN_SantaLucia_2004",
-#'   salt_corr_method = "Owczarzy2008"
+#'   salt_method = "Owczarzy2008"
 #' )
 #' }
 #' 
@@ -254,14 +255,14 @@ tm_calculate <- function(input_seq,
                         Tris = 0,
                         Mg = 0,
                         dNTPs = 0,
-                        salt_corr_method = c("Schildkraut2010",
+                        salt_method = c("Schildkraut2010",
                                             "Wetmur1991",
                                             "SantaLucia1996",
                                             "SantaLucia1998-1",
                                             "Owczarzy2004",
                                             "Owczarzy2008"),
                         DMSO = 0,
-                        formamide_value_unit = list(value = 0, unit = "percent"),
+                        formamide_unit = list(value = 0, unit = "percent"),
                         dmso_factor = 0.75,
                         formamide_factor = 0.65,
                         mismatch = TRUE) {
@@ -269,7 +270,11 @@ tm_calculate <- function(input_seq,
   method <- match.arg(method, several.ok = FALSE)
   
   # convert input_seq to genomic ranges
-  gr <- to_genomic_ranges(input_seq=input_seq, complement_seq = complement_seq)
+  if (class(input_seq) == "GRanges") {
+    gr <- input_seq
+  } else {  
+    gr <- to_genomic_ranges(input_seq=input_seq, complement_seq = complement_seq)
+  }
 
   # check and filter the sequence
   gr$sequence <- check_filter_seq(gr$sequence, method)
@@ -293,9 +298,9 @@ tm_calculate <- function(input_seq,
       Tris = Tris,
       Mg = Mg,
       dNTPs = dNTPs,
-      salt_corr_method = salt_corr_method,
+      salt_method = salt_method,
       DMSO = DMSO,
-      formamide_value_unit = formamide_value_unit,
+      formamide_unit = formamide_unit,
       dmso_factor = dmso_factor,
       formamide_factor = formamide_factor
     )
@@ -312,10 +317,10 @@ tm_calculate <- function(input_seq,
       Tris = Tris,
       Mg = Mg,
       dNTPs = dNTPs,
-      salt_corr_method = salt_corr_method,
+      salt_method = salt_method,
       mismatch = mismatch,
       DMSO = DMSO,
-      formamide_value_unit = formamide_value_unit,
+      formamide_unit = formamide_unit,
       dmso_factor = dmso_factor,
       formamide_factor = formamide_factor
     )

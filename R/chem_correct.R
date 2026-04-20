@@ -6,7 +6,7 @@
 #' @param DMSO Percent DMSO concentration in the reaction mixture. Default: 0
 #'   DMSO can lower the melting temperature of nucleic acid duplexes.
 #' 
-#' @param formamide_value_unit A list containing formamide concentration information:
+#' @param formamide_unit A list containing formamide concentration information:
 #'   - value: numeric value of formamide concentration
 #'   - unit: character string specifying the unit ("percent" or "molar")
 #'   Default: list(value=0, unit="percent")
@@ -24,10 +24,10 @@
 #' 
 #' @details 
 #' 
-#' When formamide_value_unit$unit = "percent":
+#' When formamide_unit$unit = "percent":
 #' Correction = - factor * percentage_of_formamide
 #' 
-#' When formamide_value_unit$unit = "molar":
+#' When formamide_unit$unit = "molar":
 #' Correction = (0.453 * GC/100 - 2.88) * formamide
 #' 
 #' @references 
@@ -43,20 +43,20 @@
 #' chem_correct(DMSO = 3)
 #' 
 #' # Formamide correction (percent)
-#' chem_correct(formamide_value_unit = list(value = 1.25, unit = "percent"), pt_gc = 50)
+#' chem_correct(formamide_unit = list(value = 1.25, unit = "percent"), pt_gc = 50)
 #' 
 #' # Formamide correction (molar)
-#' chem_correct(formamide_value_unit = list(value = 1.25, unit = "molar"), pt_gc = 50)
+#' chem_correct(formamide_unit = list(value = 1.25, unit = "molar"), pt_gc = 50)
 #' 
 #' @export chem_correct
 
 chem_correct <- function(DMSO = 0,
-                           formamide_value_unit = list(value = 0, unit = "percent"),
+                           formamide_unit = list(value = 0, unit = "percent"),
                            dmso_factor = 0.75,
                            formamide_factor = 0.65,
                            pt_gc = NULL){
-  if(DMSO < 0 | formamide_value_unit$value < 0){
-    stop("all parameters 'DMSO','formamide_value_unit$value' should not be less than 0")
+  if (DMSO < 0 || formamide_unit$value < 0) {
+    stop("all parameters 'DMSO','formamide_unit$value' should not be less than 0")
   }
   
   if(!any(dmso_factor %in% c(0.75,0.5,0.6,0.65,0.675))){
@@ -65,8 +65,8 @@ chem_correct <- function(DMSO = 0,
   if(!any(formamide_factor %in% c(0.65,0.6,0.72))){
     stop("'formamide_factor' shoule be one of 0.6,0.65,0.72")
   }
-  if(!formamide_value_unit$unit %in% c("percent", "molar")){
-    stop("formamide_value_unit$unit must be either 'percent' or 'molar'")
+  if(!formamide_unit$unit %in% c("percent", "molar")){
+    stop("formamide_unit$unit must be either 'percent' or 'molar'")
   }
 
   corr <- 0
@@ -75,14 +75,14 @@ chem_correct <- function(DMSO = 0,
     corr <- corr - dmso_factor*DMSO
   }
   
-  if(formamide_value_unit$value > 0){
-    if(formamide_value_unit$unit == "percent"){
-      corr <- corr - formamide_factor*formamide_value_unit$value
-    }else if(formamide_value_unit$unit == "molar"){
+  if(formamide_unit$value > 0){
+    if(formamide_unit$unit == "percent"){
+      corr <- corr - formamide_factor*formamide_unit$value
+    }else if(formamide_unit$unit == "molar"){
       if(is.null(pt_gc)){
-        stop("'pt_gc' should not be NULL when formamide_value_unit$unit = 'molar'")
+        stop("'pt_gc' should not be NULL when formamide_unit$unit = 'molar'")
       }
-      corr <- corr + (0.453*(pt_gc/100)-2.88)*formamide_value_unit$value
+      corr <- corr + (0.453*(pt_gc/100)-2.88)*formamide_unit$value
     }
   }
   
