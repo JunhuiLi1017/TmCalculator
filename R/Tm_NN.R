@@ -226,9 +226,32 @@ tm_nn <- function(gr_seq,
   imm_table_name <- rownames(imm_table_list)
   de_table_name <- rownames(de_table_list)
   
-  # Process sequence
-  gr_seq$sequence <- check_filter_seq(gr_seq$sequence, method = "tm_nn")
-  gr_seq$complement <- check_filter_seq(gr_seq$complement, method = "tm_nn")
+  # Process sequence with pairwise N filtering
+  region_ids <- names(gr_seq)
+  if (is.null(region_ids)) {
+    region_ids <- rep("", length(gr_seq))
+  }
+  empty_id <- is.na(region_ids) | region_ids == ""
+  if (any(empty_id)) {
+    region_ids[empty_id] <- paste0(
+      as.character(GenomicRanges::seqnames(gr_seq))[empty_id], ":",
+      GenomicRanges::start(gr_seq)[empty_id], "-",
+      GenomicRanges::end(gr_seq)[empty_id]
+    )
+  }
+
+  filtered_seq <- check_filter_seq(
+    list(
+      sequence = gr_seq$sequence,
+      complement = gr_seq$complement,
+      region_ids = region_ids
+    ),
+    method = "tm_nn"
+  )
+  skipped_regions <- filtered_seq$skipped_regions
+  gr_seq <- gr_seq[filtered_seq$kept]
+  gr_seq$sequence <- filtered_seq$sequence
+  gr_seq$complement <- filtered_seq$complement
 
   # Calculate Tm for each sequence
   seq_tm <- sapply(seq_along(gr_seq), function(i) {
@@ -432,7 +455,8 @@ tm_nn <- function(gr_seq,
                   "Formamide concentration" = formamide_unit$value,
                   "DMSO factor" = dmso_factor,
                   "Formamide concentration unit" = formamide_unit$unit,
-                  "Formamide factor" = formamide_factor)
+                  "Formamide factor" = formamide_factor,
+                  "Skipped regions containing N" = skipped_regions)
   )
  
   # Set class and attributes

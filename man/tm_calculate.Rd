@@ -41,6 +41,7 @@ tm_calculate(
 \item{input_seq}{Input sequence(s) in 5' to 3' direction. Can be provided as either:
 - A character string (e.g., "ATGCG")
 - A path to a FASTA file containing the sequence(s)
+- A GRanges object with sequence and complement metadata should be provided if mismatch is TRUE
 - A character vector where each element is a string in the format "chr:start-end:strand:species" (e.g., "chr1:100-200:+:BSgenome.Hsapiens.UCSC.hg38"). Strand is "+" for positive (default if not provided) or "-" for negative.
   - chr: Chromosome ID
   - start: Start position

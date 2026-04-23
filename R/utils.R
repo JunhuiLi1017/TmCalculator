@@ -28,36 +28,82 @@ check_filter_seq <- function(seq_list, method) {
     stop("Input sequence list cannot be NULL or empty")
   }
   
-  # Process each sequence in the list
-  result <- sapply(seq_list, function(i) {
-    if(is.null(i)) {
-      return(NULL)
-    }
-    
-    # Convert to uppercase
-    i_s2c <- s2c(toupper(i))
-    
-    # Filter based on method
-    if(method == "tm_wallace") {
-      baseset <- c("A","B","C","D","G","H","I","K","M","N","R","S","T","V","W","Y")
-    } else if(method == "tm_nn") {
-      baseset = c('A','C','G','T','I')
-    } else if(method == "tm_gc") {
-      baseset <- c("A","B","C","D","G","H","I","K","M","N","R","S","T","V","W","X","Y")
-    } else {
-      stop("Invalid method specified")
-    }
-    
+  # Filter based on method
+  if(method == "tm_wallace") {
+    baseset <- c("A","B","C","D","G","H","I","K","M","N","R","S","T","V","W","Y")
+  } else if(method == "tm_nn") {
+    baseset <- c("A","C","G","T","I")
+  } else if(method == "tm_gc") {
+    baseset <- c("A","B","C","D","G","H","I","K","M","N","R","S","T","V","W","X","Y")
+  } else {
+    stop("Invalid method specified")
+  }
+
+  filter_one <- function(x) {
+    x_s2c <- s2c(toupper(x))
     filtered_seq <- vector()
-    for(idx in i_s2c){
+    for(idx in x_s2c){
       if(idx %in% baseset){
         filtered_seq <- append(filtered_seq,idx)
       }
     }
-    
     return(c2s(filtered_seq))
-  })
-  
+  }
+
+  # tm_nn special mode: pairwise filtering for sequence/complement with N handling
+  if (method == "tm_nn" &&
+      is.list(seq_list) &&
+      all(c("sequence", "complement") %in% names(seq_list))) {
+    seq_vec <- seq_list$sequence
+    comp_vec <- seq_list$complement
+    region_ids <- seq_list$region_ids
+    if (is.null(region_ids)) {
+      region_ids <- as.character(seq_along(seq_vec))
+    }
+
+    if (length(seq_vec) != length(comp_vec)) {
+      stop("'sequence' and 'complement' must have the same length")
+    }
+    if (length(region_ids) != length(seq_vec)) {
+      stop("'region_ids' must have the same length as 'sequence'")
+    }
+
+    has_n <- grepl("N", toupper(as.character(seq_vec))) |
+      grepl("N", toupper(as.character(comp_vec)))
+    skipped_regions <- character(0)
+    if (any(has_n)) {
+      skipped_regions <- region_ids[has_n]
+      warning(
+        paste0(
+          "Skipped ", sum(has_n), " region(s) because sequence or complement contains 'N': ",
+          paste(skipped_regions, collapse = ", ")
+        ),
+        call. = FALSE
+      )
+      seq_vec <- seq_vec[!has_n]
+      comp_vec <- comp_vec[!has_n]
+    }
+    if (length(seq_vec) == 0) {
+      stop("No valid regions left for tm_nn calculation after filtering sequences with 'N'.")
+    }
+
+    filtered_seq <- vapply(seq_vec, filter_one, FUN.VALUE = character(1))
+    filtered_comp <- vapply(comp_vec, filter_one, FUN.VALUE = character(1))
+
+    if (any(nchar(filtered_seq) < 2) || any(nchar(filtered_comp) < 2)) {
+      stop("Invalid region or sequence in your input: too many Ns or region contains only Ns")
+    }
+
+    return(list(
+      sequence = filtered_seq,
+      complement = filtered_comp,
+      kept = !has_n,
+      skipped_regions = skipped_regions
+    ))
+  }
+
+  # Default mode: single sequence vector filtering
+  result <- vapply(seq_list, filter_one, FUN.VALUE = character(1))
   if(any(nchar(result) < 2)) {
     stop("Invalid region or sequence in your input: too many Ns or region contains only Ns")
   }
