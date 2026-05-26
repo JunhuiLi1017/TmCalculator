@@ -114,11 +114,11 @@ tm_gc <- function(gr_seq,
   salt_method <- match.arg(salt_method)
   
   if (is.null(userset)) {
-    if (!variant %in% rownames(thermodynamic_gc_params)) {
+    if (!variant %in% rownames(get_table("GC_VARTAB"))) {
       stop("only Chester1993, QuikChange, Schildkraut1965, Wetmur1991_MELTING, Wetmur1991_RNA, Wetmur1991_RNA/DNA, Primer3Plus and vonAhsen2001 are allowed in variant")
     } else {
-      gc_coef <- thermodynamic_gc_params[variant,]
-      salt_method <- thermodynamic_gc_params[variant,"salt_correction"]
+      gc_coef <- get_table("GC_VARTAB")[variant,]
+      salt_method <- get_table("GC_VARTAB")[variant,"salt_correction"]
     }
   } else {
     gc_coef <- as.numeric(userset)
@@ -157,12 +157,13 @@ tm_gc <- function(gr_seq,
                                    pt_gc = pt_gc)
       tm <- tm + corr_chem
     }
-    return(list(tm=tm,gc=pt_gc))
+    return(list(Tm = tm, GC = pt_gc))
   })
   
   gr_seq$GC <- unlist(seq_tm[2,])
   gr_seq$Tm <- unlist(seq_tm[1,])
-  
+  gr_seq <- .normalize_tm_gc_metadata(gr_seq)
+
   # Create result list with proper structure
   df_gr <- as.data.frame(gr_seq)
   result_list <- list(

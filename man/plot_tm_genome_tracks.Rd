@@ -11,92 +11,129 @@ plot_tm_genome_tracks(
   tm_track_title = "Melting Temperature (°C)",
   color_palette = c("viridis", "magma", "plasma", "inferno", "cividis"),
   show_ideogram = TRUE,
-  zoom = NULL
+  zoom = NULL,
+  x_axis = c("genome", "regions"),
+  track_type = c("gradient", "points", "line", "bars"),
+  color_by = "Tm",
+  facet_by_zoom = FALSE,
+  regions_point_size = 2,
+  regions_show_bars = TRUE
 )
 }
 \arguments{
-\item{gr}{A GRanges object. It MUST contain a metadata column named 'Tm'
-with numeric melting temperature values.}
+\item{gr}{A GRanges object. Must contain a metadata column \code{Tm} with
+numeric melting temperature values.}
 
-\item{chromosome_to_plot}{A character string specifying the chromosome to visualize.
-These chromosomes must exist in your GRanges object.}
+\item{chromosome_to_plot}{Character string. Chromosome to visualise; must
+exist in \code{gr}.}
 
-\item{genome_assembly}{A character string indicating the genome assembly (e.g., "hg19", "mm10").
-This is used by IdeogramTrack for correct ideogram display.}
+\item{genome_assembly}{Character string specifying the genome assembly
+(e.g., \code{"hg19"}, \code{"mm10"}).}
 
-\item{tm_track_title}{A character string for the title of the Tm data track.}
+\item{tm_track_title}{Character. Track / axis title.
+Default: \code{"Melting Temperature (°C)"}.}
 
-\item{color_palette}{A character string specifying the viridis color palette to use.
-Available options are:
+\item{color_palette}{Character. Viridis palette: \code{"viridis"} (default),
+\code{"magma"}, \code{"plasma"}, \code{"inferno"}, or \code{"cividis"}.}
+
+\item{show_ideogram}{Logical. Display chromosome ideogram. Default: \code{TRUE}.}
+
+\item{zoom}{Character string or character vector specifying genomic region(s)
+to zoom into, e.g. \code{"chr1:10e6-20e6"} or
+\code{c(Mut = "chr1:100-1000", WT = "chr1:5e6-5.001e6")}.
+When the vector is \emph{named} the names become region labels.
+Multiple entries produce side-by-side panels in \code{"genome"} mode and
+filtered, labelled data in \code{"regions"} mode.
+\code{NULL} (default) shows the full chromosome extent.}
+
+\item{x_axis}{Character. X-axis mode:
 \itemize{
-  \item "viridis" (default): A perceptually uniform color map that works well for most people
-  \item "magma": A perceptually uniform color map with a dark purple to bright yellow range
-  \item "plasma": A perceptually uniform color map with a dark purple to bright yellow range
-  \item "inferno": A perceptually uniform color map with a dark purple to bright yellow range
-  \item "cividis": A perceptually uniform color map optimized for color vision deficiency
-}
-All palettes are colorblind-friendly and perceptually uniform.}
+  \item \code{"genome"} (default): Standard Gviz genome-browser view.
+  \item \code{"regions"}: ggplot2 view with region index on the x-axis,
+    suitable for sparse data spread across a large chromosome.
+}}
 
-\item{show_ideogram}{Logical, whether to display the chromosome ideogram tracks.}
+\item{track_type}{Character. How Tm values are drawn:
+\itemize{
+  \item \code{"gradient"} (default): Vertical lines coloured by a
+    continuous Tm gradient (lollipop view). Not compatible with discrete
+    \code{color_by}; automatically switches to \code{"points"} when a
+    categorical \code{color_by} is requested.
+  \item \code{"points"}: Scatter points, coloured per-point by Tm gradient
+    or by category.
+  \item \code{"line"}: Connected line through all regions.
+  \item \code{"bars"}: Bar / histogram display.
+}}
 
-\item{zoom}{A character string specifying the genomic region to zoom into.
-If NULL (default), the entire range of each chromosome will be shown.
-Example: "chr1:1000000-2000000" for zooming into chr1:1000000-2000000}
+\item{color_by}{Character. Variable mapped to colour. Options:
+\itemize{
+  \item \code{"Tm"} (default): continuous viridis gradient over Tm values.
+  \item \code{"zoom_region"}: one colour per zoom window — requires
+    \code{zoom} to have two or more entries.
+  \item Any metadata column name present in \code{gr} (e.g.
+    \code{"group"}): treated as a discrete categorical variable.
+}}
+
+\item{facet_by_zoom}{Logical. In \code{"regions"} mode with multiple zoom
+windows, split into one ggplot2 facet per window. Default: \code{FALSE}.}
+
+\item{regions_point_size}{Numeric. Point size in \code{"regions"} mode.
+Default: \code{2}.}
+
+\item{regions_show_bars}{Logical. Deprecated; superseded by
+\code{track_type}. Retained for backward compatibility.}
 }
 \value{
-Invisible NULL. The function generates a plot directly.
+In \code{"regions"} mode: a \code{ggplot} object.
+  In \code{"genome"} mode: \code{invisible(NULL)} (Gviz renders directly).
 }
 \description{
 This function generates Gviz plots displaying Tm values as DataTracks
-alongside genome axes and ideograms for specified chromosomes.
-Tm values are visualized using a heatmap-like color gradient.
+alongside genome axes and ideograms for specified chromosomes. The display
+type (gradient lines, points, connected line, or bars) is configurable, and
+coloring can follow a continuous Tm gradient or any categorical metadata
+column (e.g., a \code{"group"} annotation). Multiple zoom windows on the
+same chromosome can be compared side by side.
 }
 \examples{
 \dontrun{
 library(GenomicRanges)
-library(Gviz)
-# Example 1: Generate sample data with 150 sequences
 set.seed(123)
-
-# Generate 100 sequences for chr1
-chr1_starts <- sort(sample(1:249250621, 100))  # chr1 length in hg19
-chr1_lengths <- sample(50:200, 100, replace=TRUE)
-chr1_ends <- chr1_starts + chr1_lengths
-chr1_tms <- runif(100, min=60, max=80)
-
-# Generate 50 sequences for chr2
-chr2_starts <- sort(sample(1:243199373, 50))   # chr2 length in hg19
-chr2_lengths <- sample(50:200, 50, replace=TRUE)
-chr2_ends <- chr2_starts + chr2_lengths
-chr2_tms <- runif(50, min=60, max=80)
-
-# Create GRanges object
-tm_results <- GRanges(
-  seqnames = Rle(c(rep("chr1", 100), rep("chr2", 50))),
-  ranges = IRanges(
-    start = c(chr1_starts, chr2_starts),
-    end = c(chr1_ends, chr2_ends)
-  ),
-  strand = Rle(sample(c("+", "-"), 150, replace=TRUE)),
-  Tm = c(chr1_tms, chr2_tms)
+gr <- GRanges(
+  seqnames = rep("chr1", 100),
+  ranges   = IRanges(start = sort(sample(1:249250621, 100)),
+                     width = sample(50:200, 100, replace = TRUE)),
+  Tm    = runif(100, 60, 80),
+  group = sample(c("mutation", "wildtype"), 100, replace = TRUE)
 )
+# Standard gradient view
+plot_tm_genome_tracks(gr, "chr1", "hg19",
+                      zoom = "chr1:10062800-20000000")
 
-# Plot single chromosome with zoom
-plot_tm_genome_tracks(
-  gr = tm_results,
-  chromosome_to_plot = "chr1",
-  genome_assembly = "hg19",
-  tm_track_title = "DNA Sequence Tm",
-  zoom = "chr1:10062800-20000000"
-)
+# Points colored by Tm gradient (fixed)
+plot_tm_genome_tracks(gr, "chr1", "hg19",
+                      track_type = "points",
+                      zoom = "chr1:10062800-20000000")
 
-# Example with custom color palette and no zoom
-plot_tm_genome_tracks(
-  gr = tm_results,
-  chromosome_to_plot = "chr2",
-  genome_assembly = "hg19",
-  color_palette = "plasma"
-)
+# Compare two regions side by side, colored by region
+plot_tm_genome_tracks(gr, "chr1", "hg19",
+  zoom      = c(Region1 = "chr1:7634457-133482943",
+                Region2 = "chr1:135756721-248931747"),
+  track_type = "points",
+  color_by   = "zoom_region")
+
+# Color by metadata group column
+plot_tm_genome_tracks(gr, "chr1", "hg19",
+  track_type = "points",
+  color_by   = "group")
+
+# Regions mode – index on x-axis, multiple zoom windows
+p <- plot_tm_genome_tracks(gr, "chr1", "hg19",
+  x_axis   = "regions",
+  zoom     = c(Region1 = "chr1:100-200000000",
+               Region2 = "chr1:200000000-249250621"),
+  color_by = "zoom_region")
+print(p)
 }
 
 }

@@ -131,9 +131,10 @@ Several papers report factors between 0.6 and 0.72.}
 Only applicable for the GC method. Default: TRUE}
 }
 \value{
-A list containing Tm values and options for each method used. The structure includes:
-  - Tm: A list of sequences with updated Tm attributes
-  - Options: A list containing calculation parameters and method information
+A \code{TmCalculator} list with:
+  \item{\code{gr}}{The input \code{GRanges} with metadata columns \code{Tm}
+    and \code{GC} (melting temperature in \eqn{^{\circ}}C and GC percent).}
+  \item{\code{options}}{Calculation parameters and method information.}
 }
 \description{
 Calculates melting temperature using multiple methods:

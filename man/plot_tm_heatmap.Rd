@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_tm_heatmap.R
 \name{plot_tm_heatmap}
 \alias{plot_tm_heatmap}
-\title{Plot Tm values as a heatmap using ggbio}
+\title{Plot Tm values as a heatmap using ggplot2}
 \usage{
 plot_tm_heatmap(
   gr,
@@ -11,7 +11,10 @@ plot_tm_heatmap(
   plot_type = c("karyogram", "faceted"),
   color_palette = c("viridis", "magma", "plasma", "inferno", "cividis"),
   title_name = NULL,
-  zoom = NULL
+  zoom = NULL,
+  x_axis = c("genome", "regions"),
+  regions_facet = FALSE,
+  regions_color_by = c("Tm", "chromosome")
 )
 }
 \arguments{
@@ -19,44 +22,66 @@ plot_tm_heatmap(
 with numeric melting temperature values.}
 
 \item{genome_assembly}{A character string indicating the genome assembly (e.g., "hg19", "mm10").
-This is used by ggbio for correct chromosome display.}
+This is used for setting chromosome lengths when needed.}
 
 \item{chromosome_to_plot}{A character vector specifying which chromosomes to visualize.
 These chromosomes must exist in your GRanges object.}
 
 \item{plot_type}{A character string specifying the type of plot to generate:
 \itemize{
-  \item "karyogram" (default): A single plot with all chromosomes arranged in a karyogram
-  \item "faceted": Separate plots for each chromosome
-}}
+  \item "karyogram" (default): Chromosomes arranged as rows,
+    each region shown as a colored rectangle at its genomic position.
+  \item "faceted": Same as "karyogram" but with more whitespace
+    between chromosome panels.
+}
+Ignored when \code{x_axis = "regions"}.}
 
 \item{color_palette}{A character string specifying the viridis color palette to use.
 Available options are:
 \itemize{
-  \item "viridis" (default): A perceptually uniform color map that works well for most people
-  \item "magma": A perceptually uniform color map with a dark purple to bright yellow range
-  \item "plasma": A perceptually uniform color map with a dark purple to bright yellow range
-  \item "inferno": A perceptually uniform color map with a dark purple to bright yellow range
-  \item "cividis": A perceptually uniform color map optimized for color vision deficiency
-}
-All palettes are colorblind-friendly and perceptually uniform.}
+  \item "viridis" (default)
+  \item "magma"
+  \item "plasma"
+  \item "inferno"
+  \item "cividis"
+}}
 
 \item{title_name}{A character string for the plot title.}
 
 \item{zoom}{A character string specifying the genomic region to zoom into.
 If NULL (default), the entire range of each chromosome will be shown.
-Example: c("chr1:1000000-2000000", "chr2:1000000-2000000") for zooming into chr1:1000000-2000000 and chr2:1000000-2000000}
+Example: c("chr1:1000000-2000000", "chr2:1000000-2000000").
+Only used when \code{x_axis = "genome"}.}
+
+\item{x_axis}{Character. Controls how the x-axis is constructed:
+\itemize{
+  \item \code{"genome"} (default): x-axis represents genomic position;
+    regions are drawn as colored rectangles in chromosomal space.
+  \item \code{"regions"}: x-axis represents a sequential region index
+    (ordered by chromosome then start position). y-axis shows Tm value.
+    This view makes it easy to compare Tm values across all input regions
+    regardless of how far apart they are in the genome.
+}}
+
+\item{regions_facet}{Logical. When \code{x_axis = "regions"}, facet the plot
+by chromosome so each panel has its own x index. Default: \code{FALSE}.}
+
+\item{regions_color_by}{Character. When \code{x_axis = "regions"}, map colour
+to \code{"Tm"} (default, continuous gradient) or \code{"chromosome"}
+(discrete per-chromosome colour).}
 }
 \value{
-A ggplot object displaying Tm values across genomic coordinates.
+A plotly object (interactive).
 }
 \description{
 This function generates a heatmap visualization of Tm values across chromosomes
-using the ggbio package. It supports both karyogram and faceted plot types.
+using ggplot2. It supports both a genome-coordinate view (faceted by chromosome,
+x-axis = genomic position) and a region-indexed view (x-axis = region index,
+y-axis = Tm value) that makes sparse data legible at any genomic scale.
 }
 \examples{
 \dontrun{
-# Create example GRanges object  
+# Create example GRanges object
 gr_tm <- GenomicRanges::GRanges(
   seqnames = c("chr1", "chr2", "chr1", "chr2", "chr1"),
   ranges = IRanges::IRanges(
@@ -66,15 +91,15 @@ gr_tm <- GenomicRanges::GRanges(
   Tm = c(65.5, 68.2, 70.1, 63.8, 72.0)
 )
 
-# Plot with ideograms
+# Genome-coordinate view (default)
 plot_tm_heatmap(gr_tm, genome_assembly = "hg19", plot_type = "karyogram")
 
-# Faceted plot by chromosome
-plot_tm_heatmap(gr_tm, genome_assembly = "hg19", plot_type = "faceted")
+# Region-indexed view: compare Tm values across all regions
+plot_tm_heatmap(gr_tm, genome_assembly = "hg19", x_axis = "regions")
 
-# Plot with zoom
-plot_tm_heatmap(gr_tm, genome_assembly = "hg19", plot_type = "faceted", zoom = "chr1:100-200")
-
+# Region view, faceted and coloured by chromosome
+plot_tm_heatmap(gr_tm, genome_assembly = "hg19", x_axis = "regions",
+                regions_facet = TRUE, regions_color_by = "chromosome")
 }
 
 }

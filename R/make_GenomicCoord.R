@@ -111,7 +111,7 @@
 #' library(BSgenome.Hsapiens.UCSC.hg38)
 #'
 #' ## ── Basic usage: tile chr1 with 200 bp windows, 50 bp slide ──────────
-#' coords <- make_GenomicCoord(
+#' coords <- make_genomiccoord(
 #'   bsgenome    = BSgenome.Hsapiens.UCSC.hg38,
 #'   chromosomes = "chr1",
 #'   window      = 200L,
@@ -124,7 +124,7 @@
 #' # region3 "chr1:10101-10300:+:BSgenome.Hsapiens.UCSC.hg38:region3"
 #'
 #' ## ── Non-overlapping tiling (slide == window) ─────────────────────────
-#' coords_nonoverlap <- make_GenomicCoord(
+#' coords_nonoverlap <- make_genomiccoord(
 #'   bsgenome    = BSgenome.Hsapiens.UCSC.hg38,
 #'   chromosomes = paste0("chr", 1:22),
 #'   window      = 200L,
@@ -133,7 +133,7 @@
 #' length(coords_nonoverlap)   # ~15 million windows across autosomes
 #'
 #' ## ── Custom start/end (e.g. a specific sub-region) ────────────────────
-#' coords_sub <- make_GenomicCoord(
+#' coords_sub <- make_genomiccoord(
 #'   bsgenome    = BSgenome.Hsapiens.UCSC.hg38,
 #'   chromosomes = "chr1",
 #'   window      = 200L,
@@ -144,7 +144,7 @@
 #' length(coords_sub)   # 19,981 windows in 1 Mb region
 #'
 #' ## ── No N-trimming (use full chromosome length) ────────────────────────
-#' coords_noN <- make_GenomicCoord(
+#' coords_noN <- make_genomiccoord(
 #'   bsgenome    = BSgenome.Hsapiens.UCSC.hg38,
 #'   chromosomes = "chr1",
 #'   window      = 200L,
@@ -153,7 +153,7 @@
 #' )
 #'
 #' ## ── Per-window N-filtering (removes windows with >10% N) ─────────────
-#' coords_filt <- make_GenomicCoord(
+#' coords_filt <- make_genomiccoord(
 #'   bsgenome    = BSgenome.Hsapiens.UCSC.hg38,
 #'   chromosomes = "chr1",
 #'   window      = 200L,
@@ -163,7 +163,7 @@
 #' )
 #'
 #' ## ── Get data.frame output for GRanges construction ───────────────────
-#' df <- make_GenomicCoord(
+#' df <- make_genomiccoord(
 #'   bsgenome    = BSgenome.Hsapiens.UCSC.hg38,
 #'   chromosomes = "chr1",
 #'   window      = 200L,
@@ -177,7 +177,7 @@
 #' )
 #'
 #' ## ── Pass directly to Tm_NN ───────────────────────────────────────────
-#' coords <- make_GenomicCoord(
+#' coords <- make_genomiccoord(
 #'   bsgenome    = BSgenome.Hsapiens.UCSC.hg38,
 #'   chromosomes = "chr1",
 #'   window      = 200L,
@@ -196,7 +196,7 @@
 #' @importFrom Biostrings getSeq letterFrequency
 #' @importFrom GenomeInfoDb seqlengths seqlevels
 #' @export
-make_GenomicCoord <- function(
+make_genomiccoord <- function(
     bsgenome,
     chromosomes    = NULL,
     window         = 200L,
@@ -255,7 +255,7 @@ make_GenomicCoord <- function(
     chr_len <- chr_lens[chr]
 
     if (verbose)
-      message(sprintf("[make_GenomicCoord] Processing %s  (length = %s bp)", chr, format(chr_len, big.mark = ",")))
+      message(sprintf("[make_genomiccoord] Processing %s  (length = %s bp)", chr, format(chr_len, big.mark = ",")))
 
     ## ── 5a. Determine effective start / end for this chromosome ─────────
     chr_start_raw <- if (!is.null(start_override)) start_override[chr] else 1L
@@ -378,7 +378,7 @@ make_GenomicCoord <- function(
   rownames(df_all) <- NULL
 
   if (verbose)
-    message(sprintf("[make_GenomicCoord] Done. Total windows: %s",
+    message(sprintf("[make_genomiccoord] Done. Total windows: %s",
                     format(nrow(df_all), big.mark = ",")))
 
   if (as_vector) {

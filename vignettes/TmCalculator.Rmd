@@ -76,7 +76,7 @@ result
 
 ### The options of the nearest neighbor method are:
 ```{r genomic_input_options, message=FALSE}
-result$tm$Options
+result$options
 ```
 
 ## FASTA File Processing

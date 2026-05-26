@@ -169,10 +169,9 @@ DNA_NN_Breslauer_1986: Breslauer K J (1986) <doi:10.1073/pnas.83.11.3746>
 
 input_seq <- c("AAAATTTTTTTCCCCCCCCCCCCCCGGGGGGGGGGGGTGTGCGCTGC",
 "AAAATTTTTTTCCCCCCCCCCCCCCGGGGGGGGGGGGTGTGCGCTGC")
-gr_seq <- to_genomic_ranges(input_seq)
-out <- tm_nn(gr_seq, Na=50)
+seqs <- to_genomic_ranges(input_seq)
+out <- tm_nn(seqs, Na=50)
 out
-out$tm_nn$Options
 
 }
 \references{

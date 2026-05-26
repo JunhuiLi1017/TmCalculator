@@ -4,11 +4,11 @@
 \name{TmCalculator-package}
 \alias{TmCalculator}
 \alias{TmCalculator-package}
-\title{TmCalculator: A Calculator for Melting Temperature of Nucleic Acid Sequences}
+\title{TmCalculator: Scaling Nucleic Acid Thermodynamics from Sequence-Level Calculation to Genome-Wide Profiling}
 \description{
 \if{html}{\figure{logo.png}{options: style='float: right' alt='logo' width='120'}}
 
-A comprehensive R package for calculating melting temperatures of nucleic acid sequences. Implements three calculation methods: 1. Wallace rule (Thein & Wallace, 1986) 2. Empirical formulas based on GC content (Marmur, 1962; Schildkraut, 2010; Wetmur, 1991; Untergasser, 2012; von Ahsen, 2001) 3. Nearest neighbor thermodynamics (Breslauer, 1986; Sugimoto, 1996; Allawi, 1998; SantaLucia, 2004; Freier, 1986; Xia, 1998; Chen, 2012; Bommarito, 2000; Turner, 2010; Sugimoto, 1995; Allawi, 1997; Santalucia, 2005) Includes corrections for: - Salt ions (SantaLucia, 1996, 1998; Owczarzy, 2004, 2008) - Chemical compounds (dimethyl sulfoxide, formamide) Supports both direct sequence input and FASTA file input.
+Accurate calculation of nucleic acid melting temperature (Tm) is fundamental to many molecular biology applications, and this software scales Tm analysis from individual sequences to genome‑wide thermodynamic profiling. Inputs may be sequence strings, FASTA files, or genomic coordinates, with BSgenome used for reference retrieval; results are returned as GRanges for interoperability with Bioconductor workflows and downstream multi‑omics analyses (e.g., ATAC‑seq, ChIP‑seq, RNA‑seq, QTL/GWAS). The implementation provides three Tm calculation methods: the Wallace rule (Thein & Wallace, 1986), empirical GC‑content formulas (Marmur, 1962; Schildkraut, 2010; Wetmur, 1991; Untergasser, 2012; von Ahsen, 2001), and nearest‑neighbor thermodynamics (Breslauer, 1986; Sugimoto, 1996; Allawi, 1998; SantaLucia, 2004; Freier, 1986; Xia, 1998; Chen, 2012; Bommarito, 2000; Turner, 2010; Sugimoto, 1995; Allawi, 1997; SantaLucia, 2005). Corrections are supported for salt ions (SantaLucia, 1996, 1998; Owczarzy, 2004, 2008) and for chemical conditions such as dimethyl sulfoxide and formamide. Visualization utilities and an optional Shiny application enable interactive exploration.
 }
 \seealso{
 Useful links:
@@ -19,6 +19,11 @@ Useful links:
 }
 \author{
 \strong{Maintainer}: Junhui Li \email{ljh.biostat@gmail.com} (\href{https://orcid.org/0000-0003-3973-1700}{ORCID})
+
+Authors:
+\itemize{
+  \item Lihua Julie Zhu
+}
 
 }
 \keyword{internal}

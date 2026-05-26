@@ -13,7 +13,10 @@ plot_tm_heatmap_interactive(
   plot_type = c("karyogram", "faceted"),
   color_palette = c("viridis", "magma", "plasma", "inferno", "cividis"),
   title_name = NULL,
-  zoom = NULL
+  zoom = NULL,
+  x_axis = c("genome", "regions"),
+  regions_facet = FALSE,
+  regions_color_by = c("Tm", "chromosome")
 )
 
 plot_tm_karyotype_interactive(
@@ -28,7 +31,8 @@ plot_tm_karyotype_interactive(
   yaxis_cex = 0.8,
   chr_cex = 1,
   tick_dist = 1e+07,
-  zoom = NULL
+  zoom = NULL,
+  x_axis = c("genome", "regions")
 )
 
 plot_tm_genome_tracks_interactive(
@@ -38,7 +42,9 @@ plot_tm_genome_tracks_interactive(
   tm_track_title = "Melting Temperature (°C)",
   color_palette = c("viridis", "magma", "plasma", "inferno", "cividis"),
   show_ideogram = TRUE,
-  zoom = NULL
+  zoom = NULL,
+  x_axis = c("genome", "regions"),
+  regions_show_bars = TRUE
 )
 }
 \arguments{
@@ -48,44 +54,56 @@ plot_tm_genome_tracks_interactive(
 
 \item{chromosome_to_plot}{A string specifying the chromosome to plot.}
 
-\item{plot_type}{A string specifying the plot type.}
+\item{plot_type}{Integer. karyoploteR plot type (ignored in regions mode).}
 
-\item{color_palette}{A string specifying the color palette.}
+\item{color_palette}{A string specifying the viridis palette.}
 
-\item{title_name}{A string specifying the title name.}
+\item{title_name}{A string specifying the plot title.}
 
-\item{zoom}{A string specifying the zoom level.}
+\item{zoom}{A string specifying the zoom region (genome mode only).}
 
-\item{chromosomes}{A vector of strings specifying the chromosomes to plot.}
+\item{x_axis}{Character. \code{"genome"} for chromosomal coordinates;
+\code{"regions"} for region-indexed view.}
 
-\item{colors}{A vector of strings specifying the colors for the chromosomes.}
+\item{regions_facet}{Logical. (heatmap only) Facet the regions view by
+chromosome. Default: \code{FALSE}.}
 
-\item{shapes}{A vector of strings specifying the shapes for the chromosomes.}
+\item{regions_color_by}{Character. (heatmap only) Colour regions by
+\code{"Tm"} or \code{"chromosome"}. Default: \code{"Tm"}.}
 
-\item{point_cex}{A numeric value specifying the point size.}
+\item{chromosomes}{A character vector specifying chromosomes to plot.}
 
-\item{xaxis_cex}{A numeric value specifying the x-axis label size.}
+\item{colors}{A named vector of colours per chromosome.}
 
-\item{yaxis_cex}{A numeric value specifying the y-axis label size.}
+\item{shapes}{A named integer vector of pch values per chromosome.}
 
-\item{chr_cex}{A numeric value specifying the chromosome label size.}
+\item{point_cex}{Numeric. Point size (genome mode) or point size multiplier
+(regions mode). Default: \code{1.5}.}
 
-\item{tick_dist}{A numeric value specifying the tick distance.}
+\item{xaxis_cex}{Numeric. X-axis label size. Default: \code{0.7}.}
 
-\item{tm_track_title}{A string specifying the title name.}
+\item{yaxis_cex}{Numeric. Y-axis label size. Default: \code{0.8}.}
 
-\item{show_ideogram}{A logical value specifying whether to show the ideogram.}
+\item{chr_cex}{Numeric. Chromosome label size. Default: \code{1}.}
+
+\item{tick_dist}{Numeric. X-axis tick spacing in bp. Default: \code{10000000}.}
+
+\item{tm_track_title}{A string specifying the track title.}
+
+\item{show_ideogram}{Logical. Show ideogram (genome mode only).}
+
+\item{regions_show_bars}{Logical. Add lollipop bars in regions mode.
+Default: \code{TRUE}.}
 }
 \value{
+A plotly object.
+
 A plotly object.
 }
 \description{
 These functions convert the standard Tm plots to interactive plotly versions
 that can be used in Shiny applications or R Markdown documents.
-
-These functions convert the standard Tm karyotype plots to interactive plotly versions
-that can be used in Shiny applications or R Markdown documents.
-
-These functions convert the standard Tm genome tracks plots to interactive plotly versions
-that can be used in Shiny applications or R Markdown documents.
+Each function mirrors the parameters of its non-interactive counterpart and
+adds an \code{x_axis} argument that switches between genome-coordinate and
+region-indexed views.
 }

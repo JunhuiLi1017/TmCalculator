@@ -197,9 +197,10 @@
 #' The function processes the input sequence once and applies it to all selected methods,
 #' making it more efficient than calling each method separately.
 #' 
-#' @return A list containing Tm values and options for each method used. The structure includes:
-#'   - Tm: A list of sequences with updated Tm attributes
-#'   - Options: A list containing calculation parameters and method information
+#' @return A \code{TmCalculator} list with:
+#'   \item{\code{gr}}{The input \code{GRanges} with metadata columns \code{Tm}
+#'     and \code{GC} (melting temperature in \eqn{^{\circ}}C and GC percent).}
+#'   \item{\code{options}}{Calculation parameters and method information.}
 #' 
 #' @encoding UTF-8
 #' @author Junhui Li
@@ -277,8 +278,8 @@ tm_calculate <- function(input_seq,
   }
 
   # check and filter the sequence
-  gr$sequence <- check_filter_seq(gr$sequence, method)
-  gr$complement <- check_filter_seq(gr$complement, method)
+  #gr$sequence <- check_filter_seq(gr$sequence, method)
+  #gr$complement <- check_filter_seq(gr$complement, method)
 
   # Calculate Tm using each selected method
   if ("tm_nn" %in% method) {

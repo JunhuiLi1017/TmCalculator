@@ -41,12 +41,13 @@ tm_wallace <- function(gr_seq, ambiguous = FALSE) {
     n_gc <- n_seq * pt_gc / 100
     n_at <- n_seq - n_gc
     tm <- 4 * n_gc + 2 * n_at
-    return(list(tm=tm,gc=pt_gc))
+    return(list(Tm = tm, GC = pt_gc))
   })
 
   gr_seq$GC <- unlist(seq_tm[2,])
   gr_seq$Tm <- unlist(seq_tm[1,])
-  
+  gr_seq <- .normalize_tm_gc_metadata(gr_seq)
+
   # Create result list with proper structure
   df_gr <- as.data.frame(gr_seq)
   result_list <- list(
