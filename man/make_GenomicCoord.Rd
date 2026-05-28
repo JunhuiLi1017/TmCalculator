@@ -16,6 +16,7 @@ make_genomiccoord(
   max_N_frac = 0.1,
   N_scan_block = window,
   region_prefix = "region",
+  genome_pkg_name = NULL,
   as_vector = TRUE,
   verbose = TRUE
 )
@@ -67,29 +68,29 @@ faster but less precise.  Default \code{10000L}.}
 
 \item{region_prefix}{Character.  Prefix for region IDs embedded in
 the coordinate string.  Default \code{"region"} (producing
-\code{region1}, \code{region2}, …).}
+\code{region1}, \code{region2}, ...).}
+
+\item{genome_pkg_name}{Character \strong{or} \code{NULL}.  The
+genome package name to embed in the coordinate string (4th field).
+When \code{NULL} (default), the name is extracted automatically
+from the \code{bsgenome} object via \code{S4Vectors::metadata(bsgenome)}.
+Supply explicitly when using a custom BSgenome object whose
+metadata name differs from the canonical package name.}
 
 \item{as_vector}{Logical.  When \code{TRUE} (default), return a
 plain named character vector.  When \code{FALSE}, return a
 \code{data.frame} with columns \code{coord}, \code{chr},
 \code{start}, \code{end}, \code{strand}, \code{genome},
 \code{region_id}, \code{chr_start_used}, \code{chr_end_used}
-— useful for downstream GRanges construction.}
+ --  useful for downstream GRanges construction.}
 
 \item{verbose}{Logical.  Print per-chromosome progress messages.
 Default \code{TRUE}.}
-
-\item{genome_pkg_name}{Character \strong{or} \code{NULL}.  The
-genome package name to embed in the coordinate string (4th field).
-When \code{NULL} (default), the name is extracted automatically
-from the \code{bsgenome} object via \code{metadata(bsgenome)}.
-Supply explicitly when using a custom BSgenome object whose
-metadata name differs from the canonical package name.}
 }
 \value{
 When \code{as_vector = TRUE} (default): a named character
   vector of coordinate strings, one element per window.  Names are
-  the region IDs (\code{region1}, \code{region2}, …).
+  the region IDs (\code{region1}, \code{region2}, ...).
 
   When \code{as_vector = FALSE}: a \code{data.frame} with columns
   \code{coord}, \code{chr}, \code{win_start}, \code{win_end},
@@ -102,7 +103,7 @@ overlapping windows and returns a named character vector of coordinate
 strings in the format
 \code{"chr:start-end:strand:genome_pkg:region_id"}.
 This vector is the primary input for downstream Tm calculation
-functions (\code{Tm_NN}, \code{Tm_GC}, \code{Tm_Wallace}) that
+functions (\code{tm_nn}, \code{tm_gc}, \code{tm_wallace}) that
 accept genomic coordinate strings.
 }
 \section{Coordinate string format}{
@@ -115,11 +116,11 @@ Each element of the returned vector follows the pattern:
 }
 Fields (colon-separated):
 \enumerate{
-  \item \strong{chromosome} — e.g. \code{chr1}
-  \item \strong{start-end}  — 1-based, inclusive coordinates
-  \item \strong{strand}     — \code{+} or \code{-}
-  \item \strong{genome}     — BSgenome package name (character)
-  \item \strong{region_id}  — unique label \code{regionN}
+  \item \strong{chromosome}  --  e.g. \code{chr1}
+  \item \strong{start-end}   --  1-based, inclusive coordinates
+  \item \strong{strand}      --  \code{+} or \code{-}
+  \item \strong{genome}      --  BSgenome package name (character)
+  \item \strong{region_id}   --  unique label \code{regionN}
 }
 }
 
@@ -139,7 +140,7 @@ controlled by \code{trim_N}:
     then trim \code{start} and \code{end} to those positions.
     Efficient: reads the chromosome sequence only once in blocks.}
   \item{\code{"filter"}}{Generate windows across the full
-    \code{start}–\code{end} range but then remove any window whose
+    \code{start}-\code{end} range but then remove any window whose
     N-base fraction exceeds \code{max_N_frac} (default 0.1, i.e.
     10\%).  More granular than \code{"ends"} but slower because it
     reads each window sequence.}
@@ -150,7 +151,7 @@ controlled by \code{trim_N}:
 \dontrun{
 library(BSgenome.Hsapiens.UCSC.hg38)
 
-## ── Basic usage: tile chr1 with 200 bp windows, 50 bp slide ──────────
+## -- Basic usage: tile chr1 with 200 bp windows, 50 bp slide ----------
 coords <- make_genomiccoord(
   bsgenome    = BSgenome.Hsapiens.UCSC.hg38,
   chromosomes = "chr1",
@@ -163,7 +164,7 @@ head(coords, 3)
 # region2 "chr1:10051-10250:+:BSgenome.Hsapiens.UCSC.hg38:region2"
 # region3 "chr1:10101-10300:+:BSgenome.Hsapiens.UCSC.hg38:region3"
 
-## ── Non-overlapping tiling (slide == window) ─────────────────────────
+## -- Non-overlapping tiling (slide == window) -------------------------
 coords_nonoverlap <- make_genomiccoord(
   bsgenome    = BSgenome.Hsapiens.UCSC.hg38,
   chromosomes = paste0("chr", 1:22),
@@ -172,7 +173,7 @@ coords_nonoverlap <- make_genomiccoord(
 )
 length(coords_nonoverlap)   # ~15 million windows across autosomes
 
-## ── Custom start/end (e.g. a specific sub-region) ────────────────────
+## -- Custom start/end (e.g. a specific sub-region) --------------------
 coords_sub <- make_genomiccoord(
   bsgenome    = BSgenome.Hsapiens.UCSC.hg38,
   chromosomes = "chr1",
@@ -183,7 +184,7 @@ coords_sub <- make_genomiccoord(
 )
 length(coords_sub)   # 19,981 windows in 1 Mb region
 
-## ── No N-trimming (use full chromosome length) ────────────────────────
+## -- No N-trimming (use full chromosome length) ------------------------
 coords_noN <- make_genomiccoord(
   bsgenome    = BSgenome.Hsapiens.UCSC.hg38,
   chromosomes = "chr1",
@@ -192,7 +193,7 @@ coords_noN <- make_genomiccoord(
   trim_N      = "none"
 )
 
-## ── Per-window N-filtering (removes windows with >10\% N) ─────────────
+## -- Per-window N-filtering (removes windows with >10\% N) -------------
 coords_filt <- make_genomiccoord(
   bsgenome    = BSgenome.Hsapiens.UCSC.hg38,
   chromosomes = "chr1",
@@ -202,7 +203,7 @@ coords_filt <- make_genomiccoord(
   max_N_frac  = 0.10
 )
 
-## ── Get data.frame output for GRanges construction ───────────────────
+## -- Get data.frame output for GRanges construction -------------------
 df <- make_genomiccoord(
   bsgenome    = BSgenome.Hsapiens.UCSC.hg38,
   chromosomes = "chr1",
@@ -216,7 +217,7 @@ gr <- GenomicRanges::GRanges(
   strand   = df$strand
 )
 
-## ── Pass directly to Tm_NN ───────────────────────────────────────────
+## -- Pass directly to tm_nn -------------------------------------------
 coords <- make_genomiccoord(
   bsgenome    = BSgenome.Hsapiens.UCSC.hg38,
   chromosomes = "chr1",
@@ -225,13 +226,13 @@ coords <- make_genomiccoord(
   start       = 1000000L,
   end         = 1010000L
 )
-tm_results <- Tm_NN(coords, Na = 50)
+tm_results <- tm_nn(coords, Na = 50)
 }
 
 }
 \seealso{
-\code{\link{Tm_NN}}, \code{\link{Tm_GC}},
-  \code{\link{Tm_Wallace}}, \code{\link[BSgenome]{BSgenome}},
+\code{\link{tm_nn}}, \code{\link{tm_gc}},
+  \code{\link{tm_wallace}}, \code{\link[BSgenome]{BSgenome}},
   \code{\link[Biostrings]{letterFrequency}}
 }
 \author{

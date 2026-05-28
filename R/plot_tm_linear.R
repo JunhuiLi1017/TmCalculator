@@ -251,7 +251,7 @@ plot_tm_linear <- function(
     )
   } else if (color_by == "chromosome") {
     n_chrs     <- length(unique(df$chromosome))
-    chr_colors <- setNames(
+    chr_colors <- stats::setNames(
       viridis::viridis(n_chrs, option = color_palette),
       sort(unique(df$chromosome))
     )
@@ -262,7 +262,7 @@ plot_tm_linear <- function(
   } else {
     # Arbitrary discrete metadata column (e.g. "group")
     lvls       <- sort(unique(df[[color_by]]))
-    grp_colors <- setNames(
+    grp_colors <- stats::setNames(
       viridis::viridis(length(lvls), option = color_palette),
       lvls
     )

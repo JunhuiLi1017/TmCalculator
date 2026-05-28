@@ -5,7 +5,7 @@
 #' strings in the format
 #' \code{"chr:start-end:strand:genome_pkg:region_id"}.
 #' This vector is the primary input for downstream Tm calculation
-#' functions (\code{Tm_NN}, \code{Tm_GC}, \code{Tm_Wallace}) that
+#' functions (\code{tm_nn}, \code{tm_gc}, \code{tm_wallace}) that
 #' accept genomic coordinate strings.
 #'
 #' @section Coordinate string format:
@@ -17,11 +17,11 @@
 #' }
 #' Fields (colon-separated):
 #' \enumerate{
-#'   \item \strong{chromosome} — e.g. \code{chr1}
-#'   \item \strong{start-end}  — 1-based, inclusive coordinates
-#'   \item \strong{strand}     — \code{+} or \code{-}
-#'   \item \strong{genome}     — BSgenome package name (character)
-#'   \item \strong{region_id}  — unique label \code{regionN}
+#'   \item \strong{chromosome}  --  e.g. \code{chr1}
+#'   \item \strong{start-end}   --  1-based, inclusive coordinates
+#'   \item \strong{strand}      --  \code{+} or \code{-}
+#'   \item \strong{genome}      --  BSgenome package name (character)
+#'   \item \strong{region_id}   --  unique label \code{regionN}
 #' }
 #'
 #' @section N-base trimming:
@@ -39,7 +39,7 @@
 #'     then trim \code{start} and \code{end} to those positions.
 #'     Efficient: reads the chromosome sequence only once in blocks.}
 #'   \item{\code{"filter"}}{Generate windows across the full
-#'     \code{start}–\code{end} range but then remove any window whose
+#'     \code{start}-\code{end} range but then remove any window whose
 #'     N-base fraction exceeds \code{max_N_frac} (default 0.1, i.e.
 #'     10\%).  More granular than \code{"ends"} but slower because it
 #'     reads each window sequence.}
@@ -81,11 +81,11 @@
 #'   faster but less precise.  Default \code{10000L}.
 #' @param region_prefix Character.  Prefix for region IDs embedded in
 #'   the coordinate string.  Default \code{"region"} (producing
-#'   \code{region1}, \code{region2}, …).
+#'   \code{region1}, \code{region2}, ...).
 #' @param genome_pkg_name Character \strong{or} \code{NULL}.  The
 #'   genome package name to embed in the coordinate string (4th field).
 #'   When \code{NULL} (default), the name is extracted automatically
-#'   from the \code{bsgenome} object via \code{metadata(bsgenome)}.
+#'   from the \code{bsgenome} object via \code{S4Vectors::metadata(bsgenome)}.
 #'   Supply explicitly when using a custom BSgenome object whose
 #'   metadata name differs from the canonical package name.
 #' @param as_vector   Logical.  When \code{TRUE} (default), return a
@@ -93,13 +93,13 @@
 #'   \code{data.frame} with columns \code{coord}, \code{chr},
 #'   \code{start}, \code{end}, \code{strand}, \code{genome},
 #'   \code{region_id}, \code{chr_start_used}, \code{chr_end_used}
-#'   — useful for downstream GRanges construction.
+#'    --  useful for downstream GRanges construction.
 #' @param verbose     Logical.  Print per-chromosome progress messages.
 #'   Default \code{TRUE}.
 #'
 #' @return When \code{as_vector = TRUE} (default): a named character
 #'   vector of coordinate strings, one element per window.  Names are
-#'   the region IDs (\code{region1}, \code{region2}, …).
+#'   the region IDs (\code{region1}, \code{region2}, ...).
 #'
 #'   When \code{as_vector = FALSE}: a \code{data.frame} with columns
 #'   \code{coord}, \code{chr}, \code{win_start}, \code{win_end},
@@ -110,7 +110,7 @@
 #' \dontrun{
 #' library(BSgenome.Hsapiens.UCSC.hg38)
 #'
-#' ## ── Basic usage: tile chr1 with 200 bp windows, 50 bp slide ──────────
+#' ## -- Basic usage: tile chr1 with 200 bp windows, 50 bp slide ----------
 #' coords <- make_genomiccoord(
 #'   bsgenome    = BSgenome.Hsapiens.UCSC.hg38,
 #'   chromosomes = "chr1",
@@ -123,7 +123,7 @@
 #' # region2 "chr1:10051-10250:+:BSgenome.Hsapiens.UCSC.hg38:region2"
 #' # region3 "chr1:10101-10300:+:BSgenome.Hsapiens.UCSC.hg38:region3"
 #'
-#' ## ── Non-overlapping tiling (slide == window) ─────────────────────────
+#' ## -- Non-overlapping tiling (slide == window) -------------------------
 #' coords_nonoverlap <- make_genomiccoord(
 #'   bsgenome    = BSgenome.Hsapiens.UCSC.hg38,
 #'   chromosomes = paste0("chr", 1:22),
@@ -132,7 +132,7 @@
 #' )
 #' length(coords_nonoverlap)   # ~15 million windows across autosomes
 #'
-#' ## ── Custom start/end (e.g. a specific sub-region) ────────────────────
+#' ## -- Custom start/end (e.g. a specific sub-region) --------------------
 #' coords_sub <- make_genomiccoord(
 #'   bsgenome    = BSgenome.Hsapiens.UCSC.hg38,
 #'   chromosomes = "chr1",
@@ -143,7 +143,7 @@
 #' )
 #' length(coords_sub)   # 19,981 windows in 1 Mb region
 #'
-#' ## ── No N-trimming (use full chromosome length) ────────────────────────
+#' ## -- No N-trimming (use full chromosome length) ------------------------
 #' coords_noN <- make_genomiccoord(
 #'   bsgenome    = BSgenome.Hsapiens.UCSC.hg38,
 #'   chromosomes = "chr1",
@@ -152,7 +152,7 @@
 #'   trim_N      = "none"
 #' )
 #'
-#' ## ── Per-window N-filtering (removes windows with >10% N) ─────────────
+#' ## -- Per-window N-filtering (removes windows with >10% N) -------------
 #' coords_filt <- make_genomiccoord(
 #'   bsgenome    = BSgenome.Hsapiens.UCSC.hg38,
 #'   chromosomes = "chr1",
@@ -162,7 +162,7 @@
 #'   max_N_frac  = 0.10
 #' )
 #'
-#' ## ── Get data.frame output for GRanges construction ───────────────────
+#' ## -- Get data.frame output for GRanges construction -------------------
 #' df <- make_genomiccoord(
 #'   bsgenome    = BSgenome.Hsapiens.UCSC.hg38,
 #'   chromosomes = "chr1",
@@ -176,7 +176,7 @@
 #'   strand   = df$strand
 #' )
 #'
-#' ## ── Pass directly to Tm_NN ───────────────────────────────────────────
+#' ## -- Pass directly to tm_nn -------------------------------------------
 #' coords <- make_genomiccoord(
 #'   bsgenome    = BSgenome.Hsapiens.UCSC.hg38,
 #'   chromosomes = "chr1",
@@ -185,16 +185,17 @@
 #'   start       = 1000000L,
 #'   end         = 1010000L
 #' )
-#' tm_results <- Tm_NN(coords, Na = 50)
+#' tm_results <- tm_nn(coords, Na = 50)
 #' }
 #'
 #' @author Junhui Li
-#' @seealso \code{\link{Tm_NN}}, \code{\link{Tm_GC}},
-#'   \code{\link{Tm_Wallace}}, \code{\link[BSgenome]{BSgenome}},
+#' @seealso \code{\link{tm_nn}}, \code{\link{tm_gc}},
+#'   \code{\link{tm_wallace}}, \code{\link[BSgenome]{BSgenome}},
 #'   \code{\link[Biostrings]{letterFrequency}}
 #' @importFrom methods is
 #' @importFrom Biostrings getSeq letterFrequency
 #' @importFrom GenomeInfoDb seqlengths seqlevels
+#' @importFrom S4Vectors metadata
 #' @export
 make_genomiccoord <- function(
     bsgenome,
@@ -208,11 +209,12 @@ make_genomiccoord <- function(
     max_N_frac     = 0.10,
     N_scan_block   = window,
     region_prefix  = "region",
+    genome_pkg_name = NULL,
     as_vector      = TRUE,
     verbose        = TRUE
 ) {
 
-  ## ── 0. Argument validation ───────────────────────────────────────────────
+  ## -- 0. Argument validation -----------------------------------------------
   trim_N <- match.arg(trim_N)
 
   window <- as.integer(window)
@@ -227,25 +229,25 @@ make_genomiccoord <- function(
   if (max_N_frac < 0 || max_N_frac > 1)
     stop("'max_N_frac' must be in [0, 1].")
 
-  ## ── 1. Resolve BSgenome object ───────────────────────────────────────────
+  ## -- 1. Resolve BSgenome object -------------------------------------------
   bsgenome <- .resolve_bsgenome(bsgenome)
 
-  ## ── 2. Resolve genome package name for coordinate string ─────────────────
-  pkg_name <- bsgenome@pkgname
+  ## -- 2. Resolve genome package name for coordinate string -----------------
+  pkg_name <- .resolve_pkg_name(bsgenome, genome_pkg_name)
 
-  ## ── 3. Validate chromosomes ───────────────────────────────────────────────
+  ## -- 3. Validate chromosomes -----------------------------------------------
   all_seqs   <- GenomeInfoDb::seqlevels(bsgenome)
   bad_chrs   <- setdiff(chromosomes, all_seqs)
   if (length(bad_chrs) > 0)
-    stop("Chromosomes not found in BSgenome: ", paste(bad_chrs, collapse = ", "), "\nAvailable: ", paste(head(all_seqs, 10), collapse = ", "), " ...")
+    stop("Chromosomes not found in BSgenome: ", paste(bad_chrs, collapse = ", "), "\nAvailable: ", paste(utils::head(all_seqs, 10), collapse = ", "), " ...")
   chr_lens <- GenomeInfoDb::seqlengths(bsgenome)[chromosomes]
 
-  ## ── 4. Normalise start / end overrides ───────────────────────────────────
+  ## -- 4. Normalise start / end overrides -----------------------------------
   ## Allow scalar (applied to all chromosomes) or named vector
   start_override <- .normalise_override(start, chromosomes, "start")
   end_override   <- .normalise_override(end,   chromosomes, "end")
 
-  ## ── 5. Main loop over chromosomes ────────────────────────────────────────
+  ## -- 5. Main loop over chromosomes ----------------------------------------
   result_list <- vector("list", length(chromosomes))
   global_idx  <- 1L   # running region counter across all chromosomes
 
@@ -257,7 +259,7 @@ make_genomiccoord <- function(
     if (verbose)
       message(sprintf("[make_genomiccoord] Processing %s  (length = %s bp)", chr, format(chr_len, big.mark = ",")))
 
-    ## ── 5a. Determine effective start / end for this chromosome ─────────
+    ## -- 5a. Determine effective start / end for this chromosome ---------
     chr_start_raw <- if (!is.null(start_override)) start_override[chr] else 1L
     chr_end_raw   <- if (!is.null(end_override))   end_override[chr]   else chr_len
 
@@ -267,14 +269,14 @@ make_genomiccoord <- function(
     if (chr_start_raw >= chr_end_raw)
       stop("start >= end for chromosome ", chr, " (start=", chr_start_raw, ", end=", chr_end_raw, ")")
 
-    ## ── 5b. N-end trimming ("ends" strategy) ────────────────────────────
+    ## -- 5b. N-end trimming ("ends" strategy) ----------------------------
     if (trim_N == "ends") {
       n_bounds <- .find_N_bounds(bsgenome, chr, chr_start_raw, chr_end_raw, N_scan_block)
       chr_start_eff <- n_bounds$first_nonN
       chr_end_eff   <- n_bounds$last_nonN
 
       if (verbose)
-        message(sprintf("  N-trimming: effective range %s – %s", format(chr_start_eff, big.mark = ","), format(chr_end_eff,   big.mark = ",")))
+        message(sprintf("  N-trimming: effective range %s - %s", format(chr_start_eff, big.mark = ","), format(chr_end_eff,   big.mark = ",")))
     } else {
       chr_start_eff <- chr_start_raw
       chr_end_eff   <- chr_end_raw
@@ -294,7 +296,7 @@ make_genomiccoord <- function(
       next
     }
 
-    ## ── 5c. Generate window start positions ─────────────────────────────
+    ## -- 5c. Generate window start positions -----------------------------
     win_starts <- seq(from = chr_start_eff,
                       to   = chr_end_eff - window + 1L,
                       by   = slide)
@@ -305,7 +307,7 @@ make_genomiccoord <- function(
     win_ends[overhangs] <- chr_end_eff
 
     ## Drop any windows that became shorter than window after clipping
-    ## (only happens at the very last window — keep it if ≥ 1 bp)
+    ## (only happens at the very last window  --  keep it if >= 1 bp)
     valid_windows <- (win_ends - win_starts + 1L) >= 1L
     win_starts    <- win_starts[valid_windows]
     win_ends      <- win_ends[valid_windows]
@@ -324,13 +326,13 @@ make_genomiccoord <- function(
       next
     }
 
-    ## ── 5d. Build coordinate strings ────────────────────────────────────
+    ## -- 5d. Build coordinate strings ------------------------------------
     region_ids <- paste0(region_prefix, seq(global_idx, global_idx + n_wins - 1L))
     coords_chr <- sprintf("%s:%d-%d:%s:%s:%s",
                           chr, win_starts, win_ends, strand,
                           pkg_name, region_ids)
 
-    ## ── 5e. Per-window N filtering ("filter" strategy) ──────────────────
+    ## -- 5e. Per-window N filtering ("filter" strategy) ------------------
     if (trim_N == "filter") {
       if (verbose)
         message(sprintf("  Filtering windows with N fraction > %.0f%%",
@@ -373,7 +375,7 @@ make_genomiccoord <- function(
     global_idx <- global_idx + n_wins
   }
 
-  ## ── 6. Combine and return ─────────────────────────────────────────────
+  ## -- 6. Combine and return ---------------------------------------------
   df_all <- do.call(rbind, result_list)
   rownames(df_all) <- NULL
 
@@ -414,7 +416,7 @@ make_genomiccoord <- function(
   if (!is.null(user_name)) return(as.character(user_name))
   # Try metadata slot first (most reliable)
   meta <- tryCatch(
-    BSgenome::metadata(bsgenome),
+    S4Vectors::metadata(bsgenome),
     error = function(e) NULL
   )
   if (!is.null(meta) && "Package" %in% names(meta))
@@ -423,7 +425,7 @@ make_genomiccoord <- function(
   cls <- class(bsgenome)
   if (length(cls) > 0 && nchar(cls[1]) > 5) return(cls[1])
   paste0("BSgenome.", GenomeInfoDb::organism(bsgenome), ".",
-         provider(bsgenome), ".", GenomeInfoDb::genome(bsgenome))
+         BSgenome::provider(bsgenome), ".", GenomeInfoDb::genome(bsgenome))
 }
 
 
@@ -432,7 +434,7 @@ make_genomiccoord <- function(
   if (is.null(val)) return(NULL)
   val <- as.integer(val)
   if (length(val) == 1L) {
-    # Scalar → replicate for all chromosomes
+    # Scalar -> replicate for all chromosomes
     out <- rep(val, length(chromosomes))
     names(out) <- chromosomes
     return(out)
@@ -460,7 +462,7 @@ make_genomiccoord <- function(
   chr_seq_len <- chr_end - chr_start + 1L
   block_size  <- min(block_size, chr_seq_len)
 
-  ## ── Scan from the LEFT to find first non-N position ─────────────────────
+  ## -- Scan from the LEFT to find first non-N position ---------------------
   first_nonN <- chr_start   # default: start right away
   scan_start <- chr_start
 
@@ -476,7 +478,7 @@ make_genomiccoord <- function(
     ## Count non-N bases in the block
     acgt <- Biostrings::letterFrequency(block, letters = "ACGT", as.prob = FALSE)
     if (sum(acgt) > 0L) {
-      ## Found non-N in this block — find the exact position
+      ## Found non-N in this block  --  find the exact position
       block_str <- as.character(block)
       block_chars <- strsplit(block_str, "", fixed = TRUE)[[1]]
       rel_pos    <- which(block_chars != "N")[1L]
@@ -486,7 +488,7 @@ make_genomiccoord <- function(
     scan_start <- scan_end + 1L
   }
 
-  ## ── Scan from the RIGHT to find last non-N position ──────────────────────
+  ## -- Scan from the RIGHT to find last non-N position ----------------------
   last_nonN <- chr_end   # default: end right at chr_end
   scan_end2 <- chr_end
 

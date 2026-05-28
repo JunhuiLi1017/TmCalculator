@@ -5,46 +5,109 @@
 \alias{thermodynamic_nn_params}
 \title{Thermodynamic Tables for Nucleic Acid Hybridization}
 \format{
-A list containing 12 matrices of thermodynamic parameters:
+A named list of two-column matrices with
+\code{colnames = c("left", "right")} (left = \eqn{\Delta H},
+right = \eqn{\Delta S}). Rownames are dinucleotide step keys such as
+\code{"AT/TA"}, mismatch / dangling-end keys, or feature-specific keys
+(e.g. \code{"CAG_4"} for the (CAG)4 CNG entry).
+
+\strong{Populated tables}
 \describe{
-  \item{DNA_NN_Breslauer_1986}{DNA/DNA nearest neighbor parameters from Breslauer et al. (1986)}
-  \item{DNA_NN_Sugimoto_1996}{DNA/DNA nearest neighbor parameters from Sugimoto et al. (1996)}
-  \item{DNA_NN_Allawi_1998}{DNA/DNA nearest neighbor parameters from Allawi et al. (1998)}
-  \item{DNA_NN_SantaLucia_2004}{DNA/DNA nearest neighbor parameters from SantaLucia (2004)}
-  \item{RNA_NN_Freier_1986}{RNA/RNA nearest neighbor parameters from Freier et al. (1986)}
-  \item{RNA_NN_Xia_1998}{RNA/RNA nearest neighbor parameters from Xia et al. (1998)}
-  \item{RNA_NN_Chen_2012}{RNA/RNA nearest neighbor parameters from Chen et al. (2012)}
-  \item{RNA_DNA_NN_Sugimoto_1995}{RNA/DNA nearest neighbor parameters from Sugimoto et al. (1995)}
-  \item{DNA_IMM_Peyret_1999}{DNA internal mismatch parameters from Peyret et al. (1999)}
-  \item{DNA_TMM_Bommarito_2000}{DNA terminal mismatch parameters from Bommarito et al. (2000)}
-  \item{DNA_DE_Bommarito_2000}{DNA dangling end parameters from Bommarito et al. (2000)}
-  \item{RNA_DE_Turner_2010}{RNA dangling end parameters from Turner et al. (2010)}
+  \item{DNA_NN_Breslauer_1986}{DNA/DNA NN, Breslauer et al. (1986)}
+  \item{DNA_NN_Sugimoto_1996}{DNA/DNA NN, Sugimoto et al. (1996)}
+  \item{DNA_NN_Allawi_1998}{DNA/DNA NN, Allawi (1998)}
+  \item{DNA_NN_SantaLucia_2004}{DNA/DNA NN, SantaLucia & Hicks (2004)}
+  \item{RNA_NN_Freier_1986}{RNA/RNA NN, Freier (1986)}
+  \item{RNA_NN_Xia_1998}{RNA/RNA NN, Xia (1998)}
+  \item{RNA_NN_Chen_2012}{RNA/RNA NN with GU, Chen / Serra (2012)}
+  \item{RNA_DNA_NN_Sugimoto_1995}{RNA/DNA hybrid NN, Sugimoto (1995)}
+  \item{DNA_IMM_Peyret_1999}{DNA single internal mismatch, Peyret (1999)}
+  \item{DNA_TMM_Bommarito_2000}{DNA terminal mismatch, Bommarito (2000)}
+  \item{DNA_DE_Bommarito_2000}{DNA single dangling end, Bommarito (2000)}
+  \item{RNA_DE_Turner_2010}{RNA single dangling end, Turner (2010)}
 }
 
-Each matrix contains thermodynamic parameters (enthalpy and entropy) for different
-nucleic acid interactions. The parameters are used in the nearest neighbor model
-for calculating melting temperatures of nucleic acid duplexes.
+\strong{Registered placeholders (values TBD — populate from primary literature)}
+\describe{
+  \item{DNA_NN_AllSan_1997}{Allawi & SantaLucia (1997) Biochemistry 36:10581}
+  \item{DNA_NN_SantaLucia_1996}{SantaLucia et al. (1996) Biochemistry 35:3555}
+  \item{DNA_NN_Tanaka_2004}{Tanaka et al. (2004) Biochemistry 43:7143}
+  \item{MeRNA_RNA_NN_Kierzek_2006}{Kierzek et al. (2006) Biochemistry 45:581}
+  \item{DNA_RNA_IMM_Watkins_2011}{Watkins et al. (2011) Nucleic Acids Res 39:1894}
+  \item{RNA_IMM_Lu_2006}{Lu et al. (2006) Nucleic Acids Res 34:4912}
+  \item{RNA_IMM_Davis_Znosko_2007}{Davis & Znosko (2007) Biochemistry 46:13425}
+  \item{RNA_IMM_Davis_Znosko_2008}{Davis & Znosko (2008) Biochemistry 47:10178}
+  \item{DNA_TandemMM_AllSanPey}{Allawi & SantaLucia (1997/1998); Peyret (1999)}
+  \item{RNA_TandemMM_Mathews_1999}{Mathews et al. (1999) JMB 288:911}
+  \item{DNA_DE_Ohmichi_2002}{Ohmichi et al. (2002) JACS 124:10367}
+  \item{RNA_DE_Ohmichi_2002}{Ohmichi et al. (2002) JACS 124:10367}
+  \item{RNA_DE_Serra_2008}{O'Toole / Serra (2006, 2008)}
+  \item{DNA_DDE_Ohmichi_2002}{Ohmichi et al. (2002) JACS 124:10367}
+  \item{RNA_DDE_Ohmichi_2002}{Ohmichi et al. (2002) JACS 124:10367}
+  \item{RNA_DDE_OToole_2005}{O'Toole et al. (2005) Biochemistry 44:14914}
+  \item{RNA_DDE_OToole_2006}{O'Toole et al. (2006) NAR 34:3338}
+  \item{DNA_LDE_Ohmichi_2002}{Ohmichi et al. (2002) JACS 124:10367}
+  \item{RNA_LDE_Ohmichi_2002}{Ohmichi et al. (2002) JACS 124:10367}
+  \item{DNA_IL_SantaLucia_2004}{SantaLucia & Hicks (2004)}
+  \item{RNA_IL_Lu_2006}{Lu et al. (2006) NAR 34:4912}
+  \item{RNA_IL_Badhwar_2007}{Badhwar et al. (2007) Biochemistry 46:14715}
+  \item{DNA_SBL_Tanaka_2007}{Tan & Chen (2007) Biophys J 92:3615}
+  \item{DNA_SBL_SantaLucia_2004}{SantaLucia & Hicks (2004)}
+  \item{RNA_SBL_Lu_2006}{Lu et al. (2006) NAR 34:4912}
+  \item{RNA_SBL_Blose_2007}{Blose et al. (2007) Biochemistry 46:15123}
+  \item{DNA_LBL_SantaLucia_2004}{SantaLucia & Hicks (2004)}
+  \item{RNA_LBL_Lu_2006}{Mathews (1999); Lu et al. (2006)}
+  \item{RNA_GU_Mathews_1999}{Mathews & Turner (1999) JMB 288:911}
+  \item{RNA_GU_Chen_2012}{Chen / Serra (2012)}
+  \item{DNA_CNG_Broda_2005}{Broda et al. (2005) Biochemistry 44:13851
+    - rownames use \code{paste0("C", N, "G_", n)}, e.g. \code{"CAG_4"}.}
+  \item{DNA_INO_SantaLucia_2005}{Watkins & SantaLucia (2005) NAR 33:6258}
+  \item{RNA_INO_Wright_2007}{Wright et al. (2007) Biochemistry 46:4625}
+  \item{DNA_HA_Kawakami_2001}{Kawakami / Sugimoto (2001) Biochemistry 40:14040}
+  \item{DNA_AZB_Asanuma_2005}{Asanuma et al. (2005) Angew Chem Int Ed 44:2747}
+  \item{DNA_LNA_Owczarzy_2011}{Owczarzy et al. (2011) Biochemistry 50:9352}
+  \item{DNA_LNA_McTigue_2004}{McTigue et al. (2004) Biochemistry 43:5388}
+  \item{DNA_cLNA_Owczarzy_2011}{Owczarzy et al. (2011) Biochemistry 50:9352}
+  \item{DNA_cLNA_MM_Owczarzy_2011}{Owczarzy et al. (2011) Biochemistry 50:9352}
+}
+
+To add the numeric values for any placeholder table, construct a matrix
+with two columns (\eqn{\Delta H} kcal/mol, \eqn{\Delta S} cal/(mol*K)) and
+the dinucleotide-step rownames described above, then assign it:
+\preformatted{
+thermodynamic_nn_params$DNA_CNG_Broda_2005 <- new_table
+}
 }
 \source{
-Various publications as cited in the references
+Various publications as cited above.
 }
 \usage{
 thermodynamic_nn_params
 }
 \description{
-A comprehensive collection of thermodynamic parameters used for calculating melting temperatures
-of nucleic acid duplexes. The dataset includes parameters for DNA/DNA, RNA/RNA, and RNA/DNA
-hybridizations, as well as parameters for mismatches and dangling ends.
+A comprehensive collection of thermodynamic parameters used for calculating
+melting temperatures of nucleic acid duplexes. The dataset includes
+parameters for DNA/DNA, RNA/RNA, RNA/DNA and 2'-O-methylRNA/RNA
+hybridizations, plus parameters for mismatches, dangling ends, internal /
+bulge loops, GU wobble, CNG repeats, inosine, hydroxyadenine, azobenzene
+and locked nucleic acids (LNA).
+}
+\details{
+Coverage mirrors the rmelting (Bioconductor) vignette sections 4.2.1 - 4.4.
+Tables whose numeric values are not yet ported from primary literature are
+included in the list as \code{NULL} placeholders so that
+\code{\link{tm_nn}} can still dispatch on the table name; the corresponding
+contribution is silently skipped after a one-time package-startup notice.
 }
 \examples{
 # Access DNA/DNA nearest neighbor parameters
 thermodynamic_nn_params$DNA_NN_SantaLucia_2004
 
-# Access RNA/RNA nearest neighbor parameters
-thermodynamic_nn_params$RNA_NN_Chen_2012
-
 # Access DNA internal mismatch parameters
 thermodynamic_nn_params$DNA_IMM_Peyret_1999
+
+# See which tables are still placeholders (NULL)
+names(Filter(is.null, thermodynamic_nn_params))
 }
 \references{
 Breslauer K J (1986) <doi:10.1073/pnas.83.11.3746>
@@ -57,8 +120,25 @@ Chen JL (2012) <doi:10.1021/bi3002709>
 Sugimoto N (1995) <doi:10.1016/S0048-9697(98)00088-6>
 Bommarito S (2000) <doi:10.1093/nar/28.9.1929>
 Peyret N (1999) <doi:10.1021/bi9825091>
-Allawi H T (1997) <doi:10.1021/bi962590c>
-Santalucia N (2005) <doi:10.1093/nar/gki918>
+Allawi H T & SantaLucia J (1997) <doi:10.1021/bi962590c>
+SantaLucia J (2005) <doi:10.1093/nar/gki918>
 Turner D H (2010) <doi:10.1093/nar/gkp892>
+Tanaka F (2004) Biochemistry 43:7143
+Kierzek E (2006) Biochemistry 45:581
+Watkins N E (2011) Nucleic Acids Res 39:1894
+Lu Z J (2006) Nucleic Acids Res 34:4912
+Davis A R & Znosko B M (2007, 2008) Biochemistry
+Mathews D H (1999) <doi:10.1006/jmbi.1999.2700>
+Ohmichi T (2002) J Am Chem Soc 124:10367
+O'Toole A S (2005, 2006) Biochemistry / Nucleic Acids Res
+Badhwar J (2007) Biochemistry 46:14715
+Tan Z J & Chen S J (2007) Biophys J 92:3615
+Blose J M (2007) Biochemistry 46:15123
+Broda M (2005) <doi:10.1021/bi0501447>
+Wright D J (2007) Biochemistry 46:4625
+Kawakami J / Sugimoto N (2001) <doi:10.1021/bi010918b>
+Asanuma H (2005) Angew Chem Int Ed 44:2747
+McTigue P M (2004) Biochemistry 43:5388
+Owczarzy R (2011) Biochemistry 50:9352
 }
 \keyword{datasets}

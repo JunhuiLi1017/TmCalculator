@@ -51,6 +51,10 @@ genome_name + genome_size as a single contig.}
 \item{axis.cex}{Base numbers size.}
 
 \item{title.cex}{Title size.}
+
+\item{base.tick.dist}{Numeric or \code{NULL}. Distance between base-number
+ticks passed to \code{karyoploteR::kpAddBaseNumbers}. When \code{NULL},
+a default is chosen based on total genome size.}
 }
 \value{
 Invisibly returns the KaryoPlot object.

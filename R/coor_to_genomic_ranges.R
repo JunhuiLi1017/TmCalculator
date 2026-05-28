@@ -238,19 +238,44 @@ coor_to_genomic_ranges <- function(
 .load_genome_packages <- function(pkg_names) {
   genome_objs <- list()
   for (pkg in pkg_names) {
-    if (!requireNamespace(pkg, quietly = TRUE)) {
-      stop(sprintf(
-        "BSgenome package '%s' is not installed.\nInstall with: BiocManager::install('%s')",
-        pkg, pkg
-      ))
-    }
-    suppressPackageStartupMessages(
-      suppressWarnings(library(pkg, character.only = TRUE))
-    )
-    genome_objs[[pkg]] <- get(pkg)
+    genome_objs[[pkg]] <- .get_bsgenome_from_pkg(pkg)
     message(sprintf("[coor_to_genomic_ranges] Loaded genome: %s", pkg))
   }
   genome_objs
+}
+
+
+#' Load the BSgenome object from an installed BSgenome.* data package
+#'
+#' The genome object name is given by the \code{BSgenomeObjname} field in
+#' \code{DESCRIPTION} (e.g. \code{Hsapiens}), not necessarily the package name.
+#'
+#' @param pkg Character scalar: installed BSgenome package name.
+#' @return A \code{BSgenome} object.
+#' @keywords internal
+.get_bsgenome_from_pkg <- function(pkg) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    stop(sprintf(
+      "BSgenome package '%s' is not installed.\nInstall with: BiocManager::install('%s')",
+      pkg, pkg
+    ), call. = FALSE)
+  }
+  suppressPackageStartupMessages(
+    suppressWarnings(library(pkg, character.only = TRUE))
+  )
+  objname <- utils::packageDescription(pkg, fields = "BSgenomeObjname")
+  if (is.na(objname) || !nzchar(objname)) objname <- pkg
+  ns <- asNamespace(pkg)
+  if (exists(objname, envir = ns, inherits = FALSE)) {
+    return(get(objname, envir = ns))
+  }
+  stop(sprintf(
+    paste0(
+      "BSgenome package '%s' is installed but genome object '%s' is missing.\n",
+      "Re-forge and reinstall the data package (see BSgenomeForge::forgeBSgenomeDataPkgFromNCBI)."
+    ),
+    pkg, objname
+  ), call. = FALSE)
 }
 
 
@@ -346,12 +371,6 @@ coor_to_genomic_ranges <- function(
 }
 
 
-#' Null-coalescing infix operator
-#'
-#' @param a First value.
-#' @param b Fallback value when \code{a} is \code{NULL}.
-#' @return \code{a} if not \code{NULL}, otherwise \code{b}.
-#' @keywords internal
 `%||%` <- function(a, b) if (!is.null(a)) a else b
 
 
@@ -359,9 +378,10 @@ coor_to_genomic_ranges <- function(
 #'
 #' Drop-in replacement for \code{\link{to_genomic_ranges}} that uses the fast
 #' coordinate backend in \code{\link{coor_to_genomic_ranges}} for genomic
-#' coordinate input.
+#' coordinate input. Accepts the same \code{input_seq} and \code{complement_seq}
+#' arguments as \code{\link{to_genomic_ranges}}, plus a list input
+#' \code{list(pkg_name = ..., seq = ...)} for large tiling jobs.
 #'
-#' @inheritParams to_genomic_ranges
 #' @param method Sequence extraction method passed to
 #'   \code{\link{coor_to_genomic_ranges}}. One of \code{"vectorized"} (default)
 #'   or \code{"preload_chr"}.

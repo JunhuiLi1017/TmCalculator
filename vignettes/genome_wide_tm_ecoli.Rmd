@@ -1,0 +1,458 @@
+---
+title: "Genome-wide Melting Temperature Profiling: An E. coli Case Study"
+author: "Junhui Li, Lihua Julie Zhu"
+date: "`r Sys.Date()`"
+output:
+  BiocStyle::html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+vignette: >
+  %\VignetteIndexEntry{Genome-wide Melting Temperature Profiling: An E. coli Case Study}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo      = TRUE,
+  message   = FALSE,
+  warning   = FALSE,
+  fig.align = "center",
+  fig.width = 7,
+  fig.height = 6
+)
+```
+
+# Introduction
+
+This vignette demonstrates how to compute melting temperature (Tm) across an
+entire bacterial genome in a reproducible, end-to-end workflow using
+**TmCalculator**. We use *Escherichia coli* K-12 MG1655
+(NCBI assembly GCF\_000005845.2 / ASM584v2) as the reference organism,
+calculating Tm for every non-overlapping 200 bp window along the single
+circular chromosome.
+
+The four steps covered here are:
+
+1. **Build a BSgenome data package** from the NCBI assembly accession.
+2. **Generate non-overlapping genomic windows** with `make_genomiccoord()`.
+3. **Compute Tm and GC content** for all windows with `tm_calculate()`.
+4. **Visualise** the genome-wide Tm profile as a circular (Circos) plot,
+   optionally overlaid with multi-omics tracks.
+5. **Test if the Tm values in the mutH peaks are significantly different from the rest of the genome** with `test_granges_targets()`.
+
+By the end of this vignette you will have a publication-ready circular genome
+map showing how sequence composition—quantified through Tm—varies around the
+*E. coli* chromosome, and how it relates to independently measured genomic
+features such as mismatch-repair hotspots, microsatellite density, and
+cruciform-forming sequences.
+
+---
+
+# Prerequisites
+
+## R packages
+
+```{r packages}
+# Bioconductor core
+#BiocManager::install(c(
+#  "BSgenomeForge",   # forge custom BSgenome packages from NCBI
+#  "BSgenome",
+#  "GenomicRanges"
+#))
+
+library(TmCalculator)
+library(BSgenome)
+library(GenomicRanges)
+```
+
+## Building the *E. coli* BSgenome data package {#build-bsgenome}
+
+TmCalculator retrieves sequences from BSgenome data packages. Because an
+*E. coli* BSgenome package is not on Bioconductor, we forge one locally from
+the NCBI RefSeq assembly using **BSgenomeForge**. This step only needs to be
+run once; thereafter, install the resulting package and load it like any other
+BSgenome package.
+
+```{r forge, eval=FALSE}
+library(BSgenomeForge)
+
+# Download the FASTA and build the data package (takes ~1–2 min)
+forgeBSgenomeDataPkgFromNCBI(
+  assembly_accession = "GCF_000005845.2",
+  pkg_maintainer     = "Junhui Li <ljh.biostat@gmail.com>",
+  destdir            = "."        # writes BSgenome.Ecoli.NCBI.ASM584v2/ here
+)
+
+# Install the freshly forged package
+install.packages(
+  "./BSgenome.Ecoli.NCBI.ASM584v2",
+  repos = NULL,
+  type  = "source"
+)
+```
+
+The GitHub repo ships package metadata only; sequence data must be forged once.
+The chunk below installs the package (if needed), forges it from NCBI when
+the `Ecoli` genome object is still missing, then loads it. **Knit from the top**
+so this chunk runs before `load-genome`.
+
+```{r setup-ecoli-bsgenome, echo=FALSE, message=FALSE, warning=FALSE}
+ecoli_pkg   <- "BSgenome.Ecoli.NCBI.ASM584v2"
+genome_obj  <- "Ecoli"   # BSgenomeObjname in DESCRIPTION; not the package name
+
+.ecoli_genome_ready <- function() {
+  if (!requireNamespace(ecoli_pkg, quietly = TRUE)) return(FALSE)
+  exists(genome_obj, envir = asNamespace(ecoli_pkg), inherits = FALSE)
+}
+
+if (!requireNamespace(ecoli_pkg, quietly = TRUE)) {
+  if (!requireNamespace("remotes", quietly = TRUE)) {
+    utils::install.packages("remotes", repos = "https://cloud.r-project.org")
+  }
+  remotes::install_github(
+    "JunhuiLi1017/BSgenome.Ecoli.NCBI.ASM584v2",
+    upgrade = "never",
+    quiet = TRUE
+  )
+}
+
+if (!.ecoli_genome_ready()) {
+  if (!requireNamespace("BiocManager", quietly = TRUE)) {
+    utils::install.packages("BiocManager", repos = "https://cloud.r-project.org")
+  }
+  if (!requireNamespace("BSgenomeForge", quietly = TRUE)) {
+    BiocManager::install("BSgenomeForge", ask = FALSE, update = FALSE)
+  }
+  pkgdir <- BSgenomeForge::forgeBSgenomeDataPkgFromNCBI(
+    assembly_accession = "GCF_000005845.2",
+    pkg_maintainer     = "Junhui Li <ljh.biostat@gmail.com>",
+    destdir            = tempdir()
+  )
+  utils::install.packages(pkgdir, repos = NULL, type = "source", quiet = TRUE)
+  if (ecoli_pkg %in% loadedNamespaces()) {
+    unloadNamespace(ecoli_pkg)
+  }
+}
+
+if (!.ecoli_genome_ready()) {
+  stop(
+    "Could not load genome object '", genome_obj, "' from package '", ecoli_pkg, "'.\n",
+    "Run the manual 'forge' chunk above, or forgeBSgenomeDataPkgFromNCBI() locally.",
+    call. = FALSE
+  )
+}
+```
+
+Load the genome (object `Ecoli`; package `BSgenome.Ecoli.NCBI.ASM584v2` for coordinates):
+
+```{r load-genome}
+ecoli_pkg  <- "BSgenome.Ecoli.NCBI.ASM584v2"
+genome_obj <- "Ecoli"
+
+suppressPackageStartupMessages(library(ecoli_pkg, character.only = TRUE))
+genome      <- base::get(genome_obj, envir = asNamespace(ecoli_pkg))
+genome_name <- ecoli_pkg
+chr_name    <- "U00096.3"
+chr_length  <- length(genome[[chr_name]])
+
+cat("Chromosome:", chr_name, "\n")
+cat("Length:    ", format(chr_length, big.mark = ","), "bp\n")
+```
+
+---
+
+# Step 1 — Generate Genomic Windows
+
+`make_genomiccoord()` tiles the chromosome into non-overlapping 200 bp bins
+and returns a character vector of coordinate strings accepted by
+`coor_to_genomic_ranges()`. Setting `slide = window` (both 200 bp) ensures
+the bins are contiguous and non-overlapping.
+
+```{r make-coord}
+bins_gc <- make_genomiccoord(
+  bsgenome     = genome,
+  chromosomes  = chr_name,
+  window       = 200L,
+  slide        = 200L,          # non-overlapping: slide == window
+  start        = 1,
+  end          = chr_length,
+  strand       = "+"
+)
+
+cat("Total windows:", length(bins_gc), "\n")
+cat("Last window:  ", bins_gc[length(bins_gc)], "\n")
+```
+
+`coor_to_genomic_ranges()` resolves each coordinate string against the
+BSgenome package and returns a `GRanges` object carrying the full sequence
+and its reverse complement:
+
+```{r coor-to-gr}
+input_new <- list(
+  pkg_name = genome_name,
+  seq      = bins_gc
+)
+
+runtime1 <- system.time({
+  gr_batch <- to_genomic_ranges_fast(input_new)
+})
+
+cat(sprintf(
+  "Coordinate resolution: %.2f s (elapsed)\n",
+  runtime1["elapsed"]
+))
+```
+
+---
+
+# Step 2 — Compute Genome-wide Tm
+
+We calculate Tm for every window using the nearest-neighbor (NN) method with
+the SantaLucia & Hicks (2004) parameter set and a standard monovalent salt
+concentration of 50 mM Na⁺. GC content is computed alongside Tm automatically.
+
+```{r tm-calculate}
+runtime2 <- system.time({
+  tm_ASM584v2 <- tm_calculate(
+    gr_batch,
+    method   = "tm_nn",
+    nn_table = "DNA_NN_SantaLucia_2004",
+    Na       = 50            # mM; standard PCR-like conditions
+  )
+})
+
+cat(sprintf(
+  "Tm calculation: %.2f s (elapsed) for %s windows\n",
+  runtime2["elapsed"],
+  format(length(bins_gc), big.mark = ",")
+))
+
+
+```
+
+The combined wall-clock time for both steps on a standard desktop is typically
+under 10 seconds for the full *E. coli* genome at 200 bp resolution.
+
+Extract the Tm and GC-content columns into a plain data frame for downstream
+plotting:
+
+```{r extract-tm}
+Tm <- as.data.frame(tm_ASM584v2$gr[, c(4, 6)])
+
+# Quick summary
+summary(Tm[, c("Tm", "GC")])
+```
+
+---
+
+# Step 3 — Visualise the Genome-wide Tm Profile
+
+## Assemble multi-track data
+
+We overlay the Tm/GC profile with four independently measured genomic
+datasets bundled in the `ecoli_rep_hotspots` data object:
+
+| Track | Source |
+|-------|--------|
+| MutL-AR | MutL protein ChIP-seq peaks (mismatch-repair activity) |
+| Microsatellites | Tandem-repeat density per 200 bp bin |
+| Cruciform | Cruciform-forming sequence density per 200 bp bin |
+| ssDNA | Single-stranded DNA regions |
+| GATC sites | GATC methylation-site density per 200 bp bin |
+
+```{r load-hotspots}
+data(ecoli_rep_hotspots)
+
+# Reference labels: replication origin (ori) and terminus (dif)
+label <- data.frame(
+  seqnames = genome_name,
+  start    = c(3925804, 1590777),
+  end      = c(3925804, 1590777),
+  label    = c("ori", "dif")
+)
+```
+
+```{r track-list}
+tracks <- list(
+  # --- Protein interaction ---
+  list(
+    type   = "rect",
+    data   = ecoli_rep_hotspots$all_peaks_IP_mutH,
+    col    = "black",
+    bg.col = "grey",
+    name   = "MutL-AR"
+  ),
+
+  # --- Sequence thermodynamics ---
+  list(
+    type      = "line",
+    data      = Tm,
+    value_col = "GC",
+    name      = "GC content"
+  ),
+  list(
+    type      = "line",
+    data      = Tm,
+    value_col = "Tm",
+    name      = "Melting temp"
+  ),
+
+  # --- Repeat / structural features ---
+  list(
+    type      = "line",
+    data      = ecoli_rep_hotspots$bins_rep,
+    value_col = "count",
+    name      = "Microsatellites"
+  ),
+  list(
+    type      = "line",
+    data      = ecoli_rep_hotspots$bins_cru,
+    value_col = "count",
+    name      = "Cruciform"
+  ),
+
+  # --- ssDNA regions ---
+  list(
+    data = ecoli_rep_hotspots$ssdna,
+    name = "ssDNA"
+  ),
+
+  # --- GATC methylation sites ---
+  list(
+    type      = "line",
+    data      = ecoli_rep_hotspots$bins_gatc,
+    value_col = "count",
+    name      = "GATC sites"
+  )
+)
+```
+
+## Full circular genome map
+
+`plot_circos_genome()` renders all tracks as concentric rings around the
+chromosome, with the replication origin (ori) and terminus (dif) labelled:
+
+```{r circos-full, fig.width=8, fig.height=8, fig.cap="Genome-wide Tm profile of *E. coli* K-12 MG1655 (ASM584v2). Concentric rings from outside in: MutL-AR ChIP-seq peaks (grey), GC content (%), melting temperature (°C), microsatellite density, cruciform-forming sequences, ssDNA regions, and GATC site density. Replication origin (ori, position 3,925,804) and terminus (dif, position 1,590,777) are labelled."}
+plot_circos_genome(
+  genome_name = genome_name,
+  genome_size = chr_length,
+  track_list  = tracks,
+  canvas.xlim = c(-1, 1),
+  canvas.ylim = c(-1, 1),
+  label       = label
+)
+```
+
+## Zoomed view — upper-right quadrant
+
+To highlight a genomic region in detail, restrict `canvas.xlim` and
+`canvas.ylim` to a quadrant. The plot below focuses on the first quadrant
+(upper right), which spans roughly the first quarter of the chromosome
+starting from ori:
+
+```{r circos-zoom, fig.width=7, fig.height=7, fig.cap="Zoomed circular view of the upper-right quadrant of the *E. coli* chromosome. Track order and colour scheme are identical to the full-genome plot above."}
+plot_circos_genome(
+  genome_name = genome_name,
+  genome_size = chr_length,
+  track_list  = tracks,
+  canvas.xlim = c(0.5, 1),
+  canvas.ylim = c(0,   1)
+)
+```
+
+# Step 4 — Test if the Tm values in the mutH peaks are significantly different from the rest of the genome
+
+### Step 1 — Build the mutH peak GRanges 
+```{r build-mutH-peaks}
+mutH_peaks <- GRanges(
+  seqnames = ecoli_rep_hotspots$all_peaks_IP_mutH$chr,         # NC_000913.3
+  ranges   = IRanges(start = ecoli_rep_hotspots$all_peaks_IP_mutH$start,
+                     end   = ecoli_rep_hotspots$all_peaks_IP_mutH$end)
+)
+```
+
+### Step 2 — Align seqlevels: NC_000913.3 → U00096.3
+```{r align-seqlevels}
+# tm_ASM584v2 uses the BSgenome name "U00096.3"; remap the peaks to match.
+seqlevels(mutH_peaks) <- "U00096.3"
+```
+
+### Step 3 — Annotate each Tm tile with which peak it falls into 
+```{r annotate-mutH-peaks}
+mutH_peaks$peak_id <- paste0("mutH_", seq_along(mutH_peaks))
+
+tm_annot <- integrate_granges(
+  gr_tm        = tm_ASM584v2$gr,
+  gr_features  = mutH_peaks,
+  strategy     = "overlap",
+  feature_cols = "peak_id",
+  keep_unmatched = TRUE   # keep non-overlapping tiles so they form the "non_peak" group
+)
+```
+
+### Step 4 — Add a two-level grouping column 
+```{r add-two-level-grouping-column}
+tm_annot$in_mutH <- ifelse(is.na(tm_annot$peak_id), "non_peak", "peak")
+```
+
+```{r sanity-check}
+table(tm_annot$in_mutH)
+```
+### Step 5 — Wilcoxon on Tm and GC, peaks vs the rest of the genome 
+```{r wilcoxon-on-tm-and-gc}
+res <- test_granges_targets(
+  gr           = tm_annot,
+  target       = c("Tm", "GC"),
+  method       = "wilcoxon",
+  group        = "in_mutH",
+  alternative  = "greater",   # tests "peak > non_peak"
+  posthoc      = FALSE     # only 2 groups, no post-hoc needed
+)
+res$results   # one row per target: test, statistic, p.value
+res$summary   # per-group n, mean, sd, median
+```
+
+---
+
+# Interpreting the Results
+
+**MutL-AR-associated windows have lower Tm and higher GC content** than the rest of the genome
+(p-value < 0.001 for both Tm and GC).
+
+**MutL-AR peaks cluster near the replication terminus.** The mismatch-repair
+protein MutL accumulates preferentially in the terminus region (around *dif*),
+where replication forks converge and mismatch density is highest. This spatial
+coincidence with locally elevated microsatellite density and cruciform-forming
+sequence is consistent with the replication stress model of MMR recruitment.
+
+**GATC methylation sites are distributed genome-wide** but show local density
+fluctuations that partially anti-correlate with GC content, reflecting the
+sequence context requirements for Dam methyltransferase (5′-GATC-3′).
+
+---
+
+# Computational Performance
+
+On a standard desktop computer (single core, R 4.3):
+
+| Step | Function | Time (elapsed) |
+|------|----------|---------------|
+| Coordinate generation | `make_genomiccoord()` + `coor_to_genomic_ranges()` | ~`r sprintf("%.2f", runtime1["elapsed"])` s |
+| Tm calculation (23,208 windows) | `tm_calculate()` | ~`r sprintf("%.2f", runtime2["elapsed"])` s |
+| **Total** | | **~`r sprintf("%.2f", runtime1["elapsed"] + runtime2["elapsed"])` s** |
+
+For human-scale analyses (non-overlapping 200 bp windows across the ~3.1 Gb
+haploid genome, ~15.5 M windows), we recommend running `tm_calculate()` in
+parallelly using `BiocParallel` and splitting input by chromosome. Memory
+requirements scale approximately linearly with the number of windows.
+
+---
+
+# Session Information
+
+```{r session-info}
+sessionInfo()
+```

@@ -4,7 +4,7 @@
 \name{to_genomic_ranges_fast}
 \alias{to_genomic_ranges_fast}
 \alias{to_genomic_ranges}
-\title{Convert input file into a GenomicRanges Object}
+\title{Convert input sequences to a GRanges object (fast backend)}
 \usage{
 to_genomic_ranges_fast(
   input_seq,
@@ -26,11 +26,24 @@ to_genomic_ranges(input_seq, complement_seq = NULL)
   - species:  Species name for reference genome (e.g., "BSgenome.Hsapiens.UCSC.hg38"), see \code{BSgenome::available.genomes()} for all available genomes. please make sure the genome package is installed, otherwise the function will stop.}
 
 \item{complement_seq}{Optional complementary sequences. If NULL, complementary sequences will be auto-generated. otherwise, the complementary sequences will be used as metadata. Can be provided as format of input_seq.}
+
+\item{method}{Sequence extraction method passed to
+\code{\link{coor_to_genomic_ranges}}. One of \code{"vectorized"} (default)
+or \code{"preload_chr"}.}
 }
 \value{
+A \code{GRanges} object. See \code{\link{coor_to_genomic_ranges}} for
+  metadata columns when coordinate input is used.
+
 A GenomicRanges object with seqnames, ranges, strand, name, sequence, Complement, and Tm as metadata.
 }
 \description{
+Drop-in replacement for \code{\link{to_genomic_ranges}} that uses the fast
+coordinate backend in \code{\link{coor_to_genomic_ranges}} for genomic
+coordinate input. Accepts the same \code{input_seq} and \code{complement_seq}
+arguments as \code{\link{to_genomic_ranges}}, plus a list input
+\code{list(pkg_name = ..., seq = ...)} for large tiling jobs.
+
 This function processes a vector of sequences string, a FASTA file, or a character vector with genomic coordinates into a GenomicRanges object,
 optionally including complementary sequences. sequence names are parsed based on their format:
 - If names have this pattern "chr:start-end:strand:species[:name]" (e.g., "chr1:1-5:+:seq_1"), parse components into seqnames, ranges, strand, and name.
@@ -40,6 +53,15 @@ optionally including complementary sequences. sequence names are parsed based on
 Complementary sequences are either provided or automatically generated.
 }
 \examples{
+\dontrun{
+gr <- to_genomic_ranges_fast(
+  list(
+    pkg_name = "BSgenome.Hsapiens.UCSC.hg38",
+    seq = c("chr1:1000-1199:+:win1", "chr1:1200-1399:+:win2")
+  )
+)
+}
+
 # Using a character vector with auto-generated complementary sequences
 seqs <- c("ATGCG", "GCTAG")
 names(seqs) <- c("chr1:1-5:+:seq_1", "chr2:1-5:+")

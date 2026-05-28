@@ -31,7 +31,7 @@ exist in \code{gr}.}
 (e.g., \code{"hg19"}, \code{"mm10"}).}
 
 \item{tm_track_title}{Character. Track / axis title.
-Default: \code{"Melting Temperature (°C)"}.}
+Default: \code{"Melting Temperature (\u00B0C)"}.}
 
 \item{color_palette}{Character. Viridis palette: \code{"viridis"} (default),
 \code{"magma"}, \code{"plasma"}, \code{"inferno"}, or \code{"cividis"}.}
@@ -68,7 +68,7 @@ filtered, labelled data in \code{"regions"} mode.
 \item{color_by}{Character. Variable mapped to colour. Options:
 \itemize{
   \item \code{"Tm"} (default): continuous viridis gradient over Tm values.
-  \item \code{"zoom_region"}: one colour per zoom window — requires
+  \item \code{"zoom_region"}: one colour per zoom window  --  requires
     \code{zoom} to have two or more entries.
   \item Any metadata column name present in \code{gr} (e.g.
     \code{"group"}): treated as a discrete categorical variable.
@@ -127,7 +127,7 @@ plot_tm_genome_tracks(gr, "chr1", "hg19",
   track_type = "points",
   color_by   = "group")
 
-# Regions mode – index on x-axis, multiple zoom windows
+# Regions mode - index on x-axis, multiple zoom windows
 p <- plot_tm_genome_tracks(gr, "chr1", "hg19",
   x_axis   = "regions",
   zoom     = c(Region1 = "chr1:100-200000000",

@@ -10,7 +10,7 @@ test_that("test_granges_targets compares two groups", {
     gr, target = "Tm", group = "group",
     method = "wilcoxon", posthoc = FALSE
   )
-  expect_s3_class(out, "list")
+  expect_type(out, "list")
   expect_equal(nrow(out$results), 1L)
   expect_equal(out$results$test, "Wilcoxon rank-sum")
   expect_true(out$results$p.value < 0.05)

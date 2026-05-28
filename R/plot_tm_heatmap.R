@@ -184,7 +184,7 @@ plot_tm_heatmap <- function(gr,
         option = color_palette, name = "Tm (\u00B0C)")
     } else {
       n_chrs     <- length(unique(df$chromosome))
-      chr_colors <- setNames(viridis::viridis(n_chrs, option = color_palette),
+      chr_colors <- stats::setNames(viridis::viridis(n_chrs, option = color_palette),
                               sort(unique(df$chromosome)))
       p <- p + ggplot2::scale_color_manual(values = chr_colors, name = "Chromosome")
     }

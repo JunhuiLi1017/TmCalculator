@@ -40,6 +40,7 @@ Suggests:
     rmarkdown,
     devtools,
     roxygen2,
+    remotes,
     BSgenome.Hsapiens.UCSC.hg38
 NeedsCompilation: no
 Repository: CRAN

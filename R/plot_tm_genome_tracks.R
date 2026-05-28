@@ -14,7 +14,7 @@
 #' @param genome_assembly Character string specifying the genome assembly
 #'   (e.g., \code{"hg19"}, \code{"mm10"}).
 #' @param tm_track_title Character. Track / axis title.
-#'   Default: \code{"Melting Temperature (°C)"}.
+#'   Default: \code{"Melting Temperature (\u00B0C)"}.
 #' @param color_palette Character. Viridis palette: \code{"viridis"} (default),
 #'   \code{"magma"}, \code{"plasma"}, \code{"inferno"}, or \code{"cividis"}.
 #' @param show_ideogram Logical. Display chromosome ideogram. Default: \code{TRUE}.
@@ -45,7 +45,7 @@
 #' @param color_by Character. Variable mapped to colour. Options:
 #'   \itemize{
 #'     \item \code{"Tm"} (default): continuous viridis gradient over Tm values.
-#'     \item \code{"zoom_region"}: one colour per zoom window — requires
+#'     \item \code{"zoom_region"}: one colour per zoom window  --  requires
 #'       \code{zoom} to have two or more entries.
 #'     \item Any metadata column name present in \code{gr} (e.g.
 #'       \code{"group"}): treated as a discrete categorical variable.
@@ -92,7 +92,7 @@
 #'   track_type = "points",
 #'   color_by   = "group")
 #'
-#' # Regions mode – index on x-axis, multiple zoom windows
+#' # Regions mode - index on x-axis, multiple zoom windows
 #' p <- plot_tm_genome_tracks(gr, "chr1", "hg19",
 #'   x_axis   = "regions",
 #'   zoom     = c(Region1 = "chr1:100-200000000",
@@ -136,7 +136,7 @@ plot_tm_genome_tracks <- function(
   track_type    <- match.arg(track_type)
   color_palette <- match.arg(color_palette)
   
-  # ── Validate gr ────────────────────────────────────────────────────────────
+  # -- Validate gr ------------------------------------------------------------
   if (!inherits(gr, "GRanges"))
     stop("'gr' must be a GRanges object.")
   meta_cols <- names(GenomicRanges::mcols(gr))
@@ -149,7 +149,7 @@ plot_tm_genome_tracks <- function(
   if (!chromosome_to_plot %in% unique(as.character(GenomicRanges::seqnames(gr))))
     stop(sprintf("Chromosome '%s' not found in gr.", chromosome_to_plot))
   
-  # ── Validate color_by ──────────────────────────────────────────────────────
+  # -- Validate color_by ------------------------------------------------------
   valid_color_by <- c("Tm", "chromosome", "zoom_region", meta_cols)
   if (!color_by %in% valid_color_by) {
     stop(sprintf(
@@ -160,13 +160,13 @@ plot_tm_genome_tracks <- function(
   }
   color_continuous <- identical(color_by, "Tm")
   
-  # gradient + discrete color_by → auto-switch to points
+  # gradient + discrete color_by -> auto-switch to points
   if (!color_continuous && identical(track_type, "gradient")) {
     message("'gradient' track_type only supports color_by = 'Tm'; switching to track_type = 'points'.")
     track_type <- "points"
   }
   
-  # ── Parse zoom into a list of {chr, from, to, label} ──────────────────────
+  # -- Parse zoom into a list of {chr, from, to, label} ----------------------
   zoom_list <- NULL
   
   if (!is.null(zoom)) {
@@ -198,7 +198,7 @@ plot_tm_genome_tracks <- function(
     }
   }
   
-  # ── Color palette helpers ──────────────────────────────────────────────────
+  # -- Color palette helpers --------------------------------------------------
   pal_256 <- viridis::viridis(256, option = color_palette)
   
   .tm_point_colors <- function(tm_vals, tm_range) {
@@ -208,14 +208,14 @@ plot_tm_genome_tracks <- function(
   
   .group_palette <- function(group_vals) {
     lvls <- sort(unique(as.character(group_vals)))
-    setNames(viridis::viridis(length(lvls), option = color_palette), lvls)
+    stats::setNames(viridis::viridis(length(lvls), option = color_palette), lvls)
   }
   
   .get_viridis_gviz_colors <- function() {
     viridis::viridis(2, option = color_palette)
   }
   
-  # ── Helper: set seqlengths ─────────────────────────────────────────────────
+  # -- Helper: set seqlengths -------------------------------------------------
   .set_default_seqlengths <- function(gr) {
     if (!is.null(GenomeInfoDb::seqlengths(gr)) &&
         all(!is.na(GenomeInfoDb::seqlengths(gr)))) {
@@ -238,9 +238,9 @@ plot_tm_genome_tracks <- function(
     gr
   }
   
-  # ══════════════════════════════════════════════════════════════════════════
+  # ==========================================================================
   # REGIONS MODE (ggplot2)
-  # ══════════════════════════════════════════════════════════════════════════
+  # ==========================================================================
   if (x_axis == "regions") {
     
     gr_chr <- gr[GenomicRanges::seqnames(gr) == chromosome_to_plot]
@@ -293,7 +293,7 @@ plot_tm_genome_tracks <- function(
     # Decide the color aesthetic column
     color_col <- if (color_continuous) "Tm" else color_by
     
-    # ── Build ggplot ─────────────────────────────────────────────────────────
+    # -- Build ggplot ---------------------------------------------------------
     if (track_type == "bars") {
       # bars use fill aesthetic
       fill_aes <- if (color_continuous)
@@ -330,7 +330,7 @@ plot_tm_genome_tracks <- function(
       }
     }
     
-    # ── Color / fill scales ───────────────────────────────────────────────────
+    # -- Color / fill scales ---------------------------------------------------
     if (color_continuous) {
       if (track_type == "bars") {
         p <- p + ggplot2::scale_fill_gradientn(
@@ -341,7 +341,7 @@ plot_tm_genome_tracks <- function(
       }
     } else {
       lvls     <- sort(unique(plot_df[[color_col]]))
-      grp_cols <- setNames(viridis::viridis(length(lvls), option = color_palette), lvls)
+      grp_cols <- stats::setNames(viridis::viridis(length(lvls), option = color_palette), lvls)
       if (track_type == "bars") {
         p <- p + ggplot2::scale_fill_manual(values = grp_cols, name = color_by)
       } else {
@@ -349,7 +349,7 @@ plot_tm_genome_tracks <- function(
       }
     }
     
-    # ── Optional facet by zoom region ─────────────────────────────────────────
+    # -- Optional facet by zoom region -----------------------------------------
     if (facet_by_zoom && "zoom_region" %in% names(plot_df) &&
         length(zoom_list) > 1) {
       p <- p + ggplot2::facet_wrap(~ zoom_region, scales = "free_x")
@@ -370,9 +370,9 @@ plot_tm_genome_tracks <- function(
     return(p)
   }
   
-  # ══════════════════════════════════════════════════════════════════════════
+  # ==========================================================================
   # GENOME MODE (Gviz)
-  # ══════════════════════════════════════════════════════════════════════════
+  # ==========================================================================
   gr      <- .set_default_seqlengths(gr)
   chr     <- chromosome_to_plot
   gr_chr  <- gr[GenomicRanges::seqnames(gr) == chr]
@@ -380,7 +380,7 @@ plot_tm_genome_tracks <- function(
   
   tm_range <- range(GenomicRanges::mcols(gr_chr)$Tm, na.rm = TRUE)
   if (any(is.infinite(tm_range))) {
-    warning("Tm range undefined; defaulting to 50–90.")
+    warning("Tm range undefined; defaulting to 50-90.")
     tm_range <- c(50, 90)
   }
   
@@ -394,7 +394,7 @@ plot_tm_genome_tracks <- function(
                       bars     = "histogram"
   )
   
-  # ── Compute per-feature colors ────────────────────────────────────────────
+  # -- Compute per-feature colors --------------------------------------------
   # Returns a color vector the same length as gr_chr
   .feature_colors <- function(gr_filt) {
     tm_v <- GenomicRanges::mcols(gr_filt)$Tm
@@ -410,7 +410,7 @@ plot_tm_genome_tracks <- function(
         zoom_list[[zi]]$label
       # build palette from all zoom labels (consistent across panels)
       all_labels <- sapply(zoom_list, `[[`, "label")
-      grp_pal    <- setNames(
+      grp_pal    <- stats::setNames(
         viridis::viridis(length(all_labels), option = color_palette),
         all_labels
       )
@@ -424,7 +424,7 @@ plot_tm_genome_tracks <- function(
     .group_palette(all_grp)[grp_vals]
   }
   
-  # ── Build DataTrack(s) ────────────────────────────────────────────────────
+  # -- Build DataTrack(s) ----------------------------------------------------
   .make_single_dt <- function(gr_filt, name) {
     pt_cols <- .feature_colors(gr_filt)
     
@@ -479,13 +479,13 @@ plot_tm_genome_tracks <- function(
     }
   }
 
-  # Discrete color_by: one DataTrack per category → OverlayTrack.
+  # Discrete color_by: one DataTrack per category -> OverlayTrack.
   # gr_filt is the already-zoom-filtered GRanges for this panel.
   .make_overlay_dt <- function(gr_filt) {
     if (identical(color_by, "zoom_region") && !is.null(zoom_list)) {
       # Each sub-track covers one zoom window within gr_filt
       all_labels <- sapply(zoom_list, `[[`, "label")
-      grp_pal    <- setNames(
+      grp_pal    <- stats::setNames(
         viridis::viridis(length(all_labels), option = color_palette),
         all_labels
       )
@@ -505,12 +505,12 @@ plot_tm_genome_tracks <- function(
       })
       dt_list <- Filter(Negate(is.null), dt_list)
     } else {
-      # Metadata column groups — split gr_filt by group value
+      # Metadata column groups  --  split gr_filt by group value
       grp_vals   <- as.character(GenomicRanges::mcols(gr_filt)[[color_by]])
       # Build palette from all levels in full gr_chr for color consistency
       all_grp    <- as.character(GenomicRanges::mcols(gr_chr)[[color_by]])
       grp_levels <- sort(unique(all_grp))
-      grp_pal    <- setNames(
+      grp_pal    <- stats::setNames(
         viridis::viridis(length(grp_levels), option = color_palette),
         grp_levels
       )
@@ -539,7 +539,7 @@ plot_tm_genome_tracks <- function(
   }
   
   # Build DataTrack(s) from zoom-filtered data only. Never pass full gr_chr
-  # and rely on plotTracks(from=, to=) to subset internally — Gviz still
+  # and rely on plotTracks(from=, to=) to subset internally  --  Gviz still
   # validates stored metadata against the post-filter row count and crashes.
   needs_overlay <- !color_continuous &&
     track_type %in% c("line", "bars", "points")
@@ -561,7 +561,7 @@ plot_tm_genome_tracks <- function(
     if (!is.null(iTrack)) list(iTrack, gTrack, dt) else list(gTrack, dt)
   }
   
-  # ── Plot: no zoom / single zoom / multi-panel ─────────────────────────────
+  # -- Plot: no zoom / single zoom / multi-panel -----------------------------
   if (is.null(zoom_list)) {
     tracks <- .make_tracks(.build_dt(gr_chr))
     Gviz::plotTracks(tracks, chromosome = chr,

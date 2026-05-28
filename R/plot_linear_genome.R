@@ -27,6 +27,9 @@
 #' @param legend.cex,legend.bty,legend.border See graphics::legend.
 #' @param title.cex Title size.
 #' @param axis.cex Base numbers size.
+#' @param base.tick.dist Numeric or \code{NULL}. Distance between base-number
+#'   ticks passed to \code{karyoploteR::kpAddBaseNumbers}. When \code{NULL},
+#'   a default is chosen based on total genome size.
 #'
 #' @return Invisibly returns the KaryoPlot object.
 #'
