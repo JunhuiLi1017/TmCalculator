@@ -34,11 +34,11 @@ plot_karyotype_genome(
 \item{track_list}{List. Each element defines one track. Supported fields
 (identical to \code{plot_circos_genome} where applicable):
 \itemize{
-  \item \strong{type}: Character. Drawing type – one of \code{"points"},
+  \item \strong{type}: Character. Drawing type - one of \code{"points"},
     \code{"line"}, \code{"bars"}, or \code{"rect"}. Default: \code{"points"}.
   \item \strong{data}: GRanges or data.frame with columns seqnames/chr,
     start, end, and the value column.
-  \item \strong{min_bar_width}: Numeric (0–1). For \code{bars} type only.
+  \item \strong{min_bar_width}: Numeric (0-1). For \code{bars} type only.
     Minimum bar width as a fraction of chromosome length. Needed when
     sequences are short (e.g. primers / probes) whose actual genomic
     footprint is sub-pixel at whole-chromosome scale. Default: \code{0.002}
@@ -51,7 +51,7 @@ plot_karyotype_genome(
   \item \strong{col}: Color for data and legend symbol. Auto-assigned if
     \code{NULL}.
   \item \strong{name}: Character. Track label shown in legend.
-  \item \strong{r0}, \strong{r1}: Numeric (0–1). Vertical position of the
+  \item \strong{r0}, \strong{r1}: Numeric (0-1). Vertical position of the
     track within the data panel. Auto-computed if \code{NULL}.
   \item \strong{bg.col}: Track background fill color. Default: \code{"white"}.
   \item \strong{bg.border}: Track background border color. Default: \code{NA}.
@@ -135,15 +135,15 @@ across circular and linear genome representations.
 library(GenomicRanges)
 library(karyoploteR)
 
-# ── Sample data ───────────────────────────────────────────────────────────
-# ── Typical workflow: output from tm_calculate() already has Tm AND GC ──────
+# -- Sample data -----------------------------------------------------------
+# -- Typical workflow: output from tm_calculate() already has Tm AND GC ------
 # tm_calculate() stores both columns in result$gr, so one GRanges object
 # is sufficient for all tracks.
 #
 # result <- tm_calculate(my_seqs, method = "tm_nn")
-# gr_tm  <- result$gr   # has $Tm (°C) and $GC (\%) columns
+# gr_tm  <- result$gr   # has $Tm (deg C) and $GC (\%) columns
 
-# ── Example 1: Tm points + GC bars from the same GRanges ──────────────────
+# -- Example 1: Tm points + GC bars from the same GRanges ------------------
 set.seed(42)
 gr_tm <- GRanges(
   seqnames = c(rep("chr1", 50), rep("chr2", 30)),
@@ -152,7 +152,7 @@ gr_tm <- GRanges(
     width = sample(50:200, 80, replace = TRUE)
   ),
   Tm = runif(80, 55, 85),
-  GC = runif(80, 30, 70)   # gc() returns percentages (0–100)
+  GC = runif(80, 30, 70)   # gc() returns percentages (0-100)
 )
 gr_peaks <- GRanges(
   seqnames = c("chr1", "chr1", "chr2"),
@@ -161,7 +161,7 @@ gr_peaks <- GRanges(
 
 track_list <- list(
   list(type = "points", data = gr_tm, value_col = "Tm",
-       col = "#e41a1c", name = "Tm (°C)"),
+       col = "#e41a1c", name = "Tm (deg C)"),
   list(type = "bars",   data = gr_tm, value_col = "GC",
        col = "#377eb8", name = "GC (\%)"),
   list(type = "rect",   data = gr_peaks,
@@ -170,17 +170,17 @@ track_list <- list(
 plot_karyotype_genome(
   genome_assembly = "hg19",
   track_list      = track_list,
-  title_name      = "Multi-omics – hg19"
+  title_name      = "Multi-omics - hg19"
 )
 
-# ── Example 2: line track, zoom ───────────────────────────────────────────
+# -- Example 2: line track, zoom -------------------------------------------
 plot_karyotype_genome(
   genome_assembly = "hg19",
   track_list      = list(
     list(type = "line", data = gr_tm, value_col = "Tm", col = "#984ea3", name = "GC (\%)")
   ),
   zoom            = "chr1:1000000-50000000",
-  title_name      = "Tm – chr1 zoom"
+  title_name      = "Tm - chr1 zoom"
 )
 }
 

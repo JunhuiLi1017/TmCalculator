@@ -38,8 +38,8 @@
 #'   comparisons. Passed to \code{\link[stats]{pairwise.wilcox.test}} /
 #'   \code{\link[stats]{pairwise.t.test}}. One of:
 #'   \code{"holm"} (default), \code{"hochberg"}, \code{"hommel"},
-#'   \code{"bonferroni"}, \code{"BH"} (Benjamini–Hochberg FDR),
-#'   \code{"BY"} (Benjamini–Yekutieli), \code{"fdr"} (alias of \code{"BH"}),
+#'   \code{"bonferroni"}, \code{"BH"} (Benjamini-Hochberg FDR),
+#'   \code{"BY"} (Benjamini-Yekutieli), \code{"fdr"} (alias of \code{"BH"}),
 #'   or \code{"none"}.
 #'
 #' @return A list with:
@@ -66,17 +66,17 @@
 #'
 #' # Two groups
 #' gr2 <- gr[gr$group %in% c("high", "low")]
-#' test_granges_targets(gr2, target = "Tm", group = "group", posthoc = FALSE)
+#' compare_groups(gr2, target = "Tm", group = "group", posthoc = FALSE)
 #'
 #' # Three or more groups (Kruskal-Wallis + pairwise Wilcoxon)
-#' test_granges_targets(gr, target = c("Tm", "GC"), group = "group",
+#' compare_groups(gr, target = c("Tm", "GC"), group = "group",
 #'                      method = "wilcoxon")
 #'
 #' # Three or more groups (one-way ANOVA + pairwise t-tests)
-#' test_granges_targets(gr, target = "Tm", group = "group", method = "t.test")
+#' compare_groups(gr, target = "Tm", group = "group", method = "t.test")
 #'
 #' # Post-hoc with Benjamini-Hochberg FDR control
-#' test_granges_targets(gr, target = "Tm", group = "group",
+#' compare_groups(gr, target = "Tm", group = "group",
 #'                      p.adjust.method = "BH")
 #' }
 #'
@@ -87,7 +87,7 @@
 #' @author Junhui Li
 #' @export
 
-test_granges_targets <- function(
+compare_groups <- function(
     gr,
     target = "Tm",
     method = c("wilcoxon", "t.test"),

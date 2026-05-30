@@ -2,12 +2,7 @@
 title: "Genome-wide Melting Temperature Profiling: An E. coli Case Study"
 author: "Junhui Li, Lihua Julie Zhu"
 date: "`r Sys.Date()`"
-output:
-  BiocStyle::html_document:
-    toc: true
-    toc_depth: 3
-    toc_float: true
-    number_sections: true
+output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Genome-wide Melting Temperature Profiling: An E. coli Case Study}
   %\VignetteEngine{knitr::rmarkdown}
@@ -403,7 +398,7 @@ table(tm_annot$in_mutH)
 ```
 ### Step 5 — Wilcoxon on Tm and GC, peaks vs the rest of the genome 
 ```{r wilcoxon-on-tm-and-gc}
-res <- test_granges_targets(
+res <- compare_groups(
   gr           = tm_annot,
   target       = c("Tm", "GC"),
   method       = "wilcoxon",

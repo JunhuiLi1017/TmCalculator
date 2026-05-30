@@ -16,7 +16,7 @@
 #'     features that fall within the expanded window.}
 #'   \item{\code{"bin"}}{The genomic space covered by the data is tiled into
 #'     equal-width bins. Each bin is annotated with the mean tm / GC of
-#'     overlapping tm ranges \emph{and} the aggregated feature values — suitable
+#'     overlapping tm ranges \emph{and} the aggregated feature values - suitable
 #'     for joint heatmaps and genome-wide correlation analyses.}
 #' }
 #'
@@ -77,7 +77,7 @@
 #' \dontrun{
 #' library(GenomicRanges)
 #'
-#' # ── Sample data ──────────────────────────────────────────────────────────
+#' # -- Sample data ----------------------------------------------------------
 #' set.seed(42)
 #' gr_tm <- GRanges(
 #'   seqnames = c(rep("chr1", 60), rep("chr2", 30)),
@@ -102,20 +102,20 @@
 #'   signal     = rnorm(60, 5, 2)
 #' )
 #'
-#' # Strategy 1: overlap – annotate Tm ranges with overlapping peak features
+#' # Strategy 1: overlap - annotate Tm ranges with overlapping peak features
 #' res_overlap <- integrate_granges(gr_tm, gr_features,
 #'                                   strategy = "overlap")
 #'
-#' # Strategy 2: nearest – every Tm range gets its closest peak + distance
+#' # Strategy 2: nearest - every Tm range gets its closest peak + distance
 #' res_nearest <- integrate_granges(gr_tm, gr_features,
 #'                                   strategy = "nearest")
 #' head(res_nearest$distance_to_feature)
 #'
-#' # Strategy 3: window – 5 kb window around each probe
+#' # Strategy 3: window - 5 kb window around each probe
 #' res_window <- integrate_granges(gr_tm, gr_features,
 #'                                  strategy = "window", window_size = 5000)
 #'
-#' # Strategy 4: bin – 500 kb genome bins with mean Tm and aggregated signal
+#' # Strategy 4: bin - 500 kb genome bins with mean Tm and aggregated signal
 #' res_bin <- integrate_granges(gr_tm, gr_features,
 #'                               strategy = "bin", bin_size = 5e5)
 #' as.data.frame(res_bin) |> head()
@@ -153,7 +153,7 @@ integrate_granges <- function(
 
   strategy <- match.arg(strategy)
 
-  # ── Input validation ───────────────────────────────────────────────────────
+  # -- Input validation -------------------------------------------------------
   if (!inherits(gr_tm, "GRanges"))
     stop("'gr_tm' must be a GRanges object.")
   if (!inherits(gr_features, "GRanges"))
@@ -176,7 +176,7 @@ integrate_granges <- function(
   # Prefixed output column names
   out_names <- paste0(prefix, feature_cols)
 
-  # ── Aggregation helper ─────────────────────────────────────────────────────
+  # -- Aggregation helper -----------------------------------------------------
   # Summarises a vector: mean (numeric) or comma-joined unique values (character)
   .agg <- function(vals) {
     vals <- vals[!is.na(vals)]
@@ -339,7 +339,7 @@ integrate_granges <- function(
 
       n_bins <- length(bins)
 
-      # ── Aggregate Tm (and GC) per bin ───────────────────────────────────
+      # -- Aggregate Tm (and GC) per bin -----------------------------------
       tm_hits  <- GenomicRanges::findOverlaps(bins, gr_tm_c,
                                                ignore.strand = ignore_strand)
       q_tm     <- S4Vectors::queryHits(tm_hits)
@@ -367,7 +367,7 @@ integrate_granges <- function(
         GenomicRanges::mcols(bins)$GC_mean <- GC_mean
       }
 
-      # ── Aggregate feature columns per bin ───────────────────────────────
+      # -- Aggregate feature columns per bin -------------------------------
       n_feat_col    <- rep(0L, n_bins)
 
       if (length(gr_ft_c) > 0) {

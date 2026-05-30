@@ -1,5 +1,5 @@
 # =============================================================================
-# .build_all_tm_tables() — updated with reverse complement completion (Bug 9 fix)
+# .build_all_tm_tables() - updated with reverse complement completion (Bug 9 fix)
 #
 # WHAT CHANGED:
 #   Added .complete_nn_rc() helper that adds the 6 missing reverse complement
@@ -21,11 +21,11 @@
 #   RNA_NN_Chen_2012 has extra wobble rows → complete only the standard 16.
 # =============================================================================
 
-# ── Helper: add the 6 missing reverse complement rows to a standard NN table ──
+# -- Helper: add the 6 missing reverse complement rows to a standard NN table --
 #
 # There are exactly 16 valid Watson-Crick dinucleotide keys (XY/X'Y' where
 # X' = complement of X, Y' = complement of Y). Published NN tables list only
-# 10 of these — the 6 missing ones are thermodynamically equivalent to an
+# 10 of these - the 6 missing ones are thermodynamically equivalent to an
 # existing row when read from the other strand direction.
 #
 # The complete mapping (verified by enumeration):
@@ -36,7 +36,7 @@
 #   TG/AC  <- same ΔH/ΔS as  GT/CA   (RC pair)
 #   CC/GG  <- same ΔH/ΔS as  GG/CC   (homodimer palindrome)
 #
-# @param tbl       Matrix with dimnames — a standard NN table (17+ rows).
+# @param tbl       Matrix with dimnames - a standard NN table (17+ rows).
 # @param skip_rows Row names to exclude from completion (init/sym rows and any
 #                  extra wobble rows like in RNA_NN_Chen_2012).
 # @return          The input matrix with up to 6 new rows appended.
@@ -46,7 +46,7 @@
                                           "init_oneG/C", "init_allA/T",
                                           "init_5T/A", "sym")) {
   # Fixed mapping: new key -> source key to copy values from
-  # This is the complete, verified set — do not derive algorithmically
+  # This is the complete, verified set - do not derive algorithmically
   # (TT/AA and CC/GG are self-palindromes under the RC formula and would
   # be missed by a naive "RC != self" filter).
   missing_map <- c(
@@ -76,7 +76,7 @@
   rbind(tbl, new_rows)
 }
 
-# ── Main table builder ────────────────────────────────────────────────────────
+# -- Main table builder --------------------------------------------------------
 .build_all_tm_tables <- function() {
   
   nn_col     <- c("left", "right")
@@ -85,7 +85,7 @@
                   "AA/TT", "AT/TA", "TA/AT", "CA/GT", "GT/CA",
                   "CT/GA", "GA/CT", "CG/GC", "GC/CG", "GG/CC")
   
-  # ── DNA NN Tables ───────────────────────────────────────────────────────────
+  # -- DNA NN Tables -----------------------------------------------------------
   DNA_NN_SantaLucia_2004 <- .complete_nn_rc(matrix(c(
     0.2,-5.7,  2.2,6.9,  0,0,  0,0,  0,0,  0,0,  0,-1.4,
     -7.6,-21.3,  -7.2,-20.4,  -7.2,-20.4,  -8.5,-22.7,  -8.4,-22.4,
@@ -110,7 +110,7 @@
     -7.8,-21.0,  -8.2,-22.2,  -10.6,-27.2,  -9.8,-24.4,  -8.0,-19.9
   ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
   
-  # ── RNA NN Tables ───────────────────────────────────────────────────────────
+  # -- RNA NN Tables -----------------------------------------------------------
   RNA_NN_Freier_1986 <- .complete_nn_rc(matrix(c(
     0,-10.8,  0,0,  0,0,  0,0,  0,0,  0,0,  0,-1.4,
     -6.6,-18.4,  -5.7,-15.5,  -8.1,-22.6,  -10.5,-27.8,  -10.2,-26.2,
@@ -123,7 +123,7 @@
     -10.48,-27.1,  -12.44,-32.5,  -10.64,-26.7,  -14.88,-36.9,  -13.39,-32.7
   ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
   
-  # Chen_2012 has extra wobble rows — complete_nn_rc skips non-standard rows
+  # Chen_2012 has extra wobble rows - complete_nn_rc skips non-standard rows
   # automatically and only processes the 16 standard Watson-Crick rows.
   chen_rows <- c(nn_row_std,
                  "GT/TG","GG/TT","AG/TT","TG/AT","TT/AG","TG/GT",
@@ -142,7 +142,7 @@
                 "GT/TG","GG/TT","AG/TT","TG/AT","TT/AG","TG/GT",
                 "AT/TG","CG/GT","CT/GG","GG/CT","GT/CG"))
   
-  # ── RNA/DNA Hybrid — already complete (22 rows including all RC pairs) ──────
+  # -- RNA/DNA Hybrid - already complete (22 rows including all RC pairs) ------
   # RNA_DNA_NN_Sugimoto_1995 was published with the full symmetric set.
   # .complete_nn_rc() will find nothing to add (returns tbl unchanged).
   hybrid_rows <- c("init","init_A/T","init_G/C","init_oneG/C","init_allA/T",
@@ -158,9 +158,9 @@
     -8.6,-22.9,   -8.0,-17.1,   -9.3,-23.2,  -5.9,-12.3,
     -7.8,-23.2,  -5.5,-13.5,  -9.0,-26.1,  -7.8,-21.9
   ), ncol=2, byrow=TRUE, dimnames=list(hybrid_rows, nn_col))
-  # No .complete_nn_rc() needed — already has all 16 unique pairs
+  # No .complete_nn_rc() needed - already has all 16 unique pairs
   
-  # ── IMM, TMM, DE tables (unchanged) ─────────────────────────────────────────
+  # -- IMM, TMM, DE tables (unchanged) -----------------------------------------
   imm_rows <- c(
     "AG/TT","AT/TG","CG/GT","CT/GG","GG/CT","GG/TT","GT/CG","GT/TG",
     "TG/AT","TG/GT","TT/AG","AA/TG","AG/TA","CA/GG","CG/GA","GA/CG",
@@ -255,12 +255,12 @@
     1.6,6.10,     2.2,8.10,    0.7,3.50,     3.1,10.60
   ), ncol=2, byrow=TRUE, dimnames=list(de_rna_rows, nn_col))
   
-  # ── GC Content Coefficient Table (unchanged) ─────────────────────────────
+  # -- GC Content Coefficient Table (unchanged) -----------------------------
   GC_VARTAB <- data.frame(
     A = c(69.3, 81.5, 81.5, 81.5, 78.0, 67.0, 81.5, 77.1),
     B = c(0.41, 0.41, 0.41, 0.41, 0.70, 0.80, 0.41, 0.41),
-    C = c(650,  675,  675,  675,  500,  500,  600,  528),
-    D = c(0,    0,    0,    16.6, 16.6, 16.6, 16.6, 11.7),
+    C = c(650,  675,  675,  500,  500,  500,  600,  528),
+    D = rep(1, 8),
     salt_correction = c(NA, NA, "Schildkraut2010",
                         rep("Wetmur1991", 3),
                         "Schildkraut2010", "SantaLucia1998-1"),
@@ -270,7 +270,7 @@
     stringsAsFactors = FALSE
   )
   
-  # ── Return assembled list ────────────────────────────────────────────────
+  # -- Return assembled list ------------------------------------------------
   list(
     DNA_NN_Breslauer_1986    = DNA_NN_Breslauer_1986,
     DNA_NN_Sugimoto_1996     = DNA_NN_Sugimoto_1996,
@@ -289,7 +289,7 @@
 }
 
 # =============================================================================
-# VERIFICATION — run this after building to confirm completion
+# VERIFICATION - run this after building to confirm completion
 # =============================================================================
 .verify_nn_tables <- function(tbl_list) {
   # The 6 RC pairs that should now be present in every standard DNA/RNA NN table
@@ -317,7 +317,7 @@
 }
 
 
-# ── Usage ────────────────────────────────────────────────────────────────────
+# -- Usage --------------------------------------------------------------------
 # Build once at package development time:
 #   .TM_CONSTANTS <- .build_all_tm_tables()
 #   .verify_nn_tables(.TM_CONSTANTS)

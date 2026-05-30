@@ -35,7 +35,7 @@
 #'   \item{RNA_DE_Turner_2010}{RNA single dangling end, Turner (2010)}
 #' }
 #'
-#' \strong{Registered placeholders (values TBD — populate from primary literature)}
+#' \strong{Registered placeholders (values TBD - populate from primary literature)}
 #' \describe{
 #'   \item{DNA_NN_AllSan_1997}{Allawi & SantaLucia (1997) Biochemistry 36:10581}
 #'   \item{DNA_NN_SantaLucia_1996}{SantaLucia et al. (1996) Biochemistry 35:3555}
@@ -249,7 +249,7 @@ colnames(RNA_DE_Turner_2010) <- c("left","right")
 
 
 # =============================================================================
-#  PLACEHOLDER TABLES (numeric values TBD — register from primary literature)
+#  PLACEHOLDER TABLES (numeric values TBD - register from primary literature)
 # =============================================================================
 #
 # Each new table is registered in the master list below as NULL. tm_nn()

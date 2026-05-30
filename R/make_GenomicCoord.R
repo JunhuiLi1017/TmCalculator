@@ -194,7 +194,8 @@
 #'   \code{\link[Biostrings]{letterFrequency}}
 #' @importFrom methods is
 #' @importFrom Biostrings getSeq letterFrequency
-#' @importFrom GenomeInfoDb seqlengths seqlevels
+#' @importFrom GenomeInfoDb seqlengths seqlevels genome
+#' @importFrom BSgenome provider organism
 #' @importFrom S4Vectors metadata
 #' @export
 make_genomiccoord <- function(
@@ -424,7 +425,7 @@ make_genomiccoord <- function(
   # Fallback: class name or provider + genome
   cls <- class(bsgenome)
   if (length(cls) > 0 && nchar(cls[1]) > 5) return(cls[1])
-  paste0("BSgenome.", GenomeInfoDb::organism(bsgenome), ".",
+  paste0("BSgenome.", BSgenome::organism(bsgenome), ".",
          BSgenome::provider(bsgenome), ".", GenomeInfoDb::genome(bsgenome))
 }
 

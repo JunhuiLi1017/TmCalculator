@@ -90,7 +90,7 @@ check_filter_seq <- function(seq_list, method) {
       stop("No valid regions left for tm_nn calculation after filtering sequences with 'N'.")
     }
 
-    # Vectorized filtering — one gsub call for all sequences
+    # Vectorized filtering - one gsub call for all sequences
     filtered_seq  <- filter_vec(seq_vec)
     filtered_comp <- filter_vec(comp_vec)
 
@@ -106,7 +106,7 @@ check_filter_seq <- function(seq_list, method) {
     ))
   }
 
-  # Default mode: single sequence vector filtering — also vectorized now
+  # Default mode: single sequence vector filtering - also vectorized now
   result <- filter_vec(seq_list)
   if (any(nchar(result) < 2)) {
     stop("Invalid region or sequence in your input: too many Ns or region contains only Ns")

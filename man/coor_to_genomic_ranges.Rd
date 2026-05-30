@@ -22,9 +22,9 @@ coor_to_genomic_ranges(
 }
 Supported colon-separated formats:
 \itemize{
-  \item \code{chr:start-end:strand:region_id} — requires \code{pkg_name}
+  \item \code{chr:start-end:strand:region_id} - requires \code{pkg_name}
     in the input list.
-  \item \code{chr:start-end:strand:pkg_name:region_id} — as produced by
+  \item \code{chr:start-end:strand:pkg_name:region_id} - as produced by
     \code{\link{make_genomiccoord}}.
 }}
 
@@ -46,7 +46,7 @@ A \code{GRanges} object with metadata columns:
   \describe{
     \item{\code{sequence}}{Reference sequence for each interval.}
     \item{\code{complement}}{Complementary sequence.}
-    \item{\code{GC}}{GC fraction (0–1) per interval.}
+    \item{\code{GC}}{GC fraction (0-1) per interval.}
     \item{\code{region_id}}{Region identifier from the coordinate string.}
     \item{\code{genome_pkg}}{BSgenome package name used.}
   }

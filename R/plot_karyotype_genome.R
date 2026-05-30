@@ -13,11 +13,11 @@
 #' @param track_list List. Each element defines one track. Supported fields
 #'   (identical to \code{plot_circos_genome} where applicable):
 #'   \itemize{
-#'     \item \strong{type}: Character. Drawing type – one of \code{"points"},
+#'     \item \strong{type}: Character. Drawing type - one of \code{"points"},
 #'       \code{"line"}, \code{"bars"}, or \code{"rect"}. Default: \code{"points"}.
 #'     \item \strong{data}: GRanges or data.frame with columns seqnames/chr,
 #'       start, end, and the value column.
-#'     \item \strong{min_bar_width}: Numeric (0–1). For \code{bars} type only.
+#'     \item \strong{min_bar_width}: Numeric (0-1). For \code{bars} type only.
 #'       Minimum bar width as a fraction of chromosome length. Needed when
 #'       sequences are short (e.g. primers / probes) whose actual genomic
 #'       footprint is sub-pixel at whole-chromosome scale. Default: \code{0.002}
@@ -30,7 +30,7 @@
 #'     \item \strong{col}: Color for data and legend symbol. Auto-assigned if
 #'       \code{NULL}.
 #'     \item \strong{name}: Character. Track label shown in legend.
-#'     \item \strong{r0}, \strong{r1}: Numeric (0–1). Vertical position of the
+#'     \item \strong{r0}, \strong{r1}: Numeric (0-1). Vertical position of the
 #'       track within the data panel. Auto-computed if \code{NULL}.
 #'     \item \strong{bg.col}: Track background fill color. Default: \code{"white"}.
 #'     \item \strong{bg.border}: Track background border color. Default: \code{NA}.
@@ -90,15 +90,15 @@
 #' library(GenomicRanges)
 #' library(karyoploteR)
 #'
-#' # ── Sample data ───────────────────────────────────────────────────────────
-#' # ── Typical workflow: output from tm_calculate() already has Tm AND GC ──────
+#' # -- Sample data -----------------------------------------------------------
+#' # -- Typical workflow: output from tm_calculate() already has Tm AND GC ------
 #' # tm_calculate() stores both columns in result$gr, so one GRanges object
 #' # is sufficient for all tracks.
 #' #
 #' # result <- tm_calculate(my_seqs, method = "tm_nn")
-#' # gr_tm  <- result$gr   # has $Tm (°C) and $GC (%) columns
+#' # gr_tm  <- result$gr   # has $Tm (deg C) and $GC (%) columns
 #'
-#' # ── Example 1: Tm points + GC bars from the same GRanges ──────────────────
+#' # -- Example 1: Tm points + GC bars from the same GRanges ------------------
 #' set.seed(42)
 #' gr_tm <- GRanges(
 #'   seqnames = c(rep("chr1", 50), rep("chr2", 30)),
@@ -107,7 +107,7 @@
 #'     width = sample(50:200, 80, replace = TRUE)
 #'   ),
 #'   Tm = runif(80, 55, 85),
-#'   GC = runif(80, 30, 70)   # gc() returns percentages (0–100)
+#'   GC = runif(80, 30, 70)   # gc() returns percentages (0-100)
 #' )
 #' gr_peaks <- GRanges(
 #'   seqnames = c("chr1", "chr1", "chr2"),
@@ -116,7 +116,7 @@
 #'
 #' track_list <- list(
 #'   list(type = "points", data = gr_tm, value_col = "Tm",
-#'        col = "#e41a1c", name = "Tm (°C)"),
+#'        col = "#e41a1c", name = "Tm (deg C)"),
 #'   list(type = "bars",   data = gr_tm, value_col = "GC",
 #'        col = "#377eb8", name = "GC (%)"),
 #'   list(type = "rect",   data = gr_peaks,
@@ -125,17 +125,17 @@
 #' plot_karyotype_genome(
 #'   genome_assembly = "hg19",
 #'   track_list      = track_list,
-#'   title_name      = "Multi-omics – hg19"
+#'   title_name      = "Multi-omics - hg19"
 #' )
 #'
-#' # ── Example 2: line track, zoom ───────────────────────────────────────────
+#' # -- Example 2: line track, zoom -------------------------------------------
 #' plot_karyotype_genome(
 #'   genome_assembly = "hg19",
 #'   track_list      = list(
 #'     list(type = "line", data = gr_tm, value_col = "Tm", col = "#984ea3", name = "GC (%)")
 #'   ),
 #'   zoom            = "chr1:1000000-50000000",
-#'   title_name      = "Tm – chr1 zoom"
+#'   title_name      = "Tm - chr1 zoom"
 #' )
 #' }
 #'
@@ -182,7 +182,7 @@ plot_karyotype_genome <- function(
   
   `%||%` <- function(a, b) if (!is.null(a)) a else b
   
-  # ── Internal defaults ──────────────────────────────────────────────────────
+  # -- Internal defaults ------------------------------------------------------
   default_bg.col    <- "white"
   default_bg.border <- NA
   default_bg.lwd    <- 0.5
@@ -190,11 +190,11 @@ plot_karyotype_genome <- function(
   default_cex       <- 0.5
   default_pch       <- 16
   
-  # ── Default track colors ───────────────────────────────────────────────────
+  # -- Default track colors ---------------------------------------------------
   palette      <- c("#67000d", "#fc9272")
   default_cols <- grDevices::colorRampPalette(palette)(length(track_list))
   
-  # ── Helper: coerce data to GRanges ────────────────────────────────────────
+  # -- Helper: coerce data to GRanges ----------------------------------------
   .to_gr <- function(data, track_idx) {
     if (inherits(data, "GRanges")) return(data)
     if (is.data.frame(data)) {
@@ -203,7 +203,7 @@ plot_karyotype_genome <- function(
     stop(sprintf("Track %d: 'data' must be a GRanges object or data.frame.", track_idx))
   }
   
-  # ── Determine chromosomes ─────────────────────────────────────────────────
+  # -- Determine chromosomes -------------------------------------------------
   if (identical(chromosomes, "auto")) {
     all_chrs <- unique(unlist(lapply(seq_along(track_list), function(i) {
       trk <- track_list[[i]]
@@ -214,7 +214,7 @@ plot_karyotype_genome <- function(
     chromosomes <- if (length(all_chrs) > 0) sort(unique(all_chrs)) else "all"
   }
   
-  # ── Auto-compute r0 / r1 ─────────────────────────────────────────────────
+  # -- Auto-compute r0 / r1 -------------------------------------------------
   n  <- length(track_list)
   th <- (1 - track.margin * (n - 1)) / n  # track height as fraction of panel
   
@@ -225,7 +225,7 @@ plot_karyotype_genome <- function(
       track_list[[i]]$r1 <- track_list[[i]]$r0 + th
   }
   
-  # ── Initialise karyotype ──────────────────────────────────────────────────
+  # -- Initialise karyotype --------------------------------------------------
   kp_args <- list(
     genome      = genome_assembly,
     plot.type   = plot_type,
@@ -236,7 +236,7 @@ plot_karyotype_genome <- function(
   
   kp <- do.call(karyoploteR::plotKaryotype, kp_args)
   
-  # ── Draw tracks ───────────────────────────────────────────────────────────
+  # -- Draw tracks -----------------------------------------------------------
   for (i in seq_along(track_list)) {
     trk <- track_list[[i]]
     
@@ -314,7 +314,7 @@ plot_karyotype_genome <- function(
                            col = trk$col, lwd = trk$lwd)
       
     } else if (trk$type == "bars") {
-      # Short sequences (primers / probes) are typically 20–300 bp wide on a
+      # Short sequences (primers / probes) are typically 20-300 bp wide on a
       # chromosome hundreds of Mb long.  kpBars draws rectangles from start to
       # end, so each bar is < 1 pixel wide and invisible.
       # Fix: expand every bar to at least `min_bar_width` × chr_length,
@@ -375,13 +375,13 @@ plot_karyotype_genome <- function(
     track_list[[i]] <- trk
   }
   
-  # ── Base numbers ──────────────────────────────────────────────────────────
+  # -- Base numbers ----------------------------------------------------------
   tryCatch(
     karyoploteR::kpAddBaseNumbers(kp, tick.dist = tick_dist, cex = axis_cex),
     error = function(e) warning("kpAddBaseNumbers: ", e$message)
   )
   
-  # ── Legend ────────────────────────────────────────────────────────────────
+  # -- Legend ----------------------------------------------------------------
   if (legend.show) {
     legend_names <- sapply(seq_along(track_list), function(i)
       track_list[[i]]$name %||% paste0("Track ", i))
@@ -396,7 +396,7 @@ plot_karyotype_genome <- function(
     )
   }
   
-  # ── Labels ────────────────────────────────────────────────────────────────
+  # -- Labels ----------------------------------------------------------------
   if (!is.null(label)) {
     if (is.character(label) && !inherits(label, "GRanges")) {
       # User passed a plain character string (e.g. label = "My label").
@@ -424,7 +424,7 @@ plot_karyotype_genome <- function(
     }
   }
   
-  # ── Title ─────────────────────────────────────────────────────────────────
+  # -- Title -----------------------------------------------------------------
   if (!is.null(title_name)) {
     graphics::title(main = title_name, cex.main = title.cex)
   }

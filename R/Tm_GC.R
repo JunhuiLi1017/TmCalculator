@@ -15,12 +15,17 @@
 #' @param variant Empirical constants coefficient with 8 variants:
 #'   - Chester1993: Tm = 69.3 + 0.41(Percentage_GC) - 650/N
 #'   - QuikChange: Tm = 81.5 + 0.41(Percentage_GC) - 675/N - Percentage_mismatch
-#'   - Schildkraut1965: Tm = 81.5 + 0.41(Percentage_GC) - 675/N + 16.6 x log[Na+]
-#'   - Wetmur1991_MELTING: Tm = 81.5 + 0.41(Percentage_GC) - 500/N + 16.6 x log([Na+]/(1.0 + 0.7 x [Na+])) - Percentage_mismatch
-#'   - Wetmur1991_RNA: Tm = 78 + 0.7(Percentage_GC) - 500/N + 16.6 x log([Na+]/(1.0 + 0.7 x [Na+])) - Percentage_mismatch
-#'   - Wetmur1991_RNA/DNA: Tm = 67 + 0.8(Percentage_GC) - 500/N + 16.6 x log([Na+]/(1.0 + 0.7 x [Na+])) - Percentage_mismatch
-#'   - Primer3Plus: Tm = 81.5 + 0.41(Percentage_GC) - 600/N + 16.6 x log[Na+]
-#'   - vonAhsen2001: Tm = 77.1 + 0.41(Percentage_GC) - 528/N + 11.7 x log[Na+]
+#'   - Schildkraut1965: Tm = 81.5 + 0.41(%GC) - 675/N + 16.6 x log10[Na+]
+#'   - Wetmur1991_MELTING: Tm = 81.5 + 0.41(%GC) - 500/N + 16.6 x log10([Na+]/(1 + 0.7 x [Na+])) - %mismatch
+#'   - Wetmur1991_RNA: Tm = 78 + 0.7(%GC) - 500/N + 16.6 x log10([Na+]/(1 + 0.7 x [Na+])) - %mismatch
+#'   - Wetmur1991_RNA/DNA: Tm = 67 + 0.8(%GC) - 500/N + 16.6 x log10([Na+]/(1 + 0.7 x [Na+])) - %mismatch
+#'   - Primer3Plus: Tm = 81.5 + 0.41(%GC) - 600/N + 16.6 x log10[Na+]
+#'   - vonAhsen2001: Tm = 77.1 + 0.41(%GC) - 528/N + 11.7 x log10[Na+]
+#'
+#'   Salt correction is applied only for variants that include it in the formula
+#'   (via \code{salt_correction()}). Chester1993 and QuikChange use no salt term.
+#'   D is the mismatch penalty (typically 1): Tm decreases by D x (%mismatch).
+#'   Use \code{X} (or \code{.}) in the sequence to mark mismatch positions.
 #' 
 #' @param Na Millimolar concentration of sodium ions. Default: 50
 #' 
@@ -32,7 +37,9 @@
 #' 
 #' @param dNTPs Millimolar concentration of deoxynucleotide triphosphates. Default: 0
 #' 
-#' @param salt_method Salt correction method. Options are:
+#' @param salt_method Salt correction method. \code{NULL} (default) uses the
+#'   method associated with \code{variant}. Set to \code{NA} to disable salt
+#'   correction. Options:
 #'   - "Schildkraut2010": Schildkraut & Lifson 1965
 #'   - "Wetmur1991": Wetmur 1991
 #'   - "SantaLucia1996": SantaLucia 1996
@@ -41,7 +48,7 @@
 #'   - "Owczarzy2008": Owczarzy 2008
 #'   Note: "SantaLucia1998-2" is not available for this function.
 #'   
-#' @param mismatch Logical. If TRUE (default), every '.' in the sequence is counted as a mismatch
+#' @param mismatch Logical. If TRUE (default), every 'X' in the sequence is counted as a mismatch
 #' 
 #' @param DMSO Percent DMSO concentration in the reaction mixture. Default: 0
 #' 
@@ -138,18 +145,46 @@ tm_gc <- function(gr_seq,
       mismatch_count <- sum(filtered_seq %in% 'X')
       tm <- tm - gc_coef[4]*(mismatch_count*100/n_seq)
     }
-    if (!is.null(salt_method)) {
-      corr_salt <- salt_correction(Na = Na, 
-                                   K = K, 
-                                   Tris = Tris, 
-                                   Mg = Mg, 
-                                   dNTPs = dNTPs, 
-                                   method = salt_method, 
-                                   input_seq = filtered_seq, 
-                                   ambiguous = ambiguous)
-      tm <- tm + corr_salt
+    if (!is.null(userset)) {
+      corr_salt <- salt_correction(Na = Na,
+                                  K = K, 
+                                  Tris = Tris, 
+                                  Mg = Mg,
+                                  dNTPs = dNTPs,
+                                  method = salt_method,
+                                  input_seq = filtered_seq,
+                                  ambiguous = ambiguous)
+    } else {
+      if (variant %in% c("Schildkraut1965", "Wetmur1991_MELTING", "Wetmur1991_RNA", "Wetmur1991_RNA/DNA", "Primer3Plus", "vonAhsen2001")) {
+        if (variant == "Schildkraut1965") {
+          salt_method <- "Schildkraut2010"
+        } else if (variant == "Wetmur1991_MELTING") {
+          salt_method <- "Wetmur1991"
+        } else if (variant == "Wetmur1991_RNA") {
+          salt_method <- "Wetmur1991"
+        } else if (variant == "Wetmur1991_RNA/DNA") {
+          salt_method <- "Wetmur1991"
+        } else if (variant == "Primer3Plus") {
+          salt_method <- "Schildkraut2010"
+        } else if (variant == "vonAhsen2001") {
+          salt_method <- "SantaLucia1998-1"
+        }
+        corr_salt <- salt_correction(Na = Na,
+                                    K = K, 
+                                    Tris = Tris, 
+                                    Mg = Mg,
+                                    dNTPs = dNTPs,
+                                    method = salt_method,
+                                    input_seq = filtered_seq,
+                                    ambiguous = ambiguous)
+      } else {
+        corr_salt <- 0
+      }
     }
-    if (!is.na(DMSO)) {
+
+    tm <- tm + corr_salt
+
+    if (DMSO > 0 | formamide_unit$value > 0) {
       corr_chem <- chem_correct(DMSO = DMSO, 
                                    formamide_unit = formamide_unit, 
                                    dmso_factor = dmso_factor, 

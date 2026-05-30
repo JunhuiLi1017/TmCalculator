@@ -130,7 +130,7 @@ plot_tm_heatmap <- function(gr,
     gr <- gr_filtered
   }
 
-  # ── REGIONS MODE ───────────────────────────────────────────────────────────
+  # -- REGIONS MODE -----------------------------------------------------------
   if (x_axis == "regions") {
 
     df <- data.frame(
@@ -214,7 +214,7 @@ plot_tm_heatmap <- function(gr,
     return(p_interactive)
   }
 
-  # ── GENOME MODE (original behaviour) ──────────────────────────────────────
+  # -- GENOME MODE (original behaviour) --------------------------------------
 
   # Validate zoom parameter if provided
   if (!is.null(zoom)) {

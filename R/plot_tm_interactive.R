@@ -103,7 +103,7 @@ plot_tm_karyotype_interactive <- function(gr,
 
   x_axis <- match.arg(x_axis)
 
-  # ── REGIONS MODE ───────────────────────────────────────────────────────────
+  # -- REGIONS MODE -----------------------------------------------------------
   if (x_axis == "regions") {
 
     chrs_to_use <- if (!is.null(chromosomes)) chromosomes else
@@ -163,7 +163,7 @@ plot_tm_karyotype_interactive <- function(gr,
     return(p)
   }
 
-  # ── GENOME MODE ────────────────────────────────────────────────────────────
+  # -- GENOME MODE ------------------------------------------------------------
   plot_data <- data.frame(
     chromosome = as.character(seqnames(gr)),
     position   = (start(gr) + end(gr)) / 2,
@@ -253,7 +253,7 @@ plot_tm_genome_tracks_interactive <- function(gr,
   color_palette <- match.arg(color_palette)
   x_axis        <- match.arg(x_axis)
 
-  # ── REGIONS MODE ───────────────────────────────────────────────────────────
+  # -- REGIONS MODE -----------------------------------------------------------
   if (x_axis == "regions") {
 
     gr_chr <- gr[seqnames(gr) == chromosome_to_plot]
@@ -330,7 +330,7 @@ plot_tm_genome_tracks_interactive <- function(gr,
     return(p)
   }
 
-  # ── GENOME MODE ────────────────────────────────────────────────────────────
+  # -- GENOME MODE ------------------------------------------------------------
   gr_filtered <- gr[seqnames(gr) == chromosome_to_plot]
 
   plot_data <- data.frame(

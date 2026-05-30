@@ -16,12 +16,12 @@
 #' The methods included are:
 #' - Chester1993: Tm = 69.3 + 0.41(Percentage_GC) - 650/N
 #' - QuikChange: Tm = 81.5 + 0.41(Percentage_GC) - 675/N - Percentage_mismatch
-#' - Schildkraut1965: Tm = 81.5 + 0.41(Percentage_GC) - 675/N + 16.6 x log[Na+]
-#' - Wetmur1991_MELTING: Tm = 81.5 + 0.41(Percentage_GC) - 500/N + 16.6 x log([Na+]/(1.0 + 0.7 x [Na+])) - Percentage_mismatch
-#' - Wetmur1991_RNA: Tm = 78 + 0.7(Percentage_GC) - 500/N + 16.6 x log([Na+]/(1.0 + 0.7 x [Na+])) - Percentage_mismatch
-#' - Wetmur1991_RNA/DNA: Tm = 67 + 0.8(Percentage_GC) - 500/N + 16.6 x log([Na+]/(1.0 + 0.7 x [Na+])) - Percentage_mismatch
-#' - Primer3Plus: Tm = 81.5 + 0.41(Percentage_GC) - 600/N + 16.6 x log[Na+]
-#' - vonAhsen2001: Tm = 77.1 + 0.41(Percentage_GC) - 528/N + 11.7 x log[Na+]
+#' - Schildkraut1965: Tm = 81.5 + 0.41(Percentage_GC) - 675/N + 16.6 x log10[Na+]
+#' - Wetmur1991_MELTING: Tm = 81.5 + 0.41(Percentage_GC) - 500/N + Wetmur salt - %mismatch
+#' - Wetmur1991_RNA: Tm = 78 + 0.7(Percentage_GC) - 500/N + Wetmur salt - %mismatch
+#' - Wetmur1991_RNA/DNA: Tm = 67 + 0.8(Percentage_GC) - 500/N + Wetmur salt - %mismatch
+#' - Primer3Plus: Tm = 81.5 + 0.41(Percentage_GC) - 600/N + 16.6 x log10[Na+]
+#' - vonAhsen2001: Tm = 77.1 + 0.41(Percentage_GC) - 528/N + 11.7 x log10[Na+]
 #' 
 "thermodynamic_gc_params"
 

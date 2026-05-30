@@ -27,7 +27,7 @@
 #'       colour from the chosen viridis palette.
 #'     \item \code{"Tm"}: A continuous viridis colour gradient over Tm values.
 #'     \item Any other metadata column name present in \code{gr} (e.g.,
-#'       \code{"group"}): treated as a discrete categorical variable — each
+#'       \code{"group"}): treated as a discrete categorical variable - each
 #'       unique level gets a distinct colour from the chosen viridis palette.
 #'       Useful for comparing categories such as \code{"mutation regions"} vs.
 #'       \code{"non-mutation"}.
@@ -51,7 +51,7 @@
 #'   when \code{x_axis = "label"}. Default: \code{45}.
 #' @param title_name Character. Plot title. Defaults to a generic string when
 #'   \code{NULL}.
-#' @param ylab Character. Y-axis label. Default: \code{"Tm (°C)"}.
+#' @param ylab Character. Y-axis label. Default: \code{"Tm (deg C)"}.
 #' @param show_legend Logical. Display the colour legend. Default: \code{TRUE}.
 #'
 #' @return A \code{ggplot} object. Print it to render, or convert to an
@@ -66,7 +66,7 @@
 #' \dontrun{
 #' library(GenomicRanges)
 #'
-#' # ── Sample data ───────────────────────────────────────────────────────────
+#' # -- Sample data -----------------------------------------------------------
 #' set.seed(1)
 #' gr <- GRanges(
 #'   seqnames = c(rep("chr1", 40), rep("chr2", 30), rep("chr3", 20)),
@@ -79,24 +79,24 @@
 #'   Tm = runif(90, 55, 85)
 #' )
 #'
-#' # ── Example 1: Default – index on x, colour by chromosome ─────────────────
+#' # -- Example 1: Default - index on x, colour by chromosome -----------------
 #' plot_tm_linear(gr)
 #'
-#' # ── Example 2: Region labels on x-axis ────────────────────────────────────
+#' # -- Example 2: Region labels on x-axis ------------------------------------
 #' plotly::ggplotly(plot_tm_linear(gr, x_axis = "label", x_label_angle = 60))
 #'
-#' # ── Example 3: Colour by Tm, sorted by Tm ─────────────────────────────────
+#' # -- Example 3: Colour by Tm, sorted by Tm ---------------------------------
 #' plotly::ggplotly(plot_tm_linear(gr, color_by = "chromosome", sort_by = "Tm", add_line = TRUE))
 #'
-#' # ── Example 4: Per-chromosome positional view ─────────────────────────────
+#' # -- Example 4: Per-chromosome positional view -----------------------------
 #' plot_tm_linear(gr, x_axis = "position", color_by = "Tm",
 #'                color_palette = "magma")
 #'
-#' # ── Example 5: Faceted by chromosome, index x-axis ────────────────────────
+#' # -- Example 5: Faceted by chromosome, index x-axis ------------------------
 #' plot_tm_linear(gr, facet_by_chr = TRUE, color_by = "Tm",
 #'                color_palette = "plasma")
 #'
-#' # ── Example 6: Colour by a categorical metadata column ("group") ──────────
+#' # -- Example 6: Colour by a categorical metadata column ("group") ----------
 #' gr$group <- sample(c("mutation regions", "non-mutation"), 90, replace = TRUE)
 #' plot_tm_linear(gr, color_by = "group")
 #' plotly::ggplotly(plot_tm_linear(gr, color_by = "group", add_line = FALSE))
@@ -129,7 +129,7 @@ plot_tm_linear <- function(
     show_legend    = TRUE
 ) {
   
-  # ── Input validation ───────────────────────────────────────────────────────
+  # -- Input validation -------------------------------------------------------
   if (!inherits(gr, "GRanges"))
     stop("Input 'gr' must be a GRanges object.")
   if (!"Tm" %in% names(GenomicRanges::mcols(gr)))
@@ -152,7 +152,7 @@ plot_tm_linear <- function(
   # Determine whether this is a continuous (Tm) or discrete mapping
   color_continuous <- identical(color_by, "Tm")
   
-  # ── Build data frame ───────────────────────────────────────────────────────
+  # -- Build data frame -------------------------------------------------------
   df <- data.frame(
     chromosome = as.character(GenomicRanges::seqnames(gr)),
     start      = GenomicRanges::start(gr),
@@ -169,7 +169,7 @@ plot_tm_linear <- function(
   
   df$label <- paste0(df$chromosome, ":", df$start, "-", df$end)
   
-  # ── Sort ───────────────────────────────────────────────────────────────────
+  # -- Sort -------------------------------------------------------------------
   if (sort_by == "position") {
     df <- df[order(df$chromosome, df$start), ]
   } else {
@@ -177,7 +177,7 @@ plot_tm_linear <- function(
   }
   df$index <- seq_len(nrow(df))
   
-  # ── Set x variable ─────────────────────────────────────────────────────────
+  # -- Set x variable ---------------------------------------------------------
   if (x_axis == "index") {
     df$x_var      <- df$index
     x_lab         <- "Region Index"
@@ -198,7 +198,7 @@ plot_tm_linear <- function(
   if (is.null(title_name))
     title_name <- "Tm Values across GRanges Regions"
   
-  # ── Build aesthetic mapping ────────────────────────────────────────────────
+  # -- Build aesthetic mapping ------------------------------------------------
   hover_text <- paste0(
     "Region: ", df$label,
     "\nTm: ", round(df$Tm, 2), "\u00B0C",
@@ -235,14 +235,14 @@ plot_tm_linear <- function(
     )
   }
   
-  # ── Assemble plot ──────────────────────────────────────────────────────────
+  # -- Assemble plot ----------------------------------------------------------
   p <- ggplot2::ggplot(df, aes_map) +
     ggplot2::geom_point(size = point_size)
   
   if (add_line)
     p <- p + ggplot2::geom_line(linewidth = 0.35, alpha = 0.5)
   
-  # ── Color scale ────────────────────────────────────────────────────────────
+  # -- Color scale ------------------------------------------------------------
   if (color_continuous) {
     # Continuous gradient for Tm
     p <- p + ggplot2::scale_color_viridis_c(
@@ -272,18 +272,18 @@ plot_tm_linear <- function(
     )
   }
   
-  # ── X-axis scale ───────────────────────────────────────────────────────────
+  # -- X-axis scale -----------------------------------------------------------
   if (!discrete_x) {
     p <- p + ggplot2::scale_x_continuous(expand = ggplot2::expansion(mult = 0.02))
   } else {
     p <- p + ggplot2::scale_x_discrete()
   }
   
-  # ── Faceting ───────────────────────────────────────────────────────────────
+  # -- Faceting ---------------------------------------------------------------
   if (facet_by_chr)
     p <- p + ggplot2::facet_wrap(~ chromosome, scales = "free_x")
   
-  # ── Theme and labels ───────────────────────────────────────────────────────
+  # -- Theme and labels -------------------------------------------------------
   legend_pos <- if (show_legend) "right" else "none"
   
   p <- p +

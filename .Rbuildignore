@@ -1,3 +1,7 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^LICENSE\.md$
+^vignettes/.*\.html$
+^vignettes/.*\.R$
+^vignettes/.*_files$
+^vignettes/\.build\.timestamp$
