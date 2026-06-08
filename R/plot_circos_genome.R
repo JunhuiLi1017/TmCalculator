@@ -9,13 +9,30 @@
 #' @param genome_size Numeric. Genome size.
 #' @param track_list List. Each element defines a track with fields such as:
 #'   \itemize{
-#'     \item type: "line" or "rect"
+#'     \item type: "line", "rect", or "highlight"
 #'     \item data: data.frame or GRanges
 #'     \item ylim: numeric vector of length 2
 #'     \item value_col: column name (for line tracks)
 #'     \item col: color
 #'     \item bg.border, bg.col, bg.lwd: optional track background settings
+#'     \item legend_font_col: color for this track's legend text label
+#'     \item box_col: border color of the box (default: track \code{col})
+#'     \item box_lwd: line width of the box border (default: 1)
 #'   }
+#'   Entries with \code{type = "highlight"} are not drawn as rings. They draw a
+#'   translucent radial band spanning all real tracks at the genomic
+#'   coordinates given in \code{data}. Highlight entries accept these fields:
+#'   \itemize{
+#'     \item data: GRanges or data.frame with start/end columns
+#'     \item col: fill color (default "#F1C40F")
+#'     \item alpha: fill transparency 0-1 (default 0.18)
+#'     \item border: band border color (default NA)
+#'     \item min.degree: minimum visible angular width in degrees for narrow
+#'       regions (default 0.4)
+#'   }
+#'   Highlight entries are filtered out before palette assignment, ring drawing,
+#'   and legend construction, and are always drawn after all rings regardless of
+#'   their position in the list.
 #' @param start.degree Numeric. Starting angle of the plot.
 #' @param track.height Numeric. Height of each track.
 #' @param gap.after Numeric. Gap between sectors.
@@ -38,6 +55,8 @@
 #' @param legend.bty Character. Legend box type.
 #' @param legend.border Character. Legend box border color.
 #' @param legend.lty Numeric. Legend line type.
+#' @param legend.font.col Character. Default legend text color (overridden per-track by
+#'   \code{legend_font_col} in the track list).
 #' @param label Optional GRanges/data.frame for labels.
 #' @param label.column Numeric. Label column.
 #' @param label.niceFacing Logical. Whether to face labels.
@@ -53,8 +72,10 @@
 #' @importFrom circlize circos.clear circos.par circos.initializeCircularGenome
 #' @importFrom circlize circos.track circos.axis circos.genomicLines
 #' @importFrom circlize circos.genomicRect circos.genomicLabels
+#' @importFrom circlize draw.sector circlize get.cell.meta.data
 #' @importFrom graphics text
-#' @importFrom grDevices colorRampPalette
+#' @importFrom grDevices colorRampPalette adjustcolor
+#' @importFrom BiocGenerics start end
 #'
 #' @encoding UTF-8
 #' @author Junhui Li
@@ -92,6 +113,7 @@ plot_circos_genome <- function(
     legend.bty = "n",
     legend.border = NA,
     legend.lty=1,
+    legend.font.col = "black",
     
     # labels (1:1 with circlize)
     label = NULL,
@@ -108,6 +130,11 @@ plot_circos_genome <- function(
 ) {
   
   `%||%` <- function(a, b) if (!is.null(a)) a else b
+  
+  # ===== split highlight pseudo-tracks out of track_list =====
+  is_hl          <- vapply(track_list, function(t) identical(t$type, "highlight"), logical(1))
+  highlight_list <- track_list[is_hl]
+  track_list     <- track_list[!is_hl]
   
   # ===== internal defaults =====
   default_bg.col    <- "white"
@@ -251,6 +278,61 @@ plot_circos_genome <- function(
     draw_track(track_list[[i]], i, is_first = (i == 1))
   }
   
+  # ===== highlight regions =====
+  if (length(highlight_list) > 0) {
+    
+    n_tracks  <- length(track_list)
+    rou_outer <- circlize::get.cell.meta.data(
+      "cell.top.radius", sector.index = genome_name, track.index = 1
+    )
+    rou_inner <- circlize::get.cell.meta.data(
+      "cell.bottom.radius", sector.index = genome_name, track.index = n_tracks
+    )
+    
+    for (hl in highlight_list) {
+      
+      hl_data       <- hl$data
+      hl_col        <- hl$col        %||% "#F1C40F"
+      hl_alpha      <- hl$alpha      %||% 0.18
+      hl_border     <- hl$border     %||% NA
+      hl_min.degree <- hl$min.degree %||% 0.4
+      
+      if (inherits(hl_data, "GRanges")) {
+        hl_data <- data.frame(
+          start = as.integer(BiocGenerics::start(hl_data)),
+          end   = as.integer(BiocGenerics::end(hl_data))
+        )
+      }
+      
+      fill <- grDevices::adjustcolor(hl_col, alpha.f = hl_alpha)
+      
+      for (i in seq_len(nrow(hl_data))) {
+        s <- hl_data$start[i]
+        e <- hl_data$end[i]
+        
+        th1 <- circlize::circlize(s, 0, sector.index = genome_name, track.index = 1)[1, "theta"]
+        th2 <- circlize::circlize(e, 0, sector.index = genome_name, track.index = 1)[1, "theta"]
+        
+        # enforce a minimum visible angular width for narrow regions
+        if (abs(th1 - th2) < hl_min.degree) {
+          mid <- (th1 + th2) / 2
+          th1 <- mid + hl_min.degree / 2
+          th2 <- mid - hl_min.degree / 2
+        }
+        
+        circlize::draw.sector(
+          start.degree = th1,
+          end.degree   = th2,
+          rou1 = rou_outer,
+          rou2 = rou_inner,
+          col = fill,
+          border = hl_border,
+          clock.wise = TRUE
+        )
+      }
+    }
+  }
+  
   # ===== legend =====
   if (legend.show) {
     
@@ -258,8 +340,9 @@ plot_circos_genome <- function(
       track_list[[i]]$name %||% paste0("Track", i)
     })
     
-    legend_cols <- sapply(track_list, function(trk) trk$col)
-    legend_fill <- sapply(track_list, function(trk) trk$bg.col)
+    legend_cols      <- sapply(track_list, function(trk) trk$col)
+    legend_fill      <- sapply(track_list, function(trk) trk$bg.col)
+    legend_text_cols <- sapply(track_list, function(trk) trk$legend_font_col %||% legend.font.col)
     
     graphics::legend(
       x = legend.position[1],
@@ -267,6 +350,7 @@ plot_circos_genome <- function(
       legend = legend_names,
       col = legend_cols,
       fill = legend_fill,
+      text.col = legend_text_cols,
       lty = legend.lty,
       lwd = legend.lwd,
       seg.len = legend.seg.len,

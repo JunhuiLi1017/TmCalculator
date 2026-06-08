@@ -1,0 +1,13 @@
+Package: BSgenome.Ecoli.NCBI.ASM584v2
+Title: Full genomic sequences for Escherichia coli (NCBI assembly ASM584v2)
+Description: Full genomic sequences for Escherichia coli as provided by NCBI (assembly ASM584v2, assembly accession GCF_000005845.2). The sequences are stored in DNAString objects.
+Version: 1.0.0
+Author: Junhui Li <ljh.biostat@gmail.com>
+Maintainer: Junhui Li <ljh.biostat@gmail.com>
+Depends: R (>= 4.2.0), GenomeInfoDb (>= 1.34.9), BSgenome (>= 1.66.1)
+Suggests: BSgenomeForge
+License: Artistic-2.0
+organism: Escherichia coli
+provider: NCBI
+genome: ASM584v2
+biocViews: AnnotationData, Genetics, BSgenome, Escherichia_coli

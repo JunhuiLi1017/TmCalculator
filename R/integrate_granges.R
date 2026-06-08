@@ -2,7 +2,7 @@
 #'
 #' @description
 #' Combines the output of \code{\link{tm_calculate}} (a GRanges object with
-#' \code{tm} and  \code{gc} columns) with a second GRanges carrying
+#' \code{Tm} and \code{GC} columns) with a second GRanges carrying
 #' arbitrary multi-omic metadata (ChIP-seq peaks, ATAC-seq signal, methylation
 #' sites, gene annotations, etc.) using one of four positional strategies:
 #'
@@ -27,7 +27,7 @@
 #' values.
 #'
 #' @param gr_tm A \code{GRanges} object produced by \code{tm_calculate()} (or
-#'   \code{tm_calculate()$gr}). Must contain at least a \code{tm} metadata
+#'   \code{tm_calculate()$gr}). Must contain at least a \code{Tm} metadata
 #'   column. A \code{gc} column is used automatically when present.
 #' @param gr_features A \code{GRanges} object with multi-omic feature ranges.
 #'   All (or a subset of) its metadata columns are transferred / aggregated.
@@ -86,8 +86,8 @@
 #'               sort(sample(1:243e6, 30))),
 #'     width = sample(50:200, 90, replace = TRUE)
 #'   ),
-#'   tm = runif(90, 55, 85),
-#'   gc = runif(90, 30, 70)
+#'   Tm = runif(90, 55, 85),
+#'   GC = runif(90, 30, 70)
 #' )
 #'
 #' gr_features <- GRanges(
