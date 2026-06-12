@@ -154,109 +154,63 @@ alpha (0--1 transparency), legend_font_col, ideogram, height, highlight.
 \examples{
 \dontrun{
 data(ecoli_rep_hotspots)
-data(tm_ASM584v2)
-Tm <- as.data.frame(tm_ASM584v2$gr[, c(4, 6)])
-tracks <- list(
- # --- Protein interaction ---
- list(
-   type   = "rect",
-   data   = ecoli_rep_hotspots$all_peaks_IP_mutH,
-   col    = "#2C3E50",
-   bg.col = "grey",
-   name   = "MutL-AR",
-   legend_font_col="#2C3E50",
-   ideogram = TRUE,
-   height = 0.5
- ),
- list(
-   type      = "line",
-   data      = Tm,
-   value_col = "GC",
-   name      = "GC content",
-   col       = "#4A90E2",
-   legend_font_col="#4A90E2"
- ),
- list(
-   type      = "line",
-   data      = Tm,
-   value_col = "Tm",
-   name      = "Melting temp",
-   col       = "#E06666",
-   legend_font_col="#E06666",
-   highlight = list(data = Tm[100:200,], col = "black", alpha = 0.02),
-   height = 2
- ),
- list(
-   type      = "line",
-   data      = ecoli_rep_hotspots$bins_rep,
-   value_col = "count",
-   name      = "Microsatellites",
-   col       = "#2ECC71",
-   legend_font_col="#2ECC71",
-   highlight = list(data = ecoli_rep_hotspots$bins_rep[1100:1200,], col = "black", alpha = 0.12)
- ),
- list(
-   type      = "line",
-   data      = ecoli_rep_hotspots$bins_cru,
-   value_col = "count",
-   name      = "Cruciform",
-   col       = "#3B3E6B",
-   legend_font_col="#3B3E6B"
- ),
- list(
-   data = ecoli_rep_hotspots$ssdna,
-   name = "ssDNA",
-   col  = "#8E44AD",
-   legend_font_col="#8E44AD"
- ),
- list(
-   type      = "line",
-   data      = ecoli_rep_hotspots$bins_gatc,
-   value_col = "count",
-   name      = "GATC sites",
-   col       = "#D35400",
-   legend_font_col="#D35400"
- ),
- list(
-   type       = "highlight",
-   data       = ecoli_rep_hotspots$all_peaks_IP_mutH,
-   col        = "#F1C40F",
-   alpha      = 0.18,
-   border     = NA,
-   min.degree = 0.4
- ) 
-)
-# Use the exact same `tracks` list from the vignette
-#Circular
-plot_genome_track(genome_name = "E. coli",
- genome_size = 4641652,
- track_list = tracks,
- circular = TRUE)
-#Linear
-plot_genome_track(genome_name = "E. coli",
- genome_size = 4641652,
- track_list = tracks)
+Tm <- as.data.frame(ecoli_rep_hotspots$tm_ASM584v2$gr[, c(4, 6)])
 
-plot_genome_track(genome_name = "E. coli",
- genome_size = 4641652,
- track_list = tracks,
- zoom = c("U00096.3:1000000-1200000"))
-#Circular zoom
-plot_genome_track(genome_name = "E. coli"
-, genome_size = 4641652,
- track_list = tracks,
- circular = TRUE,
- canvas.xlim = c(0.8, 1)
-, canvas.ylim = c(0, 1)
-, zoom = c("U00096.3:1000000-1200000", "U00096.3:3000000-4000000"))
-#Circular part
-plot_genome_track(genome_name = "E. coli",
- genome_size = 4641652,
- track_list = tracks,
- circular = TRUE,
- canvas.xlim = c(0.8, 1),
- canvas.ylim = c(0, 1),
- circle.margin = c(0.1, 0.01, 0.01, 0))
+tracks <- list(
+  list(type = "rect", data = ecoli_rep_hotspots$all_peaks_IP_mutH,
+       col = "#2C3E50", bg.col = "grey", name = "MutL-AR",
+       legend_font_col = "#2C3E50", ideogram = TRUE, height = 0.5),
+  list(type = "line", data = Tm, value_col = "GC",
+       name = "GC content", col = "#4A90E2",
+       legend_font_col = "#4A90E2"),
+  list(type = "line", data = Tm, value_col = "Tm",
+       name = "Melting temp", col = "#E06666",
+       legend_font_col = "#E06666", height = 2),
+  list(type = "line", data = ecoli_rep_hotspots$bins_rep,
+       value_col = "count", name = "Microsatellites", col = "#2ECC71",
+       legend_font_col = "#2ECC71"),
+  list(type = "line", data = ecoli_rep_hotspots$bins_cru,
+       value_col = "count", name = "Cruciform", col = "#3B3E6B",
+       legend_font_col = "#3B3E6B"),
+  list(data = ecoli_rep_hotspots$ssdna, name = "ssDNA",
+       col = "#8E44AD", legend_font_col = "#8E44AD"),
+  list(type = "line", data = ecoli_rep_hotspots$bins_gatc,
+       value_col = "count", name = "GATC sites", col = "#D35400",
+       legend_font_col = "#D35400"),
+  list(type = "highlight", data = ecoli_rep_hotspots$all_peaks_IP_mutH,
+       col = "#F1C40F", alpha = 0.18)
+)
+
+# Circular
+plot_genome_track("E. coli", genome_size = 4641652,
+                  track_list = tracks, circular = TRUE)
+
+# Linear
+plot_genome_track("E. coli", genome_size = 4641652,
+                  track_list = tracks)
+
+# Linear zoom (single region)
+plot_genome_track("E. coli", genome_size = 4641652,
+                  track_list = tracks,
+                  zoom = "U00096.3:1000000-2000000")
+
+# Linear zoom (multiple regions — stacked panels)
+plot_genome_track("E. coli", genome_size = 4641652,
+                  track_list = tracks,
+                  zoom = c("U00096.3:1000000-1200000",
+                           "U00096.3:3000000-3200000"))
+
+# Circular zoom (multiple regions — concatenated arcs)
+plot_genome_track("E. coli", genome_size = 4641652,
+                  track_list = tracks, circular = TRUE,
+                  zoom = c("U00096.3:1000000-1200000",
+                           "U00096.3:3000000-3200000"))
+
+# Circular with canvas panning
+plot_genome_track("E. coli", genome_size = 4641652,
+                  track_list = tracks, circular = TRUE,
+                  canvas.xlim = c(0.5, 1), canvas.ylim = c(0, 1),
+                  circle.margin = c(0.05, 0.05))
 }
 
 }

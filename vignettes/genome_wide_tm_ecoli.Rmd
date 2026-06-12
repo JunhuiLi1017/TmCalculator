@@ -162,7 +162,7 @@ cat(sprintf(
 The result is also shipped as part of the `ecoli_rep_hotspots` dataset, so
 you can skip the computation and load it directly:
 
-```{r load-data}
+```{r tm-summary}
 Tm <- as.data.frame(tm_ASM584v2$gr[, c(4, 6)])
 summary(Tm[, c("Tm", "GC")])
 ```
@@ -237,7 +237,7 @@ tracks <- list(
 
 ## Circular genome map
 
-```{r circular-full, eval=FALSE, fig.width=8, fig.height=8, fig.cap="Circular genome map of E. coli K-12 MG1655. Concentric rings from outside in: MutL-AR peaks (grey ideogram), GC content, melting temperature, microsatellite density, cruciform sequences, ssDNA regions, and GATC site density. Yellow highlight bands mark MutL-AR peak regions."}
+```{r circular-full, fig.width=8, fig.height=8, fig.cap="Circular genome map of E. coli K-12 MG1655. Concentric rings from outside in: MutL-AR peaks (grey ideogram), GC content, melting temperature, microsatellite density, cruciform sequences, ssDNA regions, and GATC site density. Yellow highlight bands mark MutL-AR peak regions."}
 plot_genome_track(
   genome_name = genome_name,
   genome_size = chr_length,
@@ -253,7 +253,7 @@ The same `tracks` list works for a linear karyoploteR layout — simply omit
 `circular = TRUE`. The ideogram track is drawn inside the chromosome bar;
 all other tracks are stacked as horizontal panels.
 
-```{r linear-full, eval=FALSE, fig.width=10, fig.height=5, fig.cap="Linear genome view of E. coli K-12 MG1655. MutL-AR peaks are drawn inside the chromosome ideogram bar."}
+```{r linear-full, fig.width=10, fig.height=5, fig.cap="Linear genome view of E. coli K-12 MG1655. MutL-AR peaks are drawn inside the chromosome ideogram bar."}
 plot_genome_track(
   genome_name = genome_name,
   genome_size = chr_length,
@@ -267,7 +267,7 @@ The `zoom` parameter accepts a character string (e.g. `"chr:start-end"`) or a
 GRanges object. In linear mode, the karyoploteR view is restricted to that
 region; in circular mode, only data overlapping the region is drawn.
 
-```{r zoom-single, eval=FALSE, fig.width=10, fig.height=5, fig.cap="Zoomed linear view of the 1.0-2.0 Mb region."}
+```{r zoom-single, fig.width=10, fig.height=5, fig.cap="Zoomed linear view of the 1.0-2.0 Mb region."}
 plot_genome_track(
   genome_name = genome_name,
   genome_size = chr_length,
@@ -283,7 +283,7 @@ In linear mode each region is drawn as a separate stacked panel; in circular
 mode the regions are concatenated around the circle with small gaps between
 them.
 
-```{r zoom-multi-linear, eval=FALSE, fig.width=10, fig.height=8, fig.cap="Two zoomed regions displayed as stacked linear panels."}
+```{r zoom-multi-linear, fig.width=10, fig.height=8, fig.cap="Two zoomed regions displayed as stacked linear panels."}
 plot_genome_track(
   genome_name = genome_name,
   genome_size = chr_length,
@@ -293,7 +293,7 @@ plot_genome_track(
 )
 ```
 
-```{r zoom-multi-circular, eval=FALSE, fig.width=8, fig.height=8, fig.cap="Two zoomed regions concatenated on a circular plot. Dashed lines separate the regions."}
+```{r zoom-multi-circular, fig.width=8, fig.height=8, fig.cap="Two zoomed regions concatenated on a circular plot. Dashed lines separate the regions."}
 plot_genome_track(
   genome_name = genome_name,
   genome_size = chr_length,
@@ -310,7 +310,7 @@ Use `canvas.xlim` and `canvas.ylim` to pan and magnify a portion of the
 circular plot. The `circle.margin` parameter controls whitespace around the
 plot.
 
-```{r circular-pan, eval=FALSE, fig.width=7, fig.height=7, fig.cap="Panned circular view showing the upper-right quadrant of the E. coli chromosome."}
+```{r circular-pan, fig.width=7, fig.height=7, fig.cap="Panned circular view showing the upper-right quadrant of the E. coli chromosome."}
 plot_genome_track(
   genome_name   = genome_name,
   genome_size   = chr_length,
@@ -328,7 +328,7 @@ Individual tracks can carry a `highlight` field to draw coloured bands within
 that track only. This is useful for marking specific regions of interest on a
 per-track basis:
 
-```{r per-track-highlight, eval=FALSE, fig.width=8, fig.height=8, fig.cap="Circular plot with per-track highlight bands on the Microsatellites track."}
+```{r per-track-highlight, fig.width=8, fig.height=8, fig.cap="Circular plot with per-track highlight bands on the Microsatellites track."}
 tracks_hl <- tracks
 tracks_hl[[4]]$highlight <- list(
   data  = ecoli_rep_hotspots$bins_rep[1100:1200, ],
@@ -353,7 +353,7 @@ rest of the genome.
 
 ### Build MutL-AR peak GRanges
 
-```{r build-mutH-peaks, eval=FALSE}
+```{r build-mutH-peaks}
 mutH_peaks <- GRanges(
   seqnames = ecoli_rep_hotspots$all_peaks_IP_mutH$chr,
   ranges   = IRanges(start = ecoli_rep_hotspots$all_peaks_IP_mutH$start,
@@ -364,7 +364,7 @@ seqlevels(mutH_peaks) <- "U00096.3"
 
 ### Annotate Tm tiles with peak membership
 
-```{r annotate-mutH-peaks, eval=FALSE}
+```{r annotate-mutH-peaks}
 mutH_peaks$peak_id <- paste0("mutH_", seq_along(mutH_peaks))
 
 tm_annot <- integrate_granges(
@@ -381,7 +381,7 @@ table(tm_annot$in_mutH)
 
 ### Wilcoxon test on Tm and GC
 
-```{r wilcoxon, eval=FALSE}
+```{r wilcoxon}
 res <- compare_groups(
   gr          = tm_annot,
   target      = c("Tm", "GC"),
