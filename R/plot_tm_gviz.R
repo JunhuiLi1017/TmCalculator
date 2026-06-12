@@ -63,6 +63,80 @@
 #' @examples
 #' \dontrun{
 #' library(GenomicRanges)
+#'
+#' ## ---- E. coli multi-omics example using ecoli_rep_hotspots ----
+#' data(ecoli_rep_hotspots)
+#' library("BSgenome.Ecoli.NCBI.ASM584v2")
+#' genome_name <- "BSgenome.Ecoli.NCBI.ASM584v2"
+#' chr_name    <- "U00096.3"
+#' chr_length  <- BSgenome.Ecoli.NCBI.ASM584v2$U00096.3@length
+
+#' genome_name="BSgenome.Ecoli.NCBI.ASM584v2"
+#' bins_gc <- make_genomiccoord(
+#'   bsgenome    = genome_name,
+#'   chromosomes = chr_name,
+#'   window      = 200L,
+#'   slide       = 200L,
+#'   start       = 1,
+#'   end         = chr_length,
+#'   strand      = "+"
+#' )
+#' input_new <- list(pkg_name = genome_name, seq = bins_gc)
+#' gr_batch <- to_genomic_ranges_fast(input_new)
+
+#' tm_ASM584v2 <- tm_calculate(
+#'   gr_batch,
+#'   method   = "tm_nn"
+#' )
+#' gr_tm <- tm_ASM584v2$gr
+#'
+#' # Annotate Tm windows with MutL-AR peak membership
+#' mutH_peaks <- GRanges(
+#'   seqnames = ecoli_rep_hotspots$all_peaks_IP_mutH$chr,
+#'   ranges   = IRanges(start = ecoli_rep_hotspots$all_peaks_IP_mutH$start,
+#'                      end   = ecoli_rep_hotspots$all_peaks_IP_mutH$end)
+#' )
+#' mutH_peaks$peak_id <- paste0("mutH_", seq_along(mutH_peaks))
+#' gr_annot <- integrate_granges(
+#'   gr_tm        = gr_tm,
+#'   gr_features  = mutH_peaks,
+#'   strategy     = "overlap",
+#'   feature_cols = "peak_id",
+#'   keep_unmatched = TRUE
+#' )
+#' gr_annot$in_mutH <- ifelse(is.na(gr_annot$peak_id), "non_peak", "peak")
+#'
+#' # Gradient view — genome mode (requires genome_assembly with seqlengths)
+#' plot_tm_gviz(gr_annot, "U00096.3", genome_assembly = NULL,
+#'              zoom = "U00096.3:1500000-1700000")
+#'
+#' # Points colored by MutL-AR peak membership
+#' plot_tm_gviz(gr_annot, "U00096.3", genome_assembly = NULL,
+#'              track_type = "points", color_by = "in_mutH",
+#'              zoom = "U00096.3:1500000-1700000")
+#'
+#' # Compare two regions side by side (ori-proximal vs terminus-proximal)
+#' plot_tm_gviz(gr_annot, "U00096.3", genome_assembly = NULL,
+#'   zoom = c(Terminus = "U00096.3:1500000-1700000",
+#'            Origin   = "U00096.3:3800000-4000000"),
+#'   track_type = "points", color_by = "zoom_region")
+#'
+#' # Regions mode — index on x-axis, colored by Tm gradient
+#' p <- plot_tm_gviz(gr_annot, "U00096.3", genome_assembly = NULL,
+#'   x_axis = "regions",
+#'   zoom   = "U00096.3:1500000-1700000",
+#'   track_type = "gradient")
+#' print(p)
+#'
+#' # Regions mode — faceted by zoom region, colored by peak membership
+#' p2 <- plot_tm_gviz(gr_annot, "U00096.3", genome_assembly = NULL,
+#'   x_axis   = "regions",
+#'   zoom     = c(Terminus = "U00096.3:1500000-1700000",
+#'                Origin   = "U00096.3:3800000-4000000"),
+#'   color_by = "in_mutH", facet_by_zoom = TRUE)
+#' print(p2)
+#'
+#' ## ---- Simulated human data example ----
 #' set.seed(123)
 #' gr <- GRanges(
 #'   seqnames = rep("chr1", 100),
@@ -71,34 +145,10 @@
 #'   Tm    = runif(100, 60, 80),
 #'   group = sample(c("mutation", "wildtype"), 100, replace = TRUE)
 #' )
-#' # Standard gradient view
-#' plot_tm_genome_tracks(gr, "chr1", "hg19",
-#'                       zoom = "chr1:10062800-20000000")
-#'
-#' # Points colored by Tm gradient (fixed)
-#' plot_tm_genome_tracks(gr, "chr1", "hg19",
-#'                       track_type = "points",
-#'                       zoom = "chr1:10062800-20000000")
-#'
-#' # Compare two regions side by side, colored by region
-#' plot_tm_genome_tracks(gr, "chr1", "hg19",
-#'   zoom      = c(Region1 = "chr1:7634457-133482943",
-#'                 Region2 = "chr1:135756721-248931747"),
-#'   track_type = "points",
-#'   color_by   = "zoom_region")
-#'
-#' # Color by metadata group column
-#' plot_tm_genome_tracks(gr, "chr1", "hg19",
-#'   track_type = "points",
-#'   color_by   = "group")
-#'
-#' # Regions mode - index on x-axis, multiple zoom windows
-#' p <- plot_tm_genome_tracks(gr, "chr1", "hg19",
-#'   x_axis   = "regions",
-#'   zoom     = c(Region1 = "chr1:100-200000000",
-#'                Region2 = "chr1:200000000-249250621"),
-#'   color_by = "zoom_region")
-#' print(p)
+#' plot_tm_gviz(gr, "chr1", "hg19",
+#'              zoom = "chr1:10062800-20000000")
+#' plot_tm_gviz(gr, "chr1", "hg19",
+#'              track_type = "points", color_by = "group")
 #' }
 #'
 #' @importFrom Gviz IdeogramTrack GenomeAxisTrack DataTrack OverlayTrack
@@ -116,7 +166,7 @@
 #'   unit
 #' @export
 
-plot_tm_genome_tracks <- function(
+plot_tm_gviz <- function(
     gr,
     chromosome_to_plot,
     genome_assembly    = NULL,

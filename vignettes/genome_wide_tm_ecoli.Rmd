@@ -86,17 +86,13 @@ if (!requireNamespace(ecoli_pkg, quietly = TRUE)) {
 }
 ```
 
-Load the genome:
-
 ```{r load-genome}
-ecoli_pkg  <- "BSgenome.Ecoli.NCBI.ASM584v2"
+genome_name <- "BSgenome.Ecoli.NCBI.ASM584v2"
 genome_obj <- "Ecoli"
 
-suppressPackageStartupMessages(library(ecoli_pkg, character.only = TRUE))
-genome      <- base::get(genome_obj, envir = asNamespace(ecoli_pkg))
-genome_name <- ecoli_pkg
+suppressPackageStartupMessages(library(genome_name, character.only = TRUE))
 chr_name    <- "U00096.3"
-chr_length  <- length(genome[[chr_name]])
+chr_length  <- BSgenome.Ecoli.NCBI.ASM584v2$U00096.3@length
 
 cat("Chromosome:", chr_name, "\n")
 cat("Length:    ", format(chr_length, big.mark = ","), "bp\n")
@@ -110,7 +106,7 @@ cat("Length:    ", format(chr_length, big.mark = ","), "bp\n")
 
 ```{r make-coord}
 bins_gc <- make_genomiccoord(
-  bsgenome    = genome,
+  bsgenome    = genome_name,
   chromosomes = chr_name,
   window      = 200L,
   slide       = 200L,
@@ -159,11 +155,10 @@ cat(sprintf(
 ))
 ```
 
-The result is also shipped as part of the `ecoli_rep_hotspots` dataset, so
-you can skip the computation and load it directly:
+The result is shipped as part of the `ecoli_rep_hotspots` dataset:
 
 ```{r tm-summary}
-Tm <- as.data.frame(tm_ASM584v2$gr[, c(4, 6)])
+Tm <- as.data.frame(tm_ASM584v2$gr[, c("Tm", "GC")])
 summary(Tm[, c("Tm", "GC")])
 ```
 
@@ -368,7 +363,7 @@ seqlevels(mutH_peaks) <- "U00096.3"
 mutH_peaks$peak_id <- paste0("mutH_", seq_along(mutH_peaks))
 
 tm_annot <- integrate_granges(
-  gr_tm          = ecoli_rep_hotspots$tm_ASM584v2$gr,
+  gr_tm          = tm_ASM584v2$gr,
   gr_features    = mutH_peaks,
   strategy       = "overlap",
   feature_cols   = "peak_id",

@@ -14,7 +14,7 @@ plot_tm_heatmap(
   zoom = NULL,
   x_axis = c("genome", "regions"),
   regions_facet = FALSE,
-  regions_color_by = c("Tm", "chromosome")
+  regions_color_by = "Tm"
 )
 }
 \arguments{
@@ -67,8 +67,9 @@ Only used when \code{x_axis = "genome"}.}
 by chromosome so each panel has its own x index. Default: \code{FALSE}.}
 
 \item{regions_color_by}{Character. When \code{x_axis = "regions"}, map colour
-to \code{"Tm"} (default, continuous gradient) or \code{"chromosome"}
-(discrete per-chromosome colour).}
+to \code{"Tm"} (default, continuous gradient), \code{"chromosome"}
+(discrete per-chromosome colour), or any metadata column name present in
+\code{gr} (e.g. \code{"in_mutH"}) for discrete categorical colouring.}
 }
 \value{
 A plotly object (interactive).
@@ -81,25 +82,78 @@ y-axis = Tm value) that makes sparse data legible at any genomic scale.
 }
 \examples{
 \dontrun{
-# Create example GRanges object
-gr_tm <- GenomicRanges::GRanges(
-  seqnames = c("chr1", "chr2", "chr1", "chr2", "chr1"),
-  ranges = IRanges::IRanges(
-    start = c(100, 200, 300, 400, 150),
-    end = c(150, 250, 350, 450, 200)
-  ),
-  Tm = c(65.5, 68.2, 70.1, 63.8, 72.0)
+library(GenomicRanges)
+
+## ---- E. coli multi-omics example ----
+data(ecoli_rep_hotspots)
+library("BSgenome.Ecoli.NCBI.ASM584v2")
+genome_name <- "BSgenome.Ecoli.NCBI.ASM584v2"
+chr_name    <- "U00096.3"
+chr_length  <- BSgenome.Ecoli.NCBI.ASM584v2$U00096.3@length
+genome_name="BSgenome.Ecoli.NCBI.ASM584v2"
+bins_gc <- make_genomiccoord(
+  bsgenome    = genome_name,
+  chromosomes = chr_name,
+  window      = 200L,
+  slide       = 200L,
+  start       = 1,
+  end         = chr_length,
+  strand      = "+"
+)
+input_new <- list(pkg_name = genome_name, seq = bins_gc)
+gr_batch <- to_genomic_ranges_fast(input_new)
+tm_ASM584v2 <- tm_calculate(
+  gr_batch,
+  method   = "tm_nn"
+)
+gr_tm <- tm_ASM584v2$gr
+
+# Annotate Tm windows with MutL-AR peak membership
+mutH_peaks <- GRanges(
+  seqnames = ecoli_rep_hotspots$all_peaks_IP_mutH$chr,
+  ranges   = IRanges(start = ecoli_rep_hotspots$all_peaks_IP_mutH$start,
+                     end   = ecoli_rep_hotspots$all_peaks_IP_mutH$end)
+)
+mutH_peaks$peak_id <- paste0("mutH_", seq_along(mutH_peaks))
+gr_annot <- integrate_granges(
+  gr_tm        = gr_tm,
+  gr_features  = mutH_peaks,
+  strategy     = "overlap",
+  feature_cols = "peak_id",
+  keep_unmatched = TRUE
+)
+gr_annot$in_mutH <- ifelse(is.na(gr_annot$peak_id), "non_peak", "peak")
+
+# Regions view — Tm gradient (default)
+plot_tm_heatmap(gr_annot, x_axis = "regions")
+
+# Regions view — colored by MutL-AR peak membership
+plot_tm_heatmap(gr_annot, x_axis = "regions",
+                regions_color_by = "in_mutH")
+
+# Regions view — colored by chromosome (single chromosome here)
+plot_tm_heatmap(gr_annot, x_axis = "regions",
+                regions_color_by = "chromosome")
+
+## ---- Simulated multi-chromosome example ----
+set.seed(42)
+gr_sim <- GRanges(
+  seqnames = c(rep("chr1", 50), rep("chr2", 50)),
+  ranges = IRanges(
+    start = c(sort(sample(1:249e6, 50)), sort(sample(1:243e6, 50))),
+    width = 200),
+  Tm = runif(100, 55, 85)
 )
 
-# Genome-coordinate view (default)
-plot_tm_heatmap(gr_tm, genome_assembly = "hg19", plot_type = "karyogram")
+# Genome-coordinate karyogram
+plot_tm_heatmap(gr_sim, genome_assembly = "hg19", plot_type = "karyogram")
 
-# Region-indexed view: compare Tm values across all regions
-plot_tm_heatmap(gr_tm, genome_assembly = "hg19", x_axis = "regions")
+# Genome-coordinate faceted view
+plot_tm_heatmap(gr_sim, genome_assembly = "hg19", plot_type = "faceted")
 
-# Region view, faceted and coloured by chromosome
-plot_tm_heatmap(gr_tm, genome_assembly = "hg19", x_axis = "regions",
-                regions_facet = TRUE, regions_color_by = "chromosome")
+# Zoom into specific regions
+plot_tm_heatmap(gr_sim, genome_assembly = "hg19",
+                zoom = c("chr1:1000000-50000000", "chr2:1000000-50000000"))
 }
 
 }

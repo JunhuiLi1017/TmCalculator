@@ -83,7 +83,30 @@
 #' @examples
 #' \dontrun{
 #' data(ecoli_rep_hotspots)
-#' Tm <- as.data.frame(ecoli_rep_hotspots$tm_ASM584v2$gr[, c(4, 6)])
+#' 
+#' library("BSgenome.Ecoli.NCBI.ASM584v2")
+#' genome_name <- "BSgenome.Ecoli.NCBI.ASM584v2"
+#' chr_name    <- "U00096.3"
+#' chr_length  <- BSgenome.Ecoli.NCBI.ASM584v2$U00096.3@length
+
+#' genome_name="BSgenome.Ecoli.NCBI.ASM584v2"
+#' bins_gc <- make_genomiccoord(
+#'   bsgenome    = genome_name,
+#'   chromosomes = chr_name,
+#'   window      = 200L,
+#'   slide       = 200L,
+#'   start       = 1,
+#'   end         = chr_length,
+#'   strand      = "+"
+#' )
+#' input_new <- list(pkg_name = genome_name, seq = bins_gc)
+#' gr_batch <- to_genomic_ranges_fast(input_new)
+
+#' tm_ASM584v2 <- tm_calculate(
+#'   gr_batch,
+#'   method   = "tm_nn"
+#' )
+#' Tm <- as.data.frame(tm_ASM584v2$gr[, c("Tm", "GC")])
 #'
 #' tracks <- list(
 #'   list(type = "rect", data = ecoli_rep_hotspots$all_peaks_IP_mutH,
@@ -149,8 +172,10 @@
 #' @importFrom IRanges IRanges
 #' @importFrom grDevices colorRampPalette adjustcolor
 #' @importFrom graphics legend text rect polygon lines segments par plot.new
-#'   plot.window layout
+#'   plot.window
 #' @importFrom BiocGenerics start end
+#' @importFrom utils tail
+#' 
 #' @export
 plot_genome_track <- function(
     genome_name,
@@ -750,7 +775,7 @@ plot_genome_track <- function(
 
     to_gr <- function(d) {
       if (inherits(d, "GRanges")) {
-        if (single_contig) GenomicRanges::seqlevels(d) <- kp_seqnames[1]
+        if (single_contig) GenomeInfoDb::seqlevels(d) <- kp_seqnames[1]
         return(d)
       }
       if (is.data.frame(d)) {

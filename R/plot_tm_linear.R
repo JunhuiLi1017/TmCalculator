@@ -66,7 +66,63 @@
 #' \dontrun{
 #' library(GenomicRanges)
 #'
-#' # -- Sample data -----------------------------------------------------------
+#' ## ---- E. coli multi-omics example ----
+#' data(ecoli_rep_hotspots)
+#' library("BSgenome.Ecoli.NCBI.ASM584v2")
+#' genome_name <- "BSgenome.Ecoli.NCBI.ASM584v2"
+#' chr_name    <- "U00096.3"
+#' chr_length  <- BSgenome.Ecoli.NCBI.ASM584v2$U00096.3@length
+
+#' genome_name="BSgenome.Ecoli.NCBI.ASM584v2"
+#' bins_gc <- make_genomiccoord(
+#'   bsgenome    = genome_name,
+#'   chromosomes = chr_name,
+#'   window      = 200L,
+#'   slide       = 200L,
+#'   start       = 1,
+#'   end         = chr_length,
+#'   strand      = "+"
+#' )
+#' input_new <- list(pkg_name = genome_name, seq = bins_gc)
+#' gr_batch <- to_genomic_ranges_fast(input_new)
+
+#' tm_ASM584v2 <- tm_calculate(
+#'   gr_batch,
+#'   method   = "tm_nn"
+#' )
+#' gr_tm <- tm_ASM584v2$gr
+#'
+#' # Annotate Tm windows with MutL-AR peak membership
+#' mutH_peaks <- GRanges(
+#'   seqnames = ecoli_rep_hotspots$all_peaks_IP_mutH$chr,
+#'   ranges   = IRanges(start = ecoli_rep_hotspots$all_peaks_IP_mutH$start,
+#'                      end   = ecoli_rep_hotspots$all_peaks_IP_mutH$end)
+#' )
+#' mutH_peaks$peak_id <- paste0("mutH_", seq_along(mutH_peaks))
+#' gr_annot <- integrate_granges(
+#'   gr_tm        = gr_tm,
+#'   gr_features  = mutH_peaks,
+#'   strategy     = "overlap",
+#'   feature_cols = "peak_id",
+#'   keep_unmatched = TRUE
+#' )
+#' gr_annot$in_mutH <- ifelse(is.na(gr_annot$peak_id), "non_peak", "peak")
+#'
+#' # Index view — color by MutL-AR peak membership
+#' plot_tm_linear(gr_annot, color_by = "in_mutH")
+#'
+#' # Sorted by Tm — reveals Tm rank distribution by group
+#' plot_tm_linear(gr_annot, color_by = "in_mutH", sort_by = "Tm",
+#'                add_line = TRUE)
+#'
+#' # Genomic position view — faceted by chromosome
+#' plot_tm_linear(gr_annot, x_axis = "position", color_by = "Tm",
+#'                color_palette = "magma")
+#'
+#' # Continuous Tm gradient
+#' plot_tm_linear(gr_annot, color_by = "Tm", color_palette = "plasma")
+#'
+#' ## ---- Simulated multi-chromosome example ----
 #' set.seed(1)
 #' gr <- GRanges(
 #'   seqnames = c(rep("chr1", 40), rep("chr2", 30), rep("chr3", 20)),
@@ -79,28 +135,19 @@
 #'   Tm = runif(90, 55, 85)
 #' )
 #'
-#' # -- Example 1: Default - index on x, colour by chromosome -----------------
+#' # Default — index on x, colour by chromosome
 #' plot_tm_linear(gr)
 #'
-#' # -- Example 2: Region labels on x-axis ------------------------------------
-#' plotly::ggplotly(plot_tm_linear(gr, x_axis = "label", x_label_angle = 60))
+#' # Region labels on x-axis
+#' plot_tm_linear(gr, x_axis = "label", x_label_angle = 60)
 #'
-#' # -- Example 3: Colour by Tm, sorted by Tm ---------------------------------
-#' plotly::ggplotly(plot_tm_linear(gr, color_by = "chromosome", sort_by = "Tm", add_line = TRUE))
-#'
-#' # -- Example 4: Per-chromosome positional view -----------------------------
-#' plot_tm_linear(gr, x_axis = "position", color_by = "Tm",
-#'                color_palette = "magma")
-#'
-#' # -- Example 5: Faceted by chromosome, index x-axis ------------------------
+#' # Faceted by chromosome, Tm gradient
 #' plot_tm_linear(gr, facet_by_chr = TRUE, color_by = "Tm",
 #'                color_palette = "plasma")
 #'
-#' # -- Example 6: Colour by a categorical metadata column ("group") ----------
-#' gr$group <- sample(c("mutation regions", "non-mutation"), 90, replace = TRUE)
+#' # Categorical metadata column
+#' gr$group <- sample(c("mutation", "wildtype"), 90, replace = TRUE)
 #' plot_tm_linear(gr, color_by = "group")
-#' plotly::ggplotly(plot_tm_linear(gr, color_by = "group", add_line = FALSE))
-#'
 #' }
 #'
 #' @importFrom ggplot2 ggplot aes geom_point geom_line scale_color_viridis_c

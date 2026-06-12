@@ -154,7 +154,28 @@ alpha (0--1 transparency), legend_font_col, ideogram, height, highlight.
 \examples{
 \dontrun{
 data(ecoli_rep_hotspots)
-Tm <- as.data.frame(ecoli_rep_hotspots$tm_ASM584v2$gr[, c(4, 6)])
+
+library("BSgenome.Ecoli.NCBI.ASM584v2")
+genome_name <- "BSgenome.Ecoli.NCBI.ASM584v2"
+chr_name    <- "U00096.3"
+chr_length  <- BSgenome.Ecoli.NCBI.ASM584v2$U00096.3@length
+genome_name="BSgenome.Ecoli.NCBI.ASM584v2"
+bins_gc <- make_genomiccoord(
+  bsgenome    = genome_name,
+  chromosomes = chr_name,
+  window      = 200L,
+  slide       = 200L,
+  start       = 1,
+  end         = chr_length,
+  strand      = "+"
+)
+input_new <- list(pkg_name = genome_name, seq = bins_gc)
+gr_batch <- to_genomic_ranges_fast(input_new)
+tm_ASM584v2 <- tm_calculate(
+  gr_batch,
+  method   = "tm_nn"
+)
+Tm <- as.data.frame(tm_ASM584v2$gr[, c("Tm", "GC")])
 
 tracks <- list(
   list(type = "rect", data = ecoli_rep_hotspots$all_peaks_IP_mutH,

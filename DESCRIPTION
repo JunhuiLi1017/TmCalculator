@@ -1,8 +1,8 @@
 Package: TmCalculator
 Type: Package
 Title: Extending Nucleic Acid Melting Temperature Analysis from Sequence-Level Computation to Genome-Wide Thermodynamic Profiling
-Version: 1.0.5
-Date: 2026-05-29
+Version: 1.0.6
+Date: 2026-06-12
 Authors@R: c(
     person(given = "Junhui", family = "Li", email = "ljh.biostat@gmail.com", role = c("cre","aut"),
            comment = c(ORCID = "0000-0003-3973-1700")),
@@ -26,9 +26,9 @@ Imports:
     Gviz,
     dplyr,
     ggbio,
+    BiocGenerics,
     ggplot2,
     karyoploteR,
-    circlize,
     graphics,
     grDevices,
     viridis,
@@ -48,4 +48,5 @@ NeedsCompilation: no
 Repository: CRAN
 RoxygenNote: 7.3.2
 LazyData: true
+LazyDataCompression: xz
 Encoding: UTF-8

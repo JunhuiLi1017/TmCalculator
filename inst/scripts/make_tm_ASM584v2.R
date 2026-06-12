@@ -49,7 +49,13 @@ tm_ASM584v2 <- tm_calculate(
 cat("Tm range: ", paste(range(tm_ASM584v2$gr$Tm), collapse = " - "), "°C\n")
 cat("GC range: ", paste(range(tm_ASM584v2$gr$GC), collapse = " - "), "\n")
 
-# Step 4 — merge into ecoli_rep_hotspots
+# Step 4 — strip metadata to keep only Tm and GC (reduce data size)
+keep_cols <- c("Tm", "GC")
+GenomicRanges::mcols(tm_ASM584v2$gr) <-
+  GenomicRanges::mcols(tm_ASM584v2$gr)[, keep_cols]
+cat("Kept metadata columns:", paste(keep_cols, collapse = ", "), "\n")
+
+# Step 5 — merge into ecoli_rep_hotspots
 load("data/ecoli_rep_hotspots.rda")
 ecoli_rep_hotspots$tm_ASM584v2 <- tm_ASM584v2
 save(ecoli_rep_hotspots, file = "data/ecoli_rep_hotspots.rda", compress = "xz")

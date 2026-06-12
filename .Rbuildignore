@@ -6,3 +6,4 @@
 ^vignettes/.*_files$
 ^vignettes/\.build\.timestamp$
 ^TmCalculatorShiny$
+^app\.R$
