@@ -1,6 +1,6 @@
 Package: TmCalculator
 Type: Package
-Title: Extending Nucleic Acid Melting Temperature Analysis from Sequence-Level Computation to Genome-Wide Thermodynamic Profiling
+Title: Genome-wide Nucleic Acid Melting Temperature Profiling and Multi-omics Integration
 Version: 1.0.6
 Date: 2026-06-12
 Authors@R: c(
@@ -15,25 +15,26 @@ Depends:
     R (>= 3.5)
 VignetteBuilder: knitr
 Imports: 
-    seqinr,
-    methods,
     BSgenome,
+    BiocGenerics,
     Biostrings,
+    GenomeInfoDb,
     GenomicRanges,
+    Gviz,
     IRanges,
     S4Vectors,
-    GenomeInfoDb,
-    Gviz,
     dplyr,
     ggbio,
-    BiocGenerics,
     ggplot2,
-    karyoploteR,
     graphics,
     grDevices,
-    viridis,
+    grid,
+    karyoploteR,
+    methods,
+    plotly,
     rlang,
-    plotly
+    seqinr,
+    viridis
 Suggests: 
     testthat (>= 3.0.0),
     knitr,
@@ -43,7 +44,8 @@ Suggests:
     remotes,
     BiocManager,
     BSgenomeForge,
-    BSgenome.Hsapiens.UCSC.hg38
+    BSgenome.Hsapiens.UCSC.hg38,
+    BSgenome.Ecoli.NCBI.ASM584v2
 NeedsCompilation: no
 Repository: CRAN
 RoxygenNote: 7.3.2

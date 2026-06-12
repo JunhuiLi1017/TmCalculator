@@ -90,7 +90,7 @@ if (!requireNamespace(ecoli_pkg, quietly = TRUE)) {
 genome_name <- "BSgenome.Ecoli.NCBI.ASM584v2"
 genome_obj <- "Ecoli"
 
-suppressPackageStartupMessages(library(genome_name, character.only = TRUE))
+library("BSgenome.Ecoli.NCBI.ASM584v2")
 chr_name    <- "U00096.3"
 chr_length  <- BSgenome.Ecoli.NCBI.ASM584v2$U00096.3@length
 
