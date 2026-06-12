@@ -690,7 +690,7 @@ server <- function(input, output, session) {
       } else if (pt == "multiomics") {
         tl <- build_tracks(gr, features(), input$multi_feat_col)
         if (input$multi_engine == "linear") {
-          draw_obj(function() TmCalculator::plot_linear_genome(
+          draw_obj(function() TmCalculator::plot_genome_track(
             genome_name = if (nzchar(input$multi_assembly)) input$multi_assembly else "genome",
             track_list = tl, chromosomes = chrom_vec(input$multi_chroms)))
         } else if (input$multi_engine == "circos") {
