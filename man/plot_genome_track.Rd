@@ -158,7 +158,8 @@ data(ecoli_rep_hotspots)
 library("BSgenome.Ecoli.NCBI.ASM584v2")
 genome_name <- "BSgenome.Ecoli.NCBI.ASM584v2"
 chr_name    <- "U00096.3"
-chr_length  <- BSgenome.Ecoli.NCBI.ASM584v2$U00096.3@length
+genome <- get(genome_name, envir = asNamespace(genome_name))
+chr_length  <- length(genome[[chr_name]])
 genome_name="BSgenome.Ecoli.NCBI.ASM584v2"
 bins_gc <- make_genomiccoord(
   bsgenome    = genome_name,

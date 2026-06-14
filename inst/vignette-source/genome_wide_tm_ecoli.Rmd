@@ -73,69 +73,22 @@ install.packages(
 )
 ```
 
-The GitHub repo ships package metadata only; sequence data must be forged once.
-The chunk below installs the package (if needed), forges it from NCBI when
-the `Ecoli` genome object is still missing, then loads it. **Knit from the top**
-so this chunk runs before `load-genome`.
+Alternatively, install the package skeleton from GitHub and forge the
+sequence data:
 
-```{r setup-ecoli-bsgenome, echo=FALSE, message=FALSE, warning=FALSE}
-ecoli_pkg   <- "BSgenome.Ecoli.NCBI.ASM584v2"
-genome_obj  <- "Ecoli"   # BSgenomeObjname in DESCRIPTION; not the package name
-
-.ecoli_genome_ready <- function() {
-  if (!requireNamespace(ecoli_pkg, quietly = TRUE)) return(FALSE)
-  exists(genome_obj, envir = asNamespace(ecoli_pkg), inherits = FALSE)
-}
-
-if (!requireNamespace(ecoli_pkg, quietly = TRUE)) {
-  if (!requireNamespace("remotes", quietly = TRUE)) {
-    utils::install.packages("remotes", repos = "https://cloud.r-project.org")
-  }
-  remotes::install_github(
-    "JunhuiLi1017/BSgenome.Ecoli.NCBI.ASM584v2",
-    upgrade = "never",
-    quiet = TRUE
-  )
-}
-
-if (!.ecoli_genome_ready()) {
-  if (!requireNamespace("BiocManager", quietly = TRUE)) {
-    utils::install.packages("BiocManager", repos = "https://cloud.r-project.org")
-  }
-  if (!requireNamespace("BSgenomeForge", quietly = TRUE)) {
-    BiocManager::install("BSgenomeForge", ask = FALSE, update = FALSE)
-  }
-  pkgdir <- BSgenomeForge::forgeBSgenomeDataPkgFromNCBI(
-    assembly_accession = "GCF_000005845.2",
-    pkg_maintainer     = "Junhui Li <ljh.biostat@gmail.com>",
-    destdir            = tempdir()
-  )
-  utils::install.packages(pkgdir, repos = NULL, type = "source", quiet = TRUE)
-  if (ecoli_pkg %in% loadedNamespaces()) {
-    unloadNamespace(ecoli_pkg)
-  }
-}
-
-if (!.ecoli_genome_ready()) {
-  stop(
-    "Could not load genome object '", genome_obj, "' from package '", ecoli_pkg, "'.\n",
-    "Run the manual 'forge' chunk above, or forgeBSgenomeDataPkgFromNCBI() locally.",
-    call. = FALSE
-  )
-}
+```{r install-github, eval=FALSE}
+remotes::install_github("JunhuiLi1017/BSgenome.Ecoli.NCBI.ASM584v2")
 ```
 
-Load the genome (object `Ecoli`; package `BSgenome.Ecoli.NCBI.ASM584v2` for coordinates):
-
 ```{r load-genome}
-ecoli_pkg  <- "BSgenome.Ecoli.NCBI.ASM584v2"
-genome_obj <- "Ecoli"
-
-suppressPackageStartupMessages(library(ecoli_pkg, character.only = TRUE))
-genome      <- base::get(genome_obj, envir = asNamespace(ecoli_pkg))
-genome_name <- ecoli_pkg
+genome_name <- "BSgenome.Ecoli.NCBI.ASM584v2"
 chr_name    <- "U00096.3"
-chr_length  <- length(genome[[chr_name]])
+
+library(genome_name, character.only = TRUE)
+objname <- utils::packageDescription(genome_name, fields = "BSgenomeObjname")
+if (is.na(objname) || !nzchar(objname)) objname <- genome_name
+genome <- get(objname, envir = asNamespace(genome_name))
+chr_length <- length(genome[[chr_name]])
 
 cat("Chromosome:", chr_name, "\n")
 cat("Length:    ", format(chr_length, big.mark = ","), "bp\n")
@@ -451,9 +404,9 @@ On a standard desktop computer (single core, R 4.3):
 
 | Step | Function | Time (elapsed) |
 |------|----------|---------------|
-| Coordinate generation | `make_genomiccoord()` + `coor_to_genomic_ranges()` | ~`r sprintf("%.2f", runtime1["elapsed"])` s |
-| Tm calculation (23,208 windows) | `tm_calculate()` | ~`r sprintf("%.2f", runtime2["elapsed"])` s |
-| **Total** | | **~`r sprintf("%.2f", runtime1["elapsed"] + runtime2["elapsed"])` s** |
+| Coordinate generation | `make_genomiccoord()` + `to_genomic_ranges_fast()` | ~1 s |
+| Tm calculation (23,208 windows) | `tm_calculate()` | ~7 s |
+| **Total** | | **~8 s** |
 
 For human-scale analyses (non-overlapping 200 bp windows across the ~3.1 Gb
 haploid genome, ~15.5 M windows), we recommend running `tm_calculate()` in

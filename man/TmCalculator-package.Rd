@@ -4,7 +4,7 @@
 \name{TmCalculator-package}
 \alias{TmCalculator}
 \alias{TmCalculator-package}
-\title{TmCalculator: Extending Nucleic Acid Melting Temperature Analysis from Sequence-Level Computation to Genome-Wide Thermodynamic Profiling}
+\title{TmCalculator: Genome-Wide Nucleic Acid Melting Temperature Profiling and Multi-Omics Integration}
 \description{
 \if{html}{\figure{logo.png}{options: style='float: right' alt='logo' width='120'}}
 

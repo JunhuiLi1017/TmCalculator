@@ -1,6 +1,6 @@
 Package: TmCalculator
 Type: Package
-Title: Genome-wide Nucleic Acid Melting Temperature Profiling and Multi-omics Integration
+Title: Genome-Wide Nucleic Acid Melting Temperature Profiling and Multi-Omics Integration
 Version: 1.0.6
 Date: 2026-06-12
 Authors@R: c(
@@ -20,32 +20,26 @@ Imports:
     Biostrings,
     GenomeInfoDb,
     GenomicRanges,
-    Gviz,
     IRanges,
     S4Vectors,
-    dplyr,
-    ggbio,
-    ggplot2,
     graphics,
     grDevices,
-    grid,
-    karyoploteR,
-    methods,
-    plotly,
-    rlang,
-    seqinr,
-    viridis
+    methods
 Suggests: 
     testthat (>= 3.0.0),
     knitr,
+    utils,
     rmarkdown,
-    devtools,
-    roxygen2,
     remotes,
     BiocManager,
     BSgenomeForge,
     BSgenome.Hsapiens.UCSC.hg38,
-    BSgenome.Ecoli.NCBI.ASM584v2
+    karyoploteR,
+    ggridges,
+    ggforce,
+    ggplot2,
+    rlang,
+    seqinr
 NeedsCompilation: no
 Repository: CRAN
 RoxygenNote: 7.3.2

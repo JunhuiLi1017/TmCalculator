@@ -51,7 +51,6 @@
 #' 
 #' @importFrom Biostrings getSeq
 #' @importFrom GenomicRanges GRanges
-#' @importFrom seqinr read.fasta
 #' @importFrom BSgenome available.genomes
 #' @importFrom IRanges IRanges
 #' @importFrom S4Vectors mcols
@@ -236,6 +235,9 @@ fa_to_genomic_ranges <- function(input_seq) {
   }
   
   # Read sequences from FASTA file
+  if (!requireNamespace("seqinr", quietly = TRUE))
+    stop("Package 'seqinr' is required to read FASTA files. ",
+         "Install it with: install.packages(\"seqinr\")", call. = FALSE)
   seq_list <- seqinr::read.fasta(input_seq, as.string = TRUE, forceDNAtolower = FALSE)
   if (length(seq_list) == 0) {
     stop("No sequences found in the FASTA file")

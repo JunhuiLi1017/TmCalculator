@@ -269,6 +269,9 @@ coor_to_genomic_ranges <- function(
   if (exists(objname, envir = ns, inherits = FALSE)) {
     return(get(objname, envir = ns))
   }
+  if (exists("Ecoli", envir = ns, inherits = FALSE)) {
+    return(get("Ecoli", envir = ns))
+  }
   stop(sprintf(
     paste0(
       "BSgenome package '%s' is installed but genome object '%s' is missing.\n",

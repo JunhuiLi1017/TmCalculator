@@ -401,10 +401,7 @@ make_genomiccoord <- function(
 #' @keywords internal
 .resolve_bsgenome <- function(x) {
   if (is.character(x)) {
-    if (!requireNamespace(x, quietly = TRUE))
-      stop("BSgenome package '", x, "' is not installed.\n",
-           "Install with: BiocManager::install(\"", x, "\")")
-    return(get(x, envir = asNamespace(x)))
+    return(.get_bsgenome_from_pkg(x))
   }
   if (!methods::is(x, "BSgenome"))
     stop("'bsgenome' must be a BSgenome object or a package name string.")

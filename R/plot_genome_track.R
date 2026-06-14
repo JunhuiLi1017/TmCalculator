@@ -87,7 +87,8 @@
 #' library("BSgenome.Ecoli.NCBI.ASM584v2")
 #' genome_name <- "BSgenome.Ecoli.NCBI.ASM584v2"
 #' chr_name    <- "U00096.3"
-#' chr_length  <- BSgenome.Ecoli.NCBI.ASM584v2$U00096.3@length
+#' genome <- get(genome_name, envir = asNamespace(genome_name))
+#' chr_length  <- length(genome[[chr_name]])
 
 #' genome_name="BSgenome.Ecoli.NCBI.ASM584v2"
 #' bins_gc <- make_genomiccoord(
@@ -165,9 +166,6 @@
 #'                   circle.margin = c(0.05, 0.05))
 #' }
 #'
-#' @importFrom karyoploteR plotKaryotype getDefaultPlotParams kpAddBaseNumbers
-#'   kpRect kpLines kpPlotRegions kpPlotCoverage kpPlotRibbon kpPlotMarkers
-#'   kpAxis kpAddLabels
 #' @importFrom GenomicRanges GRanges seqnames start end mcols
 #' @importFrom IRanges IRanges
 #' @importFrom grDevices colorRampPalette adjustcolor
@@ -673,6 +671,10 @@ plot_genome_track <- function(
   # ===================================================================
   #  LINEAR LAYOUT (karyoploteR)
   # ===================================================================
+
+  if (!requireNamespace("karyoploteR", quietly = TRUE))
+    stop("Package 'karyoploteR' is required for linear genome plots. ",
+         "Install it with: BiocManager::install(\"karyoploteR\")", call. = FALSE)
 
   # ---- resolve genome argument ----
   genome_is_string <- is.character(genome) && length(genome) == 1

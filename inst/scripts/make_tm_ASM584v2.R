@@ -12,10 +12,11 @@ library(TmCalculator)
 library(BSgenome)
 
 ecoli_pkg  <- "BSgenome.Ecoli.NCBI.ASM584v2"
-genome_obj <- "Ecoli"
 
 suppressPackageStartupMessages(library(ecoli_pkg, character.only = TRUE))
-genome      <- base::get(genome_obj, envir = asNamespace(ecoli_pkg))
+objname <- utils::packageDescription(ecoli_pkg, fields = "BSgenomeObjname")
+if (is.na(objname) || !nzchar(objname)) objname <- ecoli_pkg
+genome      <- get(objname, envir = asNamespace(ecoli_pkg))
 chr_name    <- "U00096.3"
 chr_length  <- length(genome[[chr_name]])
 
@@ -55,11 +56,15 @@ GenomicRanges::mcols(tm_ASM584v2$gr) <-
   GenomicRanges::mcols(tm_ASM584v2$gr)[, keep_cols]
 cat("Kept metadata columns:", paste(keep_cols, collapse = ", "), "\n")
 
-# Step 5 — merge into ecoli_rep_hotspots
+# Step 5 — remove tm_ASM584v2 from ecoli_rep_hotspots (computed live in vignette)
 load("data/ecoli_rep_hotspots.rda")
-ecoli_rep_hotspots$tm_ASM584v2 <- tm_ASM584v2
-save(ecoli_rep_hotspots, file = "data/ecoli_rep_hotspots.rda", compress = "xz")
-cat("Saved ecoli_rep_hotspots$tm_ASM584v2 into data/ecoli_rep_hotspots.rda\n")
+if ("tm_ASM584v2" %in% names(ecoli_rep_hotspots)) {
+  ecoli_rep_hotspots$tm_ASM584v2 <- NULL
+  save(ecoli_rep_hotspots, file = "data/ecoli_rep_hotspots.rda", compress = "xz")
+  cat("Removed tm_ASM584v2 from ecoli_rep_hotspots\n")
+} else {
+  cat("tm_ASM584v2 not present in ecoli_rep_hotspots; nothing to remove\n")
+}
 
 # Remove standalone file if it exists
 if (file.exists("data/tm_ASM584v2.rda")) {
