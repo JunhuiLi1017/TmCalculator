@@ -63,12 +63,12 @@
 #' 
 #' @examples
 #' 
-#' salt_correction(Na = 50, Mg = 1.5, method = "Owczarzy2008", 
+#' salt_correct(Na = 50, Mg = 1.5, method = "Owczarzy2008", 
 #'                input_seq = "ATGCGATGCG")
 #' 
-#' @export salt_correction
+#' @export salt_correct
 
-salt_correction <- function(Na=0,
+salt_correct <- function(Na=0,
                             K=0,
                             Tris=0,
                             Mg=0,

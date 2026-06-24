@@ -9,7 +9,7 @@
 #'   \item{B}{GC content coefficient}
 #'   \item{C}{Length correction coefficient}
 #'   \item{D}{Mismatch coefficient}
-#'   \item{salt_correction}{Associated salt correction method}
+#'   \item{salt_correct}{Associated salt correction method}
 #' }
 #' 
 #' @details
@@ -30,7 +30,7 @@ thermodynamic_gc_params <- data.frame(
   B = c(0.41, 0.41, 0.41, 0.41, 0.70, 0.80, 0.41, 0.41),
   C = c(650, 675, 675, 500, 500, 500, 600, 528),
   D = rep(1, 8),
-  salt_correction = c(NA, NA, "Schildkraut2010",
+  salt_correct = c(NA, NA, "Schildkraut2010",
                      rep("Wetmur1991", 3), "Schildkraut2010", "SantaLucia1998-1")
 )
 rownames(thermodynamic_gc_params) <- c(

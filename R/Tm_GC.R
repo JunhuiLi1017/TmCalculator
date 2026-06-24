@@ -23,7 +23,7 @@
 #'   - vonAhsen2001: Tm = 77.1 + 0.41(%GC) - 528/N + 11.7 x log10[Na+]
 #'
 #'   Salt correction is applied only for variants that include it in the formula
-#'   (via \code{salt_correction()}). Chester1993 and QuikChange use no salt term.
+#'   (via \code{salt_correct()}). Chester1993 and QuikChange use no salt term.
 #'   D is the mismatch penalty (typically 1): Tm decreases by D x (%mismatch).
 #'   Use \code{X} (or \code{.}) in the sequence to mark mismatch positions.
 #' 
@@ -125,7 +125,7 @@ tm_gc <- function(gr_seq,
       stop("only Chester1993, QuikChange, Schildkraut1965, Wetmur1991_MELTING, Wetmur1991_RNA, Wetmur1991_RNA/DNA, Primer3Plus and vonAhsen2001 are allowed in variant")
     } else {
       gc_coef <- get_table("GC_VARTAB")[variant,]
-      salt_method <- get_table("GC_VARTAB")[variant,"salt_correction"]
+      salt_method <- get_table("GC_VARTAB")[variant,"salt_correct"]
     }
   } else {
     gc_coef <- as.numeric(userset)
@@ -146,7 +146,7 @@ tm_gc <- function(gr_seq,
       tm <- tm - gc_coef[4]*(mismatch_count*100/n_seq)
     }
     if (!is.null(userset)) {
-      corr_salt <- salt_correction(Na = Na,
+      corr_salt <- salt_correct(Na = Na,
                                   K = K, 
                                   Tris = Tris, 
                                   Mg = Mg,
@@ -169,7 +169,7 @@ tm_gc <- function(gr_seq,
         } else if (variant == "vonAhsen2001") {
           salt_method <- "SantaLucia1998-1"
         }
-        corr_salt <- salt_correction(Na = Na,
+        corr_salt <- salt_correct(Na = Na,
                                     K = K, 
                                     Tris = Tris, 
                                     Mg = Mg,

@@ -496,7 +496,7 @@ tm_nn <- function(gr_seq,
 
   R <- 1.987
   if(!is.null(salt_fn)){
-    corr_salt <- salt_correction(Na = Na, 
+    corr_salt <- salt_correct(Na = Na, 
                                  K = K,
                                  Tris = Tris,
                                  Mg = Mg,
