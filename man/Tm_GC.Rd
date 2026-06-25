@@ -45,7 +45,7 @@ distributing their contribution to GC content based on their possible nucleotide
   - vonAhsen2001: Tm = 77.1 + 0.41(%GC) - 528/N + 11.7 x log10[Na+]
 
   Salt correction is applied only for variants that include it in the formula
-  (via \code{salt_correction()}). Chester1993 and QuikChange use no salt term.
+  (via \code{salt_correct()}). Chester1993 and QuikChange use no salt term.
   D is the mismatch penalty (typically 1): Tm decreases by D x (%mismatch).
   Use \code{X} (or \code{.}) in the sequence to mark mismatch positions.}
 

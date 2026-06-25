@@ -1,8 +1,8 @@
 Package: TmCalculator
 Type: Package
 Title: Genome-Wide Nucleic Acid Melting Temperature Profiling and Multi-Omics Integration
-Version: 1.0.6
-Date: 2026-06-12
+Version: 1.0.7
+Date: 2026-06-25
 Authors@R: c(
     person(given = "Junhui", family = "Li", email = "ljh.biostat@gmail.com", role = c("cre","aut"),
            comment = c(ORCID = "0000-0003-3973-1700")),
@@ -35,9 +35,9 @@ Suggests:
     BSgenomeForge,
     BSgenome.Hsapiens.UCSC.hg38,
     karyoploteR,
+    ggplot2,
     ggridges,
     ggforce,
-    ggplot2,
     rlang,
     seqinr
 NeedsCompilation: no

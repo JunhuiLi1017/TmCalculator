@@ -173,7 +173,6 @@
 #'   plot.window
 #' @importFrom BiocGenerics start end
 #' @importFrom utils tail
-#' 
 #' @export
 plot_genome_track <- function(
     genome_name,
@@ -293,21 +292,36 @@ plot_genome_track <- function(
     # space where the zoom regions are concatenated end-to-end.  Small
     # gaps are drawn between regions to visually separate them.
     zoom_offsets <- NULL  # virtual start of each region
+    zoom_has_gap <- NULL  # logical: does gap i (after region i) have missing data?
     zoom_gap_deg <- 2     # visual gap between regions (degrees)
     if (!is.null(zoom_regions)) {
       zr <- zoom_regions
       region_sizes <- zr$end - zr$start
-      n_gaps <- nrow(zr) - 1L
-      # reserve angular space for gaps; shrink effective genome_size
+      n_reg <- nrow(zr)
+
+      # determine which inter-region gaps have missing genomic data
+      zoom_has_gap <- logical(n_reg)
+      for (gi in seq_len(n_reg)) {
+        if (gi < n_reg) {
+          zoom_has_gap[gi] <- zr$start[gi + 1L] != zr$end[gi]
+        } else {
+          # wrap-around: missing = (genome_size - last_end) + first_start
+          zoom_has_gap[gi] <- (genome_size - zr$end[gi]) + zr$start[1L] > 0
+        }
+      }
+      n_gaps <- sum(zoom_has_gap)
+
+      # reserve angular space for real gaps only
       gap_total_frac <- n_gaps * zoom_gap_deg / 360
       genome_size <- sum(region_sizes) / (1 - gap_total_frac)
-      gap_bp <- genome_size * zoom_gap_deg / 360   # gap in virtual bp
-      zoom_offsets <- numeric(nrow(zr))
-      cursor_bp <- 0
-      for (zi in seq_len(nrow(zr))) {
+      gap_bp <- if (n_gaps > 0) genome_size * zoom_gap_deg / 360 else 0
+      zoom_offsets <- numeric(n_reg)
+      # half wrap-around gap before first region (only if wrap gap exists)
+      cursor_bp <- if (zoom_has_gap[n_reg]) gap_bp / 2 else 0
+      for (zi in seq_len(n_reg)) {
         zoom_offsets[zi] <- cursor_bp
         cursor_bp <- cursor_bp + region_sizes[zi]
-        if (zi < nrow(zr)) cursor_bp <- cursor_bp + gap_bp
+        if (zoom_has_gap[zi]) cursor_bp <- cursor_bp + gap_bp
       }
     }
 
@@ -354,6 +368,47 @@ plot_genome_track <- function(
       xs <- c(r_out * cos(ang), r_in * cos(rev(ang)))
       ys <- c(r_out * sin(ang), r_in * sin(rev(ang)))
       polygon(xs, ys, col = col, border = border, lwd = lwd)
+    }
+
+    # Draw ring arcs only over zoom regions (leaving gaps blank).
+    draw_ring_arcs <- function(r_in, r_out,
+                               col = NA, border = "black", lwd = 0.25) {
+      for (zi in seq_len(nrow(zoom_regions))) {
+        reg_start <- zoom_offsets[zi]
+        reg_end   <- zoom_offsets[zi] +
+                     (zoom_regions$end[zi] - zoom_regions$start[zi])
+        draw_arc(pos2rad(reg_start), pos2rad(reg_end),
+                 r_in, r_out, col = col, border = border, lwd = lwd)
+      }
+    }
+
+    # Draw zigzag break marks only at gap boundaries with missing data.
+    draw_break_marks <- function(r_in, r_out, col = "grey40", lwd = 1.2,
+                                 n_teeth = 5, amplitude = 0.012) {
+      n_reg <- nrow(zoom_regions)
+      edge_positions <- numeric(0)
+      for (zi in seq_len(n_reg)) {
+        reg_size <- zoom_regions$end[zi] - zoom_regions$start[zi]
+        # edge after this region (gap zi)
+        if (zoom_has_gap[zi])
+          edge_positions <- c(edge_positions, zoom_offsets[zi] + reg_size)
+        # edge before this region (gap from previous region)
+        prev_gi <- if (zi == 1L) n_reg else zi - 1L
+        if (zoom_has_gap[prev_gi])
+          edge_positions <- c(edge_positions, zoom_offsets[zi])
+      }
+      for (edge_bp in edge_positions) {
+        th_center <- pos2rad(edge_bp)
+        r_pts <- seq(r_in, r_out, length.out = n_teeth * 2 + 1)
+        xs <- ys <- numeric(length(r_pts))
+        for (k in seq_along(r_pts)) {
+          offset <- if (k %% 2 == 0) amplitude else -amplitude
+          ang <- th_center + offset
+          xs[k] <- r_pts[k] * cos(ang)
+          ys[k] <- r_pts[k] * sin(ang)
+        }
+        lines(xs, ys, col = col, lwd = lwd)
+      }
     }
 
     # Coerce GRanges / data.frame to a plain data.frame with start/end.
@@ -455,14 +510,7 @@ plot_genome_track <- function(
           text(r_label * cos(th), r_label * sin(th),
                labels = ax_lab[k], cex = axis.cex, adj = c(hadj, 0.5))
         }
-        # draw gap separator lines between regions
-        if (zi < nrow(zoom_regions)) {
-          gap_mid <- zoom_offsets[zi] + reg_size + gap_bp / 2
-          th_gap  <- pos2rad(gap_mid)
-          segments(r_inner * cos(th_gap), r_inner * sin(th_gap),
-                   r_tick  * cos(th_gap), r_tick  * sin(th_gap),
-                   lwd = 1.5, col = "grey50", lty = 2)
-        }
+        # (break marks are drawn after all tracks)
       }
     }
 
@@ -478,7 +526,11 @@ plot_genome_track <- function(
         ideo_col <- grDevices::adjustcolor(ideo_col, alpha.f = ideo$alpha)
       rb          <- ring_bounds[[j]]
 
-      draw_ring(rb["r0"], rb["r1"], col = ideo_bg, border = "black", lwd = 0.25)
+      if (!is.null(zoom_regions) && nrow(zoom_regions) > 1L) {
+        draw_ring_arcs(rb["r0"], rb["r1"], col = ideo_bg, border = "black", lwd = 0.25)
+      } else {
+        draw_ring(rb["r0"], rb["r1"], col = ideo_bg, border = "black", lwd = 0.25)
+      }
       df <- clip_zoom(to_df(ideo$data))
       for (ri in seq_len(nrow(df))) {
         draw_arc(pos2rad(df$start[ri]), pos2rad(df$end[ri]),
@@ -503,9 +555,14 @@ plot_genome_track <- function(
       if (!is.null(trk$alpha))
         trk$col <- grDevices::adjustcolor(trk$col, alpha.f = trk$alpha)
 
-      # background ring
-      draw_ring(rb["r0"], rb["r1"],
-                col = trk$bg.col, border = "black", lwd = 0.25)
+      # background ring (arcs with gaps when zoomed)
+      if (!is.null(zoom_regions) && nrow(zoom_regions) > 1L) {
+        draw_ring_arcs(rb["r0"], rb["r1"],
+                       col = trk$bg.col, border = "black", lwd = 0.25)
+      } else {
+        draw_ring(rb["r0"], rb["r1"],
+                  col = trk$bg.col, border = "black", lwd = 0.25)
+      }
 
       df <- clip_zoom(to_df(trk$data))
 
@@ -520,10 +577,26 @@ plot_genome_track <- function(
         r_vals <- rb["r0"] + y_norm * (rb["r1"] - rb["r0"])
         mid_pos <- (df$start + df$end) / 2
         thetas  <- pos2rad(mid_pos)
-        ord     <- order(mid_pos)
-        lines(r_vals[ord] * cos(thetas[ord]),
-              r_vals[ord] * sin(thetas[ord]),
-              col = trk$col, lwd = trk$lwd)
+        if (!is.null(zoom_regions) && nrow(zoom_regions) > 1L) {
+          # draw lines per-region to avoid connecting across gaps
+          for (zli in seq_len(nrow(zoom_regions))) {
+            reg_s <- zoom_offsets[zli]
+            reg_e <- zoom_offsets[zli] +
+                     (zoom_regions$end[zli] - zoom_regions$start[zli])
+            in_reg <- mid_pos >= reg_s & mid_pos <= reg_e
+            if (sum(in_reg) < 2L) next
+            sub_ord <- order(mid_pos[in_reg])
+            r_sub  <- r_vals[in_reg][sub_ord]
+            th_sub <- thetas[in_reg][sub_ord]
+            lines(r_sub * cos(th_sub), r_sub * sin(th_sub),
+                  col = trk$col, lwd = trk$lwd)
+          }
+        } else {
+          ord <- order(mid_pos)
+          lines(r_vals[ord] * cos(thetas[ord]),
+                r_vals[ord] * sin(thetas[ord]),
+                col = trk$col, lwd = trk$lwd)
+        }
       } else {
         # rect type
         ytop <- trk$ytop    %||% 0.98
@@ -619,6 +692,11 @@ plot_genome_track <- function(
                    col = hl_fill, border = hl_border)
         }
       }
+    }
+
+    # ---- zigzag break marks at zoom gaps ----
+    if (!is.null(zoom_has_gap) && any(zoom_has_gap) && n_draw > 0) {
+      draw_break_marks(ring_bounds[[n_draw]]["r0"], ring_bounds[[1]]["r1"])
     }
 
     # ---- legend ----

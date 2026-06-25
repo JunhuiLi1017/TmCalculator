@@ -23,7 +23,7 @@ knitr::opts_chunk$set(
 # Introduction
 
 This vignette demonstrates how to compute melting temperature (Tm) across an
-entire bacterial genome and visualise the results using **TmCalculator**. We
+entire bacterial genome and visualize the results using **TmCalculator**. We
 use *Escherichia coli* K-12 MG1655 (NCBI assembly GCF\_000005845.2 / ASM584v2)
 as the reference organism, calculating Tm for every non-overlapping 200 bp
 window along the single circular chromosome.
@@ -52,10 +52,16 @@ library(GenomicRanges)
 
 ## Step 1 — Building the *E. coli* BSgenome data package {#build-bsgenome}
 
-TmCalculator retrieves sequences from BSgenome data packages. Because an
-*E. coli* BSgenome package is not on Bioconductor, we forge one locally from
-the NCBI RefSeq assembly using **BSgenomeForge**. This step only needs to be
-run once.
+*TmCalculator* retrieves sequences from BSgenome data packages. A prebuilt
+*E. coli* package is available on Bioconductor
+(`BSgenome.Ecoli.NCBI.20080805`), but it is an older multi-strain snapshot
+and does not provide the RefSeq assembly used here
+(GCF_000005845.2, ASM584v2, sequence U00096.3). Because the MutL-AR peaks,
+microsatellite, cruciform, ssDNA, and GATC tracks are all defined against
+this assembly, we forge a matching BSgenome package locally from the NCBI
+RefSeq sequence using **BSgenomeForge**, ensuring that genome sequence and
+feature coordinates share a single reference. This step only needs to be run
+once.
 
 ```{r forge, eval=FALSE}
 library(BSgenomeForge)
@@ -73,12 +79,12 @@ install.packages(
 )
 ```
 
-The GitHub repo ships package metadata only; sequence data must be forged once.
-The chunk below installs the package (if needed), forges it from NCBI when
-the `Ecoli` genome object is still missing, then loads it. **Knit from the top**
-so this chunk runs before `load-genome`.
+During *TmCalculator* package development and vignette building (e.g. `R CMD
+check`), we cannot call `forgeBSgenomeDataPkgFromNCBI()` in the vignette
+environment, so the chunks below install the pre-forged
+`BSgenome.Ecoli.NCBI.ASM584v2` package from GitHub instead.
 
-```{r setup-ecoli-bsgenome, echo=FALSE, message=FALSE, warning=FALSE}
+```{r setup-ecoli-bsgenome, message=FALSE, warning=FALSE}
 ecoli_pkg   <- "BSgenome.Ecoli.NCBI.ASM584v2"
 genome_obj  <- "Ecoli"   # BSgenomeObjname in DESCRIPTION; not the package name
 
@@ -306,7 +312,7 @@ plot_genome_track(
   genome_name = genome_name,
   genome_size = chr_length,
   track_list  = tracks,
-  zoom        = "U00096.3:1000000-2000000"
+  zoom        = c("U00096.3:100000-500000")
 )
 ```
 
@@ -322,19 +328,8 @@ plot_genome_track(
   genome_name = genome_name,
   genome_size = chr_length,
   track_list  = tracks,
-  zoom        = c("U00096.3:1000000-1200000",
-                   "U00096.3:3000000-3200000")
-)
-```
-
-```{r zoom-multi-circular, fig.width=8, fig.height=8, fig.cap="Two zoomed regions concatenated on a circular plot. Dashed lines separate the regions."}
-plot_genome_track(
-  genome_name = genome_name,
-  genome_size = chr_length,
-  track_list  = tracks,
-  circular    = TRUE,
-  zoom        = c("U00096.3:1000000-1200000",
-                   "U00096.3:3000000-3200000")
+  zoom        = c("U00096.3:100000-500000",
+                  "U00096.3:3600000-4500000")
 )
 ```
 

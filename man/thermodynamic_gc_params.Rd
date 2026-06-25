@@ -11,7 +11,7 @@ A data frame with 8 rows and 5 columns:
   \item{B}{GC content coefficient}
   \item{C}{Length correction coefficient}
   \item{D}{Mismatch coefficient}
-  \item{salt_correction}{Associated salt correction method}
+  \item{salt_correct}{Associated salt correction method}
 }
 }
 \usage{
