@@ -86,10 +86,16 @@
                   "CT/GA", "GA/CT", "CG/GC", "GC/CG", "GG/CC")
   
   # -- DNA NN Tables -----------------------------------------------------------
+  DNA_NN_SantaLucia_2004_bug <- .complete_nn_rc(matrix(c(
+    0.2,-5.7,  2.2,6.9,  0,0,  0,0,  0,0,  0,0,  0,-1.4,
+    -7.6,-21.3,  -7.2,-20.4,  -7.2,-21.3,  -8.5,-22.7,  -8.4,-22.4,
+    -7.8,-21.0,  -8.2,-22.2,  -10.6,-27.2,  -9.8,-24.4,  -8.0,-19.9
+  ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
+  
   DNA_NN_SantaLucia_2004 <- .complete_nn_rc(matrix(c(
     0.2,-5.7,  2.2,6.9,  0,0,  0,0,  0,0,  0,0,  0,-1.4,
-    -7.6,-21.3,  -7.2,-20.4,  -7.2,-20.4,  -8.5,-22.7,  -8.4,-22.4,
-    -7.8,-21.0,  -8.2,-22.2,  -10.6,-27.2,  -9.8,-24.4,  -8.0,-19.0
+    -7.6,-21.3,  -7.2,-20.4,  -7.2,-21.3,  -8.5,-22.7,  -8.4,-22.4,
+    -7.8,-21.0,  -8.2,-22.2,  -10.6,-27.2,  -9.8,-24.4,  -8.0,-19.9
   ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
   
   DNA_NN_Breslauer_1986 <- .complete_nn_rc(matrix(c(
@@ -270,6 +276,229 @@
     stringsAsFactors = FALSE
   )
   
+  # -- Weber group (UFMG) parameter sets, from VarGibbs 5.0 -----------------
+  # Generated from the shipped .par files, full precision. Mapping verified:
+  # P-SL98/P-SG96/P-XIA98/P-FR86 reproduce the tables above exactly, and
+  # P-PY99+P-AL97+P-AL98{,B,C}+P-WT05 reproduce all 87 IMM rows exactly.
+  # Each table carries attr 'salt_mM'; do not salt-correct a set twice.
+
+  # ---- DNA, salt-resolved (Weber 2015; Fig. 3 data, never tabulated) ----
+  # AOP-OW04 at 69 mM [Na+]
+  # source: AOP-OW04-69.par
+  DNA_NN_Weber_OW04_69 <- .complete_nn_rc(matrix(c(
+         0.0000,   0.0000,     4.8549,  15.0479,     2.7622,   8.5772,     0.0000,   0.0000,
+         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,  -0.5873,    -6.8315, -20.4105,
+        -3.0941,  -8.7078,   -10.4021, -32.1233,   -14.7626, -43.1062,    -0.0815,   1.5161,
+        -7.4408, -20.5458,    -6.1987, -17.9548,   -14.9050, -41.4616,    -1.8135,  -2.2130,
+        -9.0220, -24.7968
+  ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
+  attr(DNA_NN_Weber_OW04_69, "salt_mM") <- 69
+
+  # AOP-OW04 at 119 mM [Na+]
+  # source: AOP-OW04-119.par
+  DNA_NN_Weber_OW04_119 <- .complete_nn_rc(matrix(c(
+         0.0000,   0.0000,     4.0569,  11.1000,     2.2427,   5.4788,     0.0000,   0.0000,
+         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,  -0.5873,    -7.5348, -22.2100,
+        -0.4697,  -0.6289,   -13.8995, -42.2140,   -16.2807, -46.9669,     0.2914,   2.7872,
+        -6.2247, -16.5012,    -8.2538, -23.7549,   -15.3115, -41.9659,    -3.1981,  -6.0332,
+       -10.4625, -28.5610
+  ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
+  attr(DNA_NN_Weber_OW04_119, "salt_mM") <- 119
+
+  # AOP-OW04 at 220 mM [Na+]
+  # source: AOP-OW04-220.par
+  DNA_NN_Weber_OW04_220 <- .complete_nn_rc(matrix(c(
+         0.0000,   0.0000,     4.3309,  12.6063,     2.4710,   6.7606,     0.0000,   0.0000,
+         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,  -0.5873,    -7.4688, -21.6832,
+        -0.8398,  -1.8294,   -12.9102, -38.6391,   -15.5770, -44.4811,     0.7896,   4.1875,
+        -6.7601, -18.0953,    -7.5420, -21.2968,   -15.6929, -43.0770,    -2.5826,  -4.1353,
+        -9.8508, -26.5768
+  ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
+  attr(DNA_NN_Weber_OW04_220, "salt_mM") <- 220
+
+  # AOP-OW04 at 621 mM [Na+]
+  # source: AOP-OW04-621.par
+  DNA_NN_Weber_OW04_621 <- .complete_nn_rc(matrix(c(
+         0.0000,   0.0000,     2.8755,  10.9634,     1.4790,   6.6027,     0.0000,   0.0000,
+         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,  -0.5873,    -5.7538, -16.2941,
+        -0.4605,  -0.5974,   -10.7988, -31.9130,   -10.7744, -30.3081,    -0.8610,  -0.9626,
+        -4.1898, -10.7677,    -7.2483, -20.2750,   -10.5953, -28.4924,    -4.4725, -10.2831,
+        -8.1045, -21.6798
+  ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
+  attr(DNA_NN_Weber_OW04_621, "salt_mM") <- 621
+
+  # AOP-OW04 at 1020 mM [Na+]
+  # source: AOP-OW04-1020.par
+  DNA_NN_Weber_OW04_1020 <- .complete_nn_rc(matrix(c(
+         0.0000,   0.0000,     6.4573,  16.9991,     4.8550,  11.8191,     0.0000,   0.0000,
+         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,  -0.5873,    -8.6278, -24.3084,
+        -2.1846,  -5.6406,   -13.8317, -40.2750,   -15.0245, -41.9995,    -1.7673,  -3.2100,
+        -6.9985, -18.5138,    -9.5341, -26.2352,   -14.4129, -38.8461,    -6.7989, -15.8173,
+       -11.0161, -29.2985
+  ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
+  attr(DNA_NN_Weber_OW04_1020, "salt_mM") <- 1021
+
+  # ---- DNA, general purpose ----
+  # AOP-CMB, combined dataset (recommended DNA set)
+  # source: AOP-CMB.par
+  DNA_NN_Weber_2015 <- .complete_nn_rc(matrix(c(
+         0.0000,   0.0000,     2.5326,   5.6637,     0.4900,  -0.6757,     0.0000,   0.0000,
+         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,  -0.5873,    -7.2009, -20.2175,
+        -5.6921, -15.8947,    -4.0774, -11.3388,    -8.5782, -23.1654,    -7.2564, -19.3191,
+        -6.4646, -17.0925,    -7.1036, -18.9155,    -9.7028, -24.8796,    -9.5938, -24.4371,
+        -8.7684, -22.7375
+  ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
+  attr(DNA_NN_Weber_2015, "salt_mM") <- 1020
+
+  # ---- RNA, measured at five salts, VIF scheme ----
+  # AOP-VIF at 71 mM [Na+]
+  # source: AOP-VIFRW-71.par
+  RNA_NN_Weber_VIF_71 <- .complete_nn_rc(matrix(c(
+         3.4085,   0.2886,     4.6722,  12.4606,     0.0000,   0.0000,     0.0000,   0.0000,
+         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,  -1.4000,    -5.3315, -14.8085,
+       -10.2716, -29.6132,   -10.3296, -31.9802,   -10.3505, -29.3566,   -12.4315, -32.9656,
+       -11.5553, -31.1152,   -12.1350, -33.8251,   -10.6616, -27.9859,   -14.2091, -36.2688,
+       -12.8534, -32.1972
+  ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
+  attr(RNA_NN_Weber_VIF_71, "salt_mM") <- 71
+
+  # AOP-VIF at 121 mM [Na+]
+  # source: AOP-VIFRW-121.par
+  RNA_NN_Weber_VIF_121 <- .complete_nn_rc(matrix(c(
+         2.3170,   0.2578,     5.6296,  15.1423,     0.0000,   0.0000,     0.0000,   0.0000,
+         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,  -1.4000,    -9.5363, -28.9960,
+       -11.4066, -32.4378,   -10.5677, -33.7691,   -10.1748, -29.8826,   -12.2827, -32.2623,
+       -11.3606, -30.2829,   -12.8637, -37.1318,   -10.8907, -29.1438,   -13.9826, -35.8758,
+       -11.6163, -28.9123
+  ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
+  attr(RNA_NN_Weber_VIF_121, "salt_mM") <- 121
+
+  # AOP-VIF at 221 mM [Na+]
+  # source: AOP-VIFRW-221.par
+  RNA_NN_Weber_VIF_221 <- .complete_nn_rc(matrix(c(
+         2.4417,  -1.2287,     5.2434,  14.1869,     0.0000,   0.0000,     0.0000,   0.0000,
+         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,  -1.4000,    -7.2734, -20.9687,
+       -11.0415, -30.9510,    -9.4127, -29.3164,   -11.1475, -32.0746,   -11.7833, -30.3817,
+       -12.4938, -33.5013,   -11.9556, -33.3326,   -11.9159, -31.8045,   -13.5035, -33.7292,
+       -11.8934, -29.0209
+  ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
+  attr(RNA_NN_Weber_VIF_221, "salt_mM") <- 221
+
+  # AOP-VIF at 621 mM [Na+]
+  # source: AOP-VIFRW-621.par
+  RNA_NN_Weber_VIF_621 <- .complete_nn_rc(matrix(c(
+         2.0381,  -0.7355,     4.7624,  12.6860,     0.0000,   0.0000,     0.0000,   0.0000,
+         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,  -1.4000,    -5.0673, -13.7959,
+       -12.0086, -33.5987,    -9.4331, -29.1261,   -12.3988, -36.0577,   -13.1418, -34.7699,
+       -11.6446, -30.8224,   -11.9930, -33.4713,   -11.8000, -31.5396,   -13.1341, -32.6632,
+       -11.4641, -27.8822
+  ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
+  attr(RNA_NN_Weber_VIF_621, "salt_mM") <- 621
+
+  # AOP-VIF at 1021 mM [Na+]
+  # source: AOP-VIFRW-1021.par
+  RNA_NN_Weber_VIF_1021 <- .complete_nn_rc(matrix(c(
+         5.2375,   1.0265,     1.8683,   4.8400,     0.0000,   0.0000,     0.0000,   0.0000,
+         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,  -1.4000,    -6.9088, -18.9939,
+       -12.3315, -35.5068,   -11.1870, -31.5678,    -9.2476, -22.8267,   -13.0887, -34.4079,
+       -11.4727, -29.7037,   -13.2535, -34.7600,   -12.2039, -30.9536,   -15.5716, -38.5593,
+       -15.0523, -36.9921
+  ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
+  attr(RNA_NN_Weber_VIF_1021, "salt_mM") <- 1021
+
+  # ---- RNA, measured at five salts, FIF scheme ----
+  # AOP-FIF at 71 mM [Na+]
+  # source: AOP-FIFRW-71.par
+  RNA_NN_Weber_FIF_71 <- .complete_nn_rc(matrix(c(
+         3.6100,  -1.5000,     3.7200,  10.5000,     0.0000,   0.0000,     0.0000,   0.0000,
+         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,  -1.4000,    -5.6583, -15.6834,
+        -8.5043, -25.9600,   -10.5270, -30.0115,   -11.0010, -29.8012,   -11.8700, -31.8195,
+       -10.7268, -29.1405,   -12.8979, -34.6410,   -10.5983, -27.3390,   -14.6024, -36.9660,
+       -13.3232, -33.1294
+  ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
+  attr(RNA_NN_Weber_FIF_71, "salt_mM") <- 71
+
+  # AOP-FIF at 121 mM [Na+]
+  # source: AOP-FIFRW-121.par
+  RNA_NN_Weber_FIF_121 <- .complete_nn_rc(matrix(c(
+         3.6100,  -1.5000,     3.7200,  10.5000,     0.0000,   0.0000,     0.0000,   0.0000,
+         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,  -1.4000,   -10.6106, -31.9905,
+        -7.5798, -22.7640,   -11.5058, -32.8953,   -11.7860, -32.2437,   -11.1365, -29.0034,
+        -9.6600, -25.3309,   -14.8961, -40.8555,   -10.9362, -28.2149,   -15.0954, -38.0510,
+       -12.9669, -31.8119
+  ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
+  attr(RNA_NN_Weber_FIF_121, "salt_mM") <- 121
+
+  # AOP-FIF at 221 mM [Na+]
+  # source: AOP-FIFRW-221.par
+  RNA_NN_Weber_FIF_221 <- .complete_nn_rc(matrix(c(
+         3.6100,  -1.5000,     3.7200,  10.5000,     0.0000,   0.0000,     0.0000,   0.0000,
+         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,  -1.4000,    -7.7054, -22.0235,
+        -8.4715, -24.8591,   -10.0105, -28.2728,   -12.2437, -33.5058,   -11.0624, -28.5283,
+       -11.3271, -30.2921,   -13.3287, -35.6580,   -12.0183, -31.3994,   -14.3687, -35.5373,
+       -13.0358, -31.6893
+  ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
+  attr(RNA_NN_Weber_FIF_221, "salt_mM") <- 221
+
+  # AOP-FIF at 621 mM [Na+]
+  # source: AOP-FIFRW-621.par
+  RNA_NN_Weber_FIF_621 <- .complete_nn_rc(matrix(c(
+         3.6100,  -1.5000,     3.7200,  10.5000,     0.0000,   0.0000,     0.0000,   0.0000,
+         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,  -1.4000,    -5.8155, -15.6770,
+        -9.0920, -26.3098,   -10.2523, -28.5906,   -13.3474, -36.6460,   -12.7358, -33.5822,
+       -10.4105, -27.1001,   -13.6846, -36.4177,   -11.7763, -30.4166,   -14.5406, -35.7457,
+       -13.1793, -31.8911
+  ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
+  attr(RNA_NN_Weber_FIF_621, "salt_mM") <- 621
+
+  # AOP-FIF at 1021 mM [Na+]
+  # source: AOP-FIFRW-1021.par
+  RNA_NN_Weber_FIF_1021 <- .complete_nn_rc(matrix(c(
+         3.6100,  -1.5000,     3.7200,  10.5000,     0.0000,   0.0000,     0.0000,   0.0000,
+         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,  -1.4000,    -6.4314, -17.6766,
+       -12.7794, -37.0377,   -13.5099, -39.1452,    -8.3871, -20.6134,   -12.5166, -33.0215,
+       -10.0627, -25.7313,   -13.4641, -35.8415,   -10.8365, -27.2504,   -14.7595, -36.6631,
+       -13.6056, -33.2045
+  ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
+  attr(RNA_NN_Weber_FIF_1021, "salt_mM") <- 1021
+
+  # ---- DNA/RNA hybrid ----
+  # AOP-DRFT, curve fitting (recommended high salt)
+  # source: AOP-DRFT.par
+  RNA_DNA_NN_Weber_2019_FT <- matrix(c(
+         1.4943,  -8.5131,     0.0000,   0.0000,     0.0000,   0.0000,     0.0000,   0.0000,
+         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,   0.0000,    -8.2694, -25.2054,
+        -9.3923, -25.2281,   -10.8693, -31.0383,    -9.8990, -28.5875,    -9.7935, -26.2840,
+       -11.9087, -28.2205,   -12.6023, -33.6818,   -12.2978, -33.1193,   -11.5436, -33.0019,
+       -13.4801, -34.4699,   -12.4230, -32.8537,   -11.7433, -31.0498,    -9.5595, -28.8683,
+        -9.7656, -25.4503,   -11.4676, -32.1090,   -10.2758, -29.8576
+  ), ncol=2, byrow=TRUE, dimnames=list(hybrid_rows, nn_col))
+  attr(RNA_DNA_NN_Weber_2019_FT, "salt_mM") <- 1000
+
+  # AOP-DRVH, Van't Hoff
+  # source: AOP-DRVH.par
+  RNA_DNA_NN_Weber_2019_VH <- matrix(c(
+         1.5947,  -8.6455,     0.0000,   0.0000,     0.0000,   0.0000,     0.0000,   0.0000,
+         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,   0.0000,    -7.7206, -23.8767,
+       -11.4595, -31.6731,   -10.5706, -30.0225,    -9.8591, -28.5101,   -10.6942, -29.0233,
+       -11.3728, -26.5422,   -13.0108, -35.1695,   -12.1751, -32.9612,   -11.6522, -32.9572,
+       -14.0583, -35.7112,   -12.4383, -32.9497,   -10.5935, -27.3484,   -10.2428, -30.8614,
+        -9.5993, -24.4245,   -10.7358, -29.8654,    -9.9268, -28.6058
+  ), ncol=2, byrow=TRUE, dimnames=list(hybrid_rows, nn_col))
+  attr(RNA_DNA_NN_Weber_2019_VH, "salt_mM") <- 1000
+
+  # AOP-DRLS, low salt
+  # source: AOP-DRLS.par
+  RNA_DNA_NN_Weber_2019_LS <- matrix(c(
+         0.9630,  -6.5119,     0.0000,   0.0000,     0.0000,   0.0000,     0.0000,   0.0000,
+         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,   0.0000,   -10.8561, -35.9011,
+       -10.2316, -29.0019,    -8.6009, -22.9547,    -9.4736, -30.5491,    -9.5454, -25.1770,
+       -11.8223, -30.8244,   -11.9288, -29.9238,   -12.2281, -33.2457,    -8.7011, -25.6312,
+        -8.4153, -22.4119,    -7.4720, -19.3490,   -12.7010, -37.8656,    -9.9307, -30.7749,
+       -12.2396, -33.9475,   -13.8697, -37.9789,   -10.6987, -32.0137
+  ), ncol=2, byrow=TRUE, dimnames=list(hybrid_rows, nn_col))
+  attr(RNA_DNA_NN_Weber_2019_LS, "salt_mM") <- 100
+
   # -- Return assembled list ------------------------------------------------
   list(
     DNA_NN_Breslauer_1986    = DNA_NN_Breslauer_1986,
@@ -284,7 +513,28 @@
     DNA_TMM_Bommarito_2000   = DNA_TMM_Bommarito_2000,
     DNA_DE_Bommarito_2000    = DNA_DE_Bommarito_2000,
     RNA_DE_Turner_2010       = RNA_DE_Turner_2010,
-    GC_VARTAB                = GC_VARTAB
+    GC_VARTAB                = GC_VARTAB,
+
+    # -- Weber group sets ---------------------------------------------------
+    DNA_NN_Weber_OW04_69     = DNA_NN_Weber_OW04_69,
+    DNA_NN_Weber_OW04_119    = DNA_NN_Weber_OW04_119,
+    DNA_NN_Weber_OW04_220    = DNA_NN_Weber_OW04_220,
+    DNA_NN_Weber_OW04_621    = DNA_NN_Weber_OW04_621,
+    DNA_NN_Weber_OW04_1020   = DNA_NN_Weber_OW04_1020,
+    DNA_NN_Weber_2015        = DNA_NN_Weber_2015,
+    RNA_NN_Weber_VIF_71      = RNA_NN_Weber_VIF_71,
+    RNA_NN_Weber_VIF_121     = RNA_NN_Weber_VIF_121,
+    RNA_NN_Weber_VIF_221     = RNA_NN_Weber_VIF_221,
+    RNA_NN_Weber_VIF_621     = RNA_NN_Weber_VIF_621,
+    RNA_NN_Weber_VIF_1021    = RNA_NN_Weber_VIF_1021,
+    RNA_NN_Weber_FIF_71      = RNA_NN_Weber_FIF_71,
+    RNA_NN_Weber_FIF_121     = RNA_NN_Weber_FIF_121,
+    RNA_NN_Weber_FIF_221     = RNA_NN_Weber_FIF_221,
+    RNA_NN_Weber_FIF_621     = RNA_NN_Weber_FIF_621,
+    RNA_NN_Weber_FIF_1021    = RNA_NN_Weber_FIF_1021,
+    RNA_DNA_NN_Weber_2019_FT = RNA_DNA_NN_Weber_2019_FT,
+    RNA_DNA_NN_Weber_2019_VH = RNA_DNA_NN_Weber_2019_VH,
+    RNA_DNA_NN_Weber_2019_LS = RNA_DNA_NN_Weber_2019_LS
   )
 }
 
@@ -298,7 +548,15 @@
   standard_tables <- c("DNA_NN_Breslauer_1986","DNA_NN_Sugimoto_1996",
                        "DNA_NN_Allawi_1998","DNA_NN_SantaLucia_2004",
                        "RNA_NN_Freier_1986","RNA_NN_Xia_1998",
-                       "RNA_NN_Chen_2012","RNA_DNA_NN_Sugimoto_1995")
+                       "RNA_NN_Chen_2012","RNA_DNA_NN_Sugimoto_1995",
+                       "DNA_NN_Weber_2015","DNA_NN_Weber_OW04_69",
+                       "DNA_NN_Weber_OW04_119","DNA_NN_Weber_OW04_220",
+                       "DNA_NN_Weber_OW04_621","DNA_NN_Weber_OW04_1020",
+                       "RNA_NN_Weber_VIF_71","RNA_NN_Weber_VIF_121",
+                       "RNA_NN_Weber_VIF_221","RNA_NN_Weber_VIF_621",
+                       "RNA_NN_Weber_VIF_1021","RNA_NN_Weber_FIF_71",
+                       "RNA_NN_Weber_FIF_121","RNA_NN_Weber_FIF_221",
+                       "RNA_NN_Weber_FIF_621","RNA_NN_Weber_FIF_1021")
   
   all_ok <- TRUE
   for (nm in standard_tables) {
@@ -309,6 +567,27 @@
     cat(sprintf("  %-35s  rows=%-3d  %s\n", nm, n_rows, status))
     if (length(missing) > 0) all_ok <- FALSE
   }
+  # -- Weber sets must all carry a salt attribute --------------------------
+  weber <- grep("Weber", names(tbl_list), value = TRUE)
+  cat("\n  salt attributes on Weber sets:\n")
+  for (nm in weber) {
+    s <- attr(tbl_list[[nm]], "salt_mM")
+    cat(sprintf("  %-28s %8s mM  %s\n", nm,
+                if (is.null(s)) "NA" else format(s),
+                if (!is.null(s) && !is.na(s)) "OK" else "MISSING"))
+    if (is.null(s) || is.na(s)) all_ok <- FALSE
+  }
+
+  # -- Published values that were previously mistranscribed -----------------
+  sl <- tbl_list$DNA_NN_SantaLucia_2004
+  ref <- list("TA/AT" = c(-7.2, -21.3), "GG/CC" = c(-8.0, -19.9))
+  cat("\n  SantaLucia 2004 spot checks (vs P-SL04.par and P-SL98.par):\n")
+  for (k in names(ref)) {
+    ok <- isTRUE(all.equal(unname(sl[k, ]), ref[[k]], tolerance = 1e-8))
+    cat(sprintf("  %-28s %s\n", k, if (ok) "OK" else "FAIL"))
+    if (!ok) all_ok <- FALSE
+  }
+
   if (all_ok) {
     cat("\nAll tables complete. keys_fr lookups will always succeed.\n")
     cat("The keys_rf / pos_nn_rf fallback in tm_nn_core() can now be removed.\n")

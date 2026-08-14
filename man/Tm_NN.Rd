@@ -10,7 +10,14 @@ tm_nn(
   shift = 0,
   nn_table = c("DNA_NN_SantaLucia_2004", "DNA_NN_Breslauer_1986", "DNA_NN_Sugimoto_1996",
     "DNA_NN_Allawi_1998", "RNA_NN_Freier_1986", "RNA_NN_Xia_1998", "RNA_NN_Chen_2012",
-    "RNA_DNA_NN_Sugimoto_1995"),
+    "RNA_DNA_NN_Sugimoto_1995", "DNA_NN_Weber_2015", "DNA_NN_Weber_OW04_69",
+    "DNA_NN_Weber_OW04_119", "DNA_NN_Weber_OW04_220", "DNA_NN_Weber_OW04_621",
+    "DNA_NN_Weber_OW04_1020", "RNA_NN_Weber_VIF_71", "RNA_NN_Weber_VIF_121",
+    "RNA_NN_Weber_VIF_221", "RNA_NN_Weber_VIF_621", "RNA_NN_Weber_VIF_1021",
+    "RNA_NN_Weber_FIF_71", "RNA_NN_Weber_FIF_121", 
+     "RNA_NN_Weber_FIF_221",
+    "RNA_NN_Weber_FIF_621", "RNA_NN_Weber_FIF_1021", "RNA_DNA_NN_Weber_2019_FT",
+    "RNA_DNA_NN_Weber_2019_VH", "RNA_DNA_NN_Weber_2019_LS"),
   tmm_table = "DNA_TMM_Bommarito_2000",
   imm_table = "DNA_IMM_Peyret_1999",
   de_table = c("DNA_DE_Bommarito_2000", "RNA_DE_Turner_2010"),
@@ -23,7 +30,7 @@ tm_nn(
   Mg = 0,
   dNTPs = 0,
   salt_method = c("Schildkraut2010", "Wetmur1991", "SantaLucia1996", "SantaLucia1998-1",
-    "Owczarzy2004", "Owczarzy2008"),
+    "Owczarzy2004", "Owczarzy2008", "none"),
   DMSO = 0,
   formamide_unit = list(value = 0, unit = "percent"),
   dmso_factor = 0.75,
@@ -61,21 +68,38 @@ to_genomic_ranges() function.}
   - Specific alignment positions are needed}
 
 \item{nn_table}{Thermodynamic nearest-neighbor parameters for different nucleic acid hybridizations.
-  Eight parameter sets are available, organized by hybridization type:
+  Twenty-seven parameter sets are available, organized by hybridization type.
+  Sets marked with a sodium concentration were fitted at that condition and
+  are not salt-corrected further (see the "Choosing a parameter set" section).
 
-  DNA/DNA hybridizations:
+  DNA/DNA hybridizations, reference salt:
   - "DNA_NN_Breslauer_1986": Original DNA/DNA parameters
   - "DNA_NN_Sugimoto_1996": Improved DNA/DNA parameters
   - "DNA_NN_Allawi_1998": DNA/DNA parameters with internal mismatch corrections
-  - "DNA_NN_SantaLucia_2004": Updated DNA/DNA parameters
+  - "DNA_NN_SantaLucia_2004": Unified DNA/DNA parameters (default)
 
-  RNA/RNA hybridizations:
+  DNA/DNA hybridizations, melting-temperature optimized (Weber 2015):
+  - "DNA_NN_Weber_2015": Combined dataset, 1020 mM. Recommended when a
+    salt-optimized DNA set is wanted at high salt
+  - "DNA_NN_Weber_OW04_69", "...119", "...220", "...621", "...1020":
+    fitted independently at 69, 119, 220, 621 and 1020 mM sodium
+
+  RNA/RNA hybridizations, reference salt:
   - "RNA_NN_Freier_1986": Original RNA/RNA parameters
   - "RNA_NN_Xia_1998": Improved RNA/RNA parameters
   - "RNA_NN_Chen_2012": Updated RNA/RNA parameters with GU pair corrections
 
+  RNA/RNA hybridizations, salt-optimized (Ferreira 2019). VIF (variable
+  initiation factors) gave better cross-validation than FIF (fixed):
+  - "RNA_NN_Weber_VIF_71", "...121", "...221", "...621", "...1021"
+  - "RNA_NN_Weber_FIF_71", "...121", "...221", "...621", "...1021"
+
   RNA/DNA hybridizations:
-  - "RNA_DNA_NN_Sugimoto_1995": RNA/DNA hybridization parameters}
+  - "RNA_DNA_NN_Sugimoto_1995": RNA/DNA hybridization parameters
+  - "RNA_DNA_NN_Weber_2019_FT": curve-fitting derived, 1000 mM. Best
+    performing high-salt hybrid set in Basilio Barbosa (2019)
+  - "RNA_DNA_NN_Weber_2019_VH": van't Hoff derived, 1000 mM
+  - "RNA_DNA_NN_Weber_2019_LS": low salt, 100 mM}
 
 \item{tmm_table}{Thermodynamic parameters for terminal mismatches. Default: "DNA_TMM_Bommarito_2000"
 These parameters account for mismatches at the ends of the duplex.}
@@ -114,10 +138,14 @@ Available options:
 - "Wetmur1991": Classic salt correction method
 - "SantaLucia1996": DNA-specific salt correction
 - "SantaLucia1998-1": Improved DNA salt correction
-- "SantaLucia1998-2": Alternative DNA salt correction
 - "Owczarzy2004": Comprehensive salt correction
 - "Owczarzy2008": Updated comprehensive salt correction
-Note: Setting to NA disables salt correction}
+- "none": Disables salt correction entirely
+Note: Parameter sets fitted at a specific sodium concentration (those
+carrying a "salt_mM" attribute, i.e. the Weber/VarGibbs series) already
+account for salt. When the requested \code{Na} matches the concentration
+such a set was fitted at, salt correction is skipped automatically; when
+it does not, a warning is issued.}
 
 \item{DMSO}{Percent DMSO concentration in the reaction mixture. Default: 0
 DMSO can lower the melting temperature of nucleic acid duplexes.}
@@ -135,10 +163,26 @@ Other published values: 0.5, 0.6, 0.675}
 Default: 0.65
 Literature reports values ranging from 0.6 to 0.72}
 }
+\value{
+A \code{TmCalculator} list with:
+  \item{\code{gr}}{The input \code{GRanges} with metadata columns \code{Tm}
+    and \code{GC} (melting temperature in \eqn{^{\circ}}C and GC percent).
+    Sequences that could not be evaluated receive \code{NA}.}
+  \item{\code{options}}{The calculation parameters actually used, including
+    the parameter tables and their citations, ion and additive
+    concentrations, \code{Salt correction method}, and two fields recording
+    how salt was handled: \code{Salt correction applied} (logical) and
+    \code{Parameter set fitted at [Na+] (mM)}, which is \code{NA} for
+    reference-salt sets. Regions skipped for containing \code{N} are listed
+    in \code{Skipped regions containing N}.}
+}
 \description{
-Calculate melting temperature using nearest neighbor thermodynamics. The function checks if all
-sequence combinations in the input sequence are present in the thermodynamic parameter tables
-before performing calculations.
+Calculates melting temperature (Tm) from nearest-neighbor (NN) thermodynamics,
+summing the stacking enthalpies and entropies of adjacent base-pair steps and
+applying initiation, symmetry, salt and chemical corrections. Terminal
+mismatches, internal mismatches and dangling ends are supported through
+dedicated parameter tables. The function verifies that every dinucleotide step
+in the input sequence is present in the selected tables before calculating.
 }
 \details{
 DNA_NN_Breslauer_1986: Breslauer K J (1986) <doi:10.1073/pnas.83.11.3746>
@@ -156,7 +200,30 @@ DNA_NN_Breslauer_1986: Breslauer K J (1986) <doi:10.1073/pnas.83.11.3746>
  RNA_NN_Chen_2012: Chen JL (2012) <doi:10.1021/bi3002709>
  
  RNA_DNA_NN_Sugimoto_1995: Sugimoto N (1995)<doi:10.1016/S0048-9697(98)00088-6>
- 
+
+ The following sets were derived by melting-temperature optimization and are
+ fitted at the sodium concentration given in parentheses. They are not
+ salt-corrected further; see the \dQuote{Choosing a parameter set} section.
+
+ DNA_NN_Weber_2015 (1020 mM): Weber G (2015) <doi:10.1093/bioinformatics/btu751>
+
+ DNA_NN_Weber_OW04_69 (69 mM), DNA_NN_Weber_OW04_119 (119 mM),
+ DNA_NN_Weber_OW04_220 (220 mM), DNA_NN_Weber_OW04_621 (621 mM),
+ DNA_NN_Weber_OW04_1020 (1020 mM): Weber G (2015) <doi:10.1093/bioinformatics/btu751>
+
+ RNA_NN_Weber_VIF_71 (71 mM), RNA_NN_Weber_VIF_121 (121 mM),
+ RNA_NN_Weber_VIF_221 (221 mM), RNA_NN_Weber_VIF_621 (621 mM),
+ RNA_NN_Weber_VIF_1021 (1021 mM): Ferreira I (2019) <doi:10.1016/j.chemphys.2019.01.016>,
+ variable initiation factors
+
+ RNA_NN_Weber_FIF_71 (71 mM), RNA_NN_Weber_FIF_121 (121 mM),
+ RNA_NN_Weber_FIF_221 (221 mM), RNA_NN_Weber_FIF_621 (621 mM),
+ RNA_NN_Weber_FIF_1021 (1021 mM): Ferreira I (2019) <doi:10.1016/j.chemphys.2019.01.016>,
+ fixed initiation factors
+
+ RNA_DNA_NN_Weber_2019_FT (1000 mM), RNA_DNA_NN_Weber_2019_VH (1000 mM),
+ RNA_DNA_NN_Weber_2019_LS (100 mM): Basilio Barbosa V (2019) <doi:10.1016/j.bpc.2019.106189>
+
  DNA_TMM_Bommarito_2000: Bommarito S (2000)  <doi:10.1093/nar/28.9.1929>
  
  DNA_IMM_Peyret_1999: Peyret N (1999) <doi:10.1021/bi9825091> & Allawi H T (1997) <doi:10.1021/bi962590c> & Santalucia N (2005) <doi:10.1093/nar/gki918>
@@ -165,6 +232,28 @@ DNA_NN_Breslauer_1986: Breslauer K J (1986) <doi:10.1073/pnas.83.11.3746>
  
  RNA_DE_Turner_2010: Turner D H (2010) <doi:10.1093/nar/gkp892>
 }
+\section{Choosing a parameter set}{
+
+Parameter sets fall into two families that are handled differently.
+
+\strong{Reference-salt sets} (Breslauer 1986, Sugimoto 1996, Allawi 1998,
+SantaLucia 2004, Freier 1986, Xia 1998, Chen 2012, Sugimoto 1995) were fitted
+at a single reference sodium concentration, and other conditions are reached
+by applying one of the \code{salt_method} correction formulas.
+
+\strong{Condition-specific sets} (the Weber/VarGibbs series) were instead
+fitted directly at a stated sodium concentration and are intended to
+\emph{replace} salt correction rather than be corrected. Each carries a
+\code{salt_mM} attribute. When the requested \code{Na} matches that value,
+salt correction is skipped automatically; when it does not, the correction is
+still applied but a warning is issued, since correcting an already
+condition-specific set double-counts the ionic effect. Whether a correction
+was applied is recorded in the returned \code{options}.
+
+As a rule of thumb, pick the set whose fitted salt is closest to your
+experimental condition rather than correcting a distant one.
+}
+
 \examples{
 
 input_seq <- c("AAAATTTTTTTCCCCCCCCCCCCCCGGGGGGGGGGGGTGTGCGCTGC",
@@ -172,6 +261,13 @@ input_seq <- c("AAAATTTTTTTCCCCCCCCCCCCCCGGGGGGGGGGGGTGTGCGCTGC",
 seqs <- to_genomic_ranges(input_seq)
 out <- tm_nn(seqs, Na=50)
 out
+
+# A parameter set fitted at a stated sodium concentration. Because Na
+# matches the concentration the set was fitted at, salt correction is
+# skipped automatically rather than applied on top of it.
+out_ls <- tm_nn(seqs, nn_table = "RNA_DNA_NN_Weber_2019_LS", Na = 100)
+out_ls$options[["Salt correction applied"]]
+out_ls$options[["Parameter set fitted at [Na+] (mM)"]]
 
 }
 \references{
@@ -200,6 +296,16 @@ Allawi H, SantaLucia J: Thermodynamics and NMR of internal G-T mismatches in DNA
 Santalucia N E W J . Nearest-neighbor thermodynamics of deoxyinosine pairs in DNA duplexes[J]. Nucleic Acids Research, 2005, 33(19):6258-67.
 
 Peyret N , Seneviratne P A , Allawi H T , et al. Nearest-Neighbor Thermodynamics and NMR of DNA Sequences with Internal A-A, C-C, G-G, and T-T Mismatches, [J]. Biochemistry, 1999, 38(12):3468-3477.
+
+Weber G. Optimization method for obtaining nearest-neighbour DNA entropies and enthalpies directly from melting temperatures[J]. Bioinformatics, 2015, 31(6):871-877.
+
+Ferreira I, Jolley E A, Znosko B M, et al. Replacing salt correction factors with optimized RNA nearest-neighbour enthalpy and entropy parameters[J]. Chemical Physics, 2019, 521:69-76.
+
+Basilio Barbosa V, de Oliveira Martins E, Weber G. Nearest-neighbour parameters optimized for melting temperature prediction of DNA/RNA hybrids at high and low salt concentrations[J]. Biophysical Chemistry, 2019, 251:106189.
+}
+\seealso{
+\code{\link{tm_calculate}} for a single entry point to the
+  nearest-neighbor, GC-content and Wallace methods.
 }
 \author{
 Junhui Li

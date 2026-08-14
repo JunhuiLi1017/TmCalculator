@@ -22,11 +22,27 @@ knitr::opts_chunk$set(
 
 # Introduction
 
-This vignette demonstrates how to compute melting temperature (Tm) across an
-entire bacterial genome and visualize the results using **TmCalculator**. We
-use *Escherichia coli* K-12 MG1655 (NCBI assembly GCF\_000005845.2 / ASM584v2)
-as the reference organism, calculating Tm for every non-overlapping 200 bp
-window along the single circular chromosome.
+Hasenauer FC, Barreto HC, Lotton C, Matic I (2025). Genome-wide mapping of
+spontaneous DNA replication error-hotspots using mismatch repair proteins in
+rapidly proliferating *Escherichia coli*. *Nucleic Acids Research*
+**53**(2): gkae1196. <doi:10.1093/nar/gkae1196>.
+
+Spontaneous DNA replication errors are not randomly distributed along the
+*Escherichia coli* chromosome. Hasenauer *et al.* (2025) mapped these
+hotspots genome-wide by tagging the mismatch-repair protein MutL in rapidly
+proliferating *mutH*-deficient cells, where mismatches can be detected but
+not corrected. MutL ChIP-seq peaks (MutL-associated regions, MutL-AR) are
+enriched for sequences of lower thermal stability, mononucleotide repeats
+(microsatellites), cruciform-forming DNA, and single-stranded DNA, and are
+depleted for GATC methylation sites. These associations motivate a direct
+comparison between replication-error hotspots and local DNA melting
+temperature (Tm).
+
+This vignette uses **TmCalculator** to compute Tm across the *E. coli* K-12
+MG1655 genome (NCBI assembly GCF\_000005845.2 / ASM584v2) for every
+non-overlapping 200 bp window, then overlays the Hasenauer *et al.*
+annotation tracks (shipped as `ecoli_rep_hotspots`) to ask whether MutL-AR
+windows differ in Tm and GC content from the rest of the chromosome.
 
 The workflow covers five steps:
 
@@ -219,15 +235,16 @@ customisable legends.
 
 ## Assemble the track list
 
-We overlay the Tm/GC profile with four independently measured genomic datasets:
+We overlay the Tm/GC profile with the Hasenauer *et al.* (2025) multi-omics
+layers from `ecoli_rep_hotspots`:
 
-| Track | Source |
-|-------|--------|
-| MutL-AR | MutL protein ChIP-seq peaks (mismatch-repair activity) |
-| Microsatellites | Tandem-repeat density per 200 bp bin |
-| Cruciform | Cruciform-forming sequence density per 200 bp bin |
-| ssDNA | Single-stranded DNA regions |
-| GATC sites | GATC methylation-site density per 200 bp bin |
+| Track | Description |
+|-------|-------------|
+| MutL-AR | MutL ChIP-seq peaks marking replication-error / mismatch-repair hotspots |
+| Microsatellites | Tandem-repeat (mononucleotide-repeat) density per 1 kb bin |
+| Cruciform | Cruciform-forming sequence density per 1 kb bin |
+| ssDNA | Single-stranded DNA regions enriched near error hotspots |
+| GATC sites | Dam methylation-site (5'-GATC-3') density per 1 kb bin |
 
 ```{r track-list}
 # Reference labels: replication origin (ori) and terminus (dif)
@@ -328,6 +345,7 @@ plot_genome_track(
   genome_name = genome_name,
   genome_size = chr_length,
   track_list  = tracks,
+  circular    = TRUE,
   zoom        = c("U00096.3:100000-500000",
                   "U00096.3:3600000-4500000")
 )

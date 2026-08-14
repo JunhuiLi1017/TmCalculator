@@ -1,8 +1,31 @@
 #' Calculate melting temperature using nearest neighbor thermodynamics
-#' 
-#' Calculate melting temperature using nearest neighbor thermodynamics. The function checks if all
-#' sequence combinations in the input sequence are present in the thermodynamic parameter tables
-#' before performing calculations.
+#'
+#' Calculates melting temperature (Tm) from nearest-neighbor (NN) thermodynamics,
+#' summing the stacking enthalpies and entropies of adjacent base-pair steps and
+#' applying initiation, symmetry, salt and chemical corrections. Terminal
+#' mismatches, internal mismatches and dangling ends are supported through
+#' dedicated parameter tables. The function verifies that every dinucleotide step
+#' in the input sequence is present in the selected tables before calculating.
+#'
+#' @section Choosing a parameter set:
+#' Parameter sets fall into two families that are handled differently.
+#'
+#' \strong{Reference-salt sets} (Breslauer 1986, Sugimoto 1996, Allawi 1998,
+#' SantaLucia 2004, Freier 1986, Xia 1998, Chen 2012, Sugimoto 1995) were fitted
+#' at a single reference sodium concentration, and other conditions are reached
+#' by applying one of the \code{salt_method} correction formulas.
+#'
+#' \strong{Condition-specific sets} (the Weber/VarGibbs series) were instead
+#' fitted directly at a stated sodium concentration and are intended to
+#' \emph{replace} salt correction rather than be corrected. Each carries a
+#' \code{salt_mM} attribute. When the requested \code{Na} matches that value,
+#' salt correction is skipped automatically; when it does not, the correction is
+#' still applied but a warning is issued, since correcting an already
+#' condition-specific set double-counts the ionic effect. Whether a correction
+#' was applied is recorded in the returned \code{options}.
+#'
+#' As a rule of thumb, pick the set whose fitted salt is closest to your
+#' experimental condition rather than correcting a distant one.
 #' 
 #' @param gr_seq Pre-processed sequence(s) in 5' to 3' direction. This should be the output from
 #'   to_genomic_ranges() function.
@@ -34,21 +57,38 @@
 #'   - Specific alignment positions are needed
 #' 
 #' @param nn_table Thermodynamic nearest-neighbor parameters for different nucleic acid hybridizations.
-#'   Eight parameter sets are available, organized by hybridization type:
-#' 
-#'   DNA/DNA hybridizations:
+#'   Twenty-seven parameter sets are available, organized by hybridization type.
+#'   Sets marked with a sodium concentration were fitted at that condition and
+#'   are not salt-corrected further (see the "Choosing a parameter set" section).
+#'
+#'   DNA/DNA hybridizations, reference salt:
 #'   - "DNA_NN_Breslauer_1986": Original DNA/DNA parameters
 #'   - "DNA_NN_Sugimoto_1996": Improved DNA/DNA parameters
 #'   - "DNA_NN_Allawi_1998": DNA/DNA parameters with internal mismatch corrections
-#'   - "DNA_NN_SantaLucia_2004": Updated DNA/DNA parameters
-#' 
-#'   RNA/RNA hybridizations:
+#'   - "DNA_NN_SantaLucia_2004": Unified DNA/DNA parameters (default)
+#'
+#'   DNA/DNA hybridizations, melting-temperature optimized (Weber 2015):
+#'   - "DNA_NN_Weber_2015": Combined dataset, 1020 mM. Recommended when a
+#'     salt-optimized DNA set is wanted at high salt
+#'   - "DNA_NN_Weber_OW04_69", "...119", "...220", "...621", "...1020":
+#'     fitted independently at 69, 119, 220, 621 and 1020 mM sodium
+#'
+#'   RNA/RNA hybridizations, reference salt:
 #'   - "RNA_NN_Freier_1986": Original RNA/RNA parameters
 #'   - "RNA_NN_Xia_1998": Improved RNA/RNA parameters
 #'   - "RNA_NN_Chen_2012": Updated RNA/RNA parameters with GU pair corrections
-#' 
+#'
+#'   RNA/RNA hybridizations, salt-optimized (Ferreira 2019). VIF (variable
+#'   initiation factors) gave better cross-validation than FIF (fixed):
+#'   - "RNA_NN_Weber_VIF_71", "...121", "...221", "...621", "...1021"
+#'   - "RNA_NN_Weber_FIF_71", "...121", "...221", "...621", "...1021"
+#'
 #'   RNA/DNA hybridizations:
 #'   - "RNA_DNA_NN_Sugimoto_1995": RNA/DNA hybridization parameters
+#'   - "RNA_DNA_NN_Weber_2019_FT": curve-fitting derived, 1000 mM. Best
+#'     performing high-salt hybrid set in Basilio Barbosa (2019)
+#'   - "RNA_DNA_NN_Weber_2019_VH": van't Hoff derived, 1000 mM
+#'   - "RNA_DNA_NN_Weber_2019_LS": low salt, 100 mM
 #' 
 #' @param tmm_table Thermodynamic parameters for terminal mismatches. Default: "DNA_TMM_Bommarito_2000"
 #'   These parameters account for mismatches at the ends of the duplex.
@@ -87,10 +127,14 @@
 #'   - "Wetmur1991": Classic salt correction method
 #'   - "SantaLucia1996": DNA-specific salt correction
 #'   - "SantaLucia1998-1": Improved DNA salt correction
-#'   - "SantaLucia1998-2": Alternative DNA salt correction
 #'   - "Owczarzy2004": Comprehensive salt correction
 #'   - "Owczarzy2008": Updated comprehensive salt correction
-#'   Note: Setting to NA disables salt correction
+#'   - "none": Disables salt correction entirely
+#'   Note: Parameter sets fitted at a specific sodium concentration (those
+#'   carrying a "salt_mM" attribute, i.e. the Weber/VarGibbs series) already
+#'   account for salt. When the requested \code{Na} matches the concentration
+#'   such a set was fitted at, salt correction is skipped automatically; when
+#'   it does not, a warning is issued.
 #' 
 #' @param DMSO Percent DMSO concentration in the reaction mixture. Default: 0
 #'   DMSO can lower the melting temperature of nucleic acid duplexes.
@@ -125,7 +169,30 @@
 #'  RNA_NN_Chen_2012: Chen JL (2012) <doi:10.1021/bi3002709>
 #'  
 #'  RNA_DNA_NN_Sugimoto_1995: Sugimoto N (1995)<doi:10.1016/S0048-9697(98)00088-6>
-#'  
+#'
+#'  The following sets were derived by melting-temperature optimization and are
+#'  fitted at the sodium concentration given in parentheses. They are not
+#'  salt-corrected further; see the \dQuote{Choosing a parameter set} section.
+#'
+#'  DNA_NN_Weber_2015 (1020 mM): Weber G (2015) <doi:10.1093/bioinformatics/btu751>
+#'
+#'  DNA_NN_Weber_OW04_69 (69 mM), DNA_NN_Weber_OW04_119 (119 mM),
+#'  DNA_NN_Weber_OW04_220 (220 mM), DNA_NN_Weber_OW04_621 (621 mM),
+#'  DNA_NN_Weber_OW04_1020 (1020 mM): Weber G (2015) <doi:10.1093/bioinformatics/btu751>
+#'
+#'  RNA_NN_Weber_VIF_71 (71 mM), RNA_NN_Weber_VIF_121 (121 mM),
+#'  RNA_NN_Weber_VIF_221 (221 mM), RNA_NN_Weber_VIF_621 (621 mM),
+#'  RNA_NN_Weber_VIF_1021 (1021 mM): Ferreira I (2019) <doi:10.1016/j.chemphys.2019.01.016>,
+#'  variable initiation factors
+#'
+#'  RNA_NN_Weber_FIF_71 (71 mM), RNA_NN_Weber_FIF_121 (121 mM),
+#'  RNA_NN_Weber_FIF_221 (221 mM), RNA_NN_Weber_FIF_621 (621 mM),
+#'  RNA_NN_Weber_FIF_1021 (1021 mM): Ferreira I (2019) <doi:10.1016/j.chemphys.2019.01.016>,
+#'  fixed initiation factors
+#'
+#'  RNA_DNA_NN_Weber_2019_FT (1000 mM), RNA_DNA_NN_Weber_2019_VH (1000 mM),
+#'  RNA_DNA_NN_Weber_2019_LS (100 mM): Basilio Barbosa V (2019) <doi:10.1016/j.bpc.2019.106189>
+#'
 #'  DNA_TMM_Bommarito_2000: Bommarito S (2000)  <doi:10.1093/nar/28.9.1929>
 #'  
 #'  DNA_IMM_Peyret_1999: Peyret N (1999) <doi:10.1021/bi9825091> & Allawi H T (1997) <doi:10.1021/bi962590c> & Santalucia N (2005) <doi:10.1093/nar/gki918>
@@ -161,17 +228,45 @@
 #' Santalucia N E W J . Nearest-neighbor thermodynamics of deoxyinosine pairs in DNA duplexes[J]. Nucleic Acids Research, 2005, 33(19):6258-67.
 #' 
 #' Peyret N , Seneviratne P A , Allawi H T , et al. Nearest-Neighbor Thermodynamics and NMR of DNA Sequences with Internal A-A, C-C, G-G, and T-T Mismatches, [J]. Biochemistry, 1999, 38(12):3468-3477.
-#' 
+#'
+#' Weber G. Optimization method for obtaining nearest-neighbour DNA entropies and enthalpies directly from melting temperatures[J]. Bioinformatics, 2015, 31(6):871-877.
+#'
+#' Ferreira I, Jolley E A, Znosko B M, et al. Replacing salt correction factors with optimized RNA nearest-neighbour enthalpy and entropy parameters[J]. Chemical Physics, 2019, 521:69-76.
+#'
+#' Basilio Barbosa V, de Oliveira Martins E, Weber G. Nearest-neighbour parameters optimized for melting temperature prediction of DNA/RNA hybrids at high and low salt concentrations[J]. Biophysical Chemistry, 2019, 251:106189.
+#'
+#' @return A \code{TmCalculator} list with:
+#'   \item{\code{gr}}{The input \code{GRanges} with metadata columns \code{Tm}
+#'     and \code{GC} (melting temperature in \eqn{^{\circ}}C and GC percent).
+#'     Sequences that could not be evaluated receive \code{NA}.}
+#'   \item{\code{options}}{The calculation parameters actually used, including
+#'     the parameter tables and their citations, ion and additive
+#'     concentrations, \code{Salt correction method}, and two fields recording
+#'     how salt was handled: \code{Salt correction applied} (logical) and
+#'     \code{Parameter set fitted at [Na+] (mM)}, which is \code{NA} for
+#'     reference-salt sets. Regions skipped for containing \code{N} are listed
+#'     in \code{Skipped regions containing N}.}
+#'
+#' @seealso \code{\link{tm_calculate}} for a single entry point to the
+#'   nearest-neighbor, GC-content and Wallace methods.
+#'
 #' @author Junhui Li
-#' 
+#'
 #' @examples
-#' 
+#'
 #' input_seq <- c("AAAATTTTTTTCCCCCCCCCCCCCCGGGGGGGGGGGGTGTGCGCTGC",
 #' "AAAATTTTTTTCCCCCCCCCCCCCCGGGGGGGGGGGGTGTGCGCTGC")
 #' seqs <- to_genomic_ranges(input_seq)
 #' out <- tm_nn(seqs, Na=50)
 #' out
-#' 
+#'
+#' # A parameter set fitted at a stated sodium concentration. Because Na
+#' # matches the concentration the set was fitted at, salt correction is
+#' # skipped automatically rather than applied on top of it.
+#' out_ls <- tm_nn(seqs, nn_table = "RNA_DNA_NN_Weber_2019_LS", Na = 100)
+#' out_ls$options[["Salt correction applied"]]
+#' out_ls$options[["Parameter set fitted at [Na+] (mM)"]]
+#'
 #' @export tm_nn
 
 tm_nn <- function(gr_seq,
@@ -184,7 +279,26 @@ tm_nn <- function(gr_seq,
                                      "RNA_NN_Freier_1986",
                                      "RNA_NN_Xia_1998",
                                      "RNA_NN_Chen_2012",
-                                     "RNA_DNA_NN_Sugimoto_1995"),
+                                     "RNA_DNA_NN_Sugimoto_1995",
+                                     "DNA_NN_Weber_2015",
+                                     "DNA_NN_Weber_OW04_69",
+                                     "DNA_NN_Weber_OW04_119",
+                                     "DNA_NN_Weber_OW04_220",
+                                     "DNA_NN_Weber_OW04_621",
+                                     "DNA_NN_Weber_OW04_1020",
+                                     "RNA_NN_Weber_VIF_71",
+                                     "RNA_NN_Weber_VIF_121",
+                                     "RNA_NN_Weber_VIF_221",
+                                     "RNA_NN_Weber_VIF_621",
+                                     "RNA_NN_Weber_VIF_1021",
+                                     "RNA_NN_Weber_FIF_71",
+                                     "RNA_NN_Weber_FIF_121",
+                                     "RNA_NN_Weber_FIF_221",
+                                     "RNA_NN_Weber_FIF_621",
+                                     "RNA_NN_Weber_FIF_1021",
+                                     "RNA_DNA_NN_Weber_2019_FT",
+                                     "RNA_DNA_NN_Weber_2019_VH",
+                                     "RNA_DNA_NN_Weber_2019_LS"),
                   tmm_table      = "DNA_TMM_Bommarito_2000",
                   imm_table      = "DNA_IMM_Peyret_1999",
                   de_table       = c("DNA_DE_Bommarito_2000",
@@ -202,7 +316,8 @@ tm_nn <- function(gr_seq,
                                         "SantaLucia1996",
                                         "SantaLucia1998-1",
                                         "Owczarzy2004",
-                                        "Owczarzy2008"),
+                                        "Owczarzy2008",
+                                        "none"),
                   DMSO           = 0,
                   formamide_unit = list(value = 0, unit = "percent"),
                   dmso_factor    = 0.75,
@@ -222,7 +337,30 @@ tm_nn <- function(gr_seq,
   tmm_tbl <- get_table(tmm_table)
   imm_tbl <- get_table(imm_table)
   de_tbl <- get_table(de_table)
-  
+
+  # -- Salt-correction guard -------------------------------------------------
+  # Some parameter sets (the Weber/VarGibbs series) are fitted AT a specific
+  # sodium concentration and are intended to replace salt correction rather
+  # than be corrected. Applying a correction on top of them double-counts the
+  # ionic effect and yields silently wrong Tm values. Sets that carry the
+  # attribute "salt_mM" are handled here.
+  salt_fn_eff <- if (identical(salt_method, "none")) NULL else salt_method
+  tbl_salt <- attr(nn_tbl, "salt_mM")
+  if (!is.null(tbl_salt) && !is.na(tbl_salt) && !is.null(salt_fn_eff)) {
+    if (isTRUE(all.equal(as.numeric(tbl_salt), as.numeric(Na),
+                         tolerance = 0.02, scale = 1))) {
+      # Already fitted at this salt: skip correction silently.
+      salt_fn_eff <- NULL
+    } else {
+      warning("Parameter set '", nn_table, "' was fitted at ", tbl_salt,
+              " mM [Na+], but Na = ", Na, " mM was requested. The '",
+              salt_method, "' correction is being applied on top of a ",
+              "condition-specific parameter set, which is approximate. ",
+              "Prefer the set fitted nearest your condition, or set ",
+              "salt_method = \"none\".", call. = FALSE)
+    }
+  }
+
   # Process sequence with pairwise N filtering
   region_ids <- names(gr_seq)
   if (is.null(region_ids)) {
@@ -270,7 +408,7 @@ tm_nn <- function(gr_seq,
     }
     result <- tryCatch(
       .tm_nn_core(seq_str, cseq_str, ambiguous, shift, nn_tbl=nn_tbl, tmm_tbl=tmm_tbl, imm_tbl=imm_tbl, de_tbl=de_tbl, dnac_high, dnac_low, self_comp,
-                  Na, K, Tris, Mg, dNTPs, salt_fn=salt_method, DMSO, dmso_factor, formamide_factor, formamide_unit),
+                  Na, K, Tris, Mg, dNTPs, salt_fn=salt_fn_eff, DMSO, dmso_factor, formamide_factor, formamide_unit),
       error = function(e) NA_real_
     )
     tm[i] <- result$Tm
@@ -292,7 +430,26 @@ tm_nn <- function(gr_seq,
                         "DNA_TMM_Bommarito_2000" = "Bommarito S (2000)  <doi:10.1093/nar/28.9.1929>",
                         "DNA_IMM_Peyret_1999" = "Peyret N (1999) <doi:10.1021/bi9825091> & Allawi H T (1997) <doi:10.1021/bi962590c> & Santalucia N (2005) <doi:10.1093/nar/gki918>",
                         "DNA_DE_Bommarito_2000" = "Bommarito S (2000) <doi:10.1093/nar/28.9.1929>",
-                        "RNA_DE_Turner_2010" = "Turner D H (2010) <doi:10.1093/nar/gkp892>")
+                        "RNA_DE_Turner_2010" = "Turner D H (2010) <doi:10.1093/nar/gkp892>",
+                        "DNA_NN_Weber_2015" = "Weber G (2015) <doi:10.1093/bioinformatics/btu751>",
+                        "DNA_NN_Weber_OW04_69" = "Weber G (2015) <doi:10.1093/bioinformatics/btu751>, 69 mM [Na+]",
+                        "DNA_NN_Weber_OW04_119" = "Weber G (2015) <doi:10.1093/bioinformatics/btu751>, 119 mM [Na+]",
+                        "DNA_NN_Weber_OW04_220" = "Weber G (2015) <doi:10.1093/bioinformatics/btu751>, 220 mM [Na+]",
+                        "DNA_NN_Weber_OW04_621" = "Weber G (2015) <doi:10.1093/bioinformatics/btu751>, 621 mM [Na+]",
+                        "DNA_NN_Weber_OW04_1020" = "Weber G (2015) <doi:10.1093/bioinformatics/btu751>, 1020 mM [Na+]",
+                        "RNA_NN_Weber_VIF_71" = "Ferreira I (2019) <doi:10.1016/j.chemphys.2019.01.016>, VIF, 71 mM [Na+]",
+                        "RNA_NN_Weber_VIF_121" = "Ferreira I (2019) <doi:10.1016/j.chemphys.2019.01.016>, VIF, 121 mM [Na+]",
+                        "RNA_NN_Weber_VIF_221" = "Ferreira I (2019) <doi:10.1016/j.chemphys.2019.01.016>, VIF, 221 mM [Na+]",
+                        "RNA_NN_Weber_VIF_621" = "Ferreira I (2019) <doi:10.1016/j.chemphys.2019.01.016>, VIF, 621 mM [Na+]",
+                        "RNA_NN_Weber_VIF_1021" = "Ferreira I (2019) <doi:10.1016/j.chemphys.2019.01.016>, VIF, 1021 mM [Na+]",
+                        "RNA_NN_Weber_FIF_71" = "Ferreira I (2019) <doi:10.1016/j.chemphys.2019.01.016>, FIF, 71 mM [Na+]",
+                        "RNA_NN_Weber_FIF_121" = "Ferreira I (2019) <doi:10.1016/j.chemphys.2019.01.016>, FIF, 121 mM [Na+]",
+                        "RNA_NN_Weber_FIF_221" = "Ferreira I (2019) <doi:10.1016/j.chemphys.2019.01.016>, FIF, 221 mM [Na+]",
+                        "RNA_NN_Weber_FIF_621" = "Ferreira I (2019) <doi:10.1016/j.chemphys.2019.01.016>, FIF, 621 mM [Na+]",
+                        "RNA_NN_Weber_FIF_1021" = "Ferreira I (2019) <doi:10.1016/j.chemphys.2019.01.016>, FIF, 1021 mM [Na+]",
+                        "RNA_DNA_NN_Weber_2019_FT" = "Basilio Barbosa V (2019) <doi:10.1016/j.bpc.2019.106189>, curve fitting, 1000 mM [Na+]",
+                        "RNA_DNA_NN_Weber_2019_VH" = "Basilio Barbosa V (2019) <doi:10.1016/j.bpc.2019.106189>, van't Hoff, 1000 mM [Na+]",
+                        "RNA_DNA_NN_Weber_2019_LS" = "Basilio Barbosa V (2019) <doi:10.1016/j.bpc.2019.106189>, low salt, 100 mM [Na+]")
   
   # Create result list with proper structure
   
@@ -315,6 +472,10 @@ tm_nn <- function(gr_seq,
                    "Mg" = Mg,
                    "dNTPs" = dNTPs,
                    "Salt correction method" = salt_method,
+                   "Salt correction applied" = !is.null(salt_fn_eff),
+                   "Parameter set fitted at [Na+] (mM)" =
+                     if (is.null(attr(nn_tbl, "salt_mM"))) NA_real_
+                     else as.numeric(attr(nn_tbl, "salt_mM")),
                    "Percent of DMSO" = DMSO,
                    "Formamide concentration" = formamide_unit$value,
                    "DMSO factor" = dmso_factor,
@@ -495,7 +656,7 @@ tm_nn <- function(gr_seq,
   }
 
   R <- 1.987
-  if(!is.null(salt_fn)){
+  if(!is.null(salt_fn) && !identical(salt_fn, "none")){
     corr_salt <- salt_correct(Na = Na, 
                                  K = K,
                                  Tris = Tris,

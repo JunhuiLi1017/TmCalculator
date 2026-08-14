@@ -13,7 +13,14 @@ tm_calculate(
   shift = 0,
   nn_table = c("DNA_NN_SantaLucia_2004", "DNA_NN_Breslauer_1986", "DNA_NN_Sugimoto_1996",
     "DNA_NN_Allawi_1998", "RNA_NN_Freier_1986", "RNA_NN_Xia_1998", "RNA_NN_Chen_2012",
-    "RNA_DNA_NN_Sugimoto_1995"),
+    "RNA_DNA_NN_Sugimoto_1995", "DNA_NN_Weber_2015", "DNA_NN_Weber_OW04_69",
+    "DNA_NN_Weber_OW04_119", "DNA_NN_Weber_OW04_220", "DNA_NN_Weber_OW04_621",
+    "DNA_NN_Weber_OW04_1020", "RNA_NN_Weber_VIF_71", "RNA_NN_Weber_VIF_121",
+    "RNA_NN_Weber_VIF_221", "RNA_NN_Weber_VIF_621", "RNA_NN_Weber_VIF_1021",
+    "RNA_NN_Weber_FIF_71", "RNA_NN_Weber_FIF_121", 
+     "RNA_NN_Weber_FIF_221",
+    "RNA_NN_Weber_FIF_621", "RNA_NN_Weber_FIF_1021", "RNA_DNA_NN_Weber_2019_FT",
+    "RNA_DNA_NN_Weber_2019_VH", "RNA_DNA_NN_Weber_2019_LS"),
   tmm_table = "DNA_TMM_Bommarito_2000",
   imm_table = "DNA_IMM_Peyret_1999",
   de_table = c("DNA_DE_Bommarito_2000", "RNA_DE_Turner_2010"),
@@ -29,7 +36,7 @@ tm_calculate(
   Mg = 0,
   dNTPs = 0,
   salt_method = c("Schildkraut2010", "Wetmur1991", "SantaLucia1996", "SantaLucia1998-1",
-    "Owczarzy2004", "Owczarzy2008"),
+    "Owczarzy2004", "Owczarzy2008", "none"),
   DMSO = 0,
   formamide_unit = list(value = 0, unit = "percent"),
   dmso_factor = 0.75,
@@ -68,7 +75,10 @@ nucleotide compositions. Default: FALSE}
 Only applicable for the NN method. Default: 0}
 
 \item{nn_table}{Thermodynamic nearest-neighbor parameters for different nucleic acid hybridizations.
-Only applicable for the NN method. Default: "DNA_NN_SantaLucia_2004"}
+Only applicable for the NN method. Sets whose name encodes a sodium
+concentration were fitted at that condition and are not salt-corrected
+again. See \code{\link{tm_nn}} for the full list and guidance on choosing
+between them. Default: "DNA_NN_SantaLucia_2004"}
 
 \item{tmm_table}{Thermodynamic parameters for terminal mismatches. Only applicable for the NN method.
 Default: "DNA_TMM_Bommarito_2000"}
@@ -106,11 +116,12 @@ Usersets override value sets. Default: NULL}
 
 \item{salt_method}{Salt correction method for Tm. Default: "Schildkraut2010"
 Available options:
+- "none": Disables salt correction. Also selected automatically when the
+  chosen \code{nn_table} was fitted at the requested \code{Na}.
 - "Schildkraut2010": Updated salt correction method
 - "Wetmur1991": Classic salt correction method
 - "SantaLucia1996": DNA-specific salt correction
 - "SantaLucia1998-1": Improved DNA salt correction
-- "SantaLucia1998-2": Alternative DNA salt correction
 - "Owczarzy2004": Comprehensive salt correction
 - "Owczarzy2008": Updated comprehensive salt correction
 Default: "Schildkraut2010"}
@@ -134,23 +145,74 @@ Only applicable for the GC method. Default: TRUE}
 A \code{TmCalculator} list with:
   \item{\code{gr}}{The input \code{GRanges} with metadata columns \code{Tm}
     and \code{GC} (melting temperature in \eqn{^{\circ}}C and GC percent).}
-  \item{\code{options}}{Calculation parameters and method information.}
+  \item{\code{options}}{Calculation parameters and method information. For
+    the nearest-neighbor method this includes \code{Salt correction applied}
+    (logical) and \code{Parameter set fitted at [Na+] (mM)}, which record
+    whether a salt correction was actually performed.}
 }
 \description{
-Calculates melting temperature using multiple methods:
-- Nearest Neighbor thermodynamics (tm_nn)
-- GC content-based method (tm_gc)
-- Wallace rule (tm_wallace)
+Calculates nucleic acid melting temperature (Tm) by one of three methods, and
+returns the result as a \code{GRanges} object so that Tm can be used directly
+as a quantitative genomic feature alongside other assays:
+\itemize{
+  \item \strong{Nearest neighbor} (\code{tm_nn}) sums the stacking free
+    energies of adjacent base-pair steps using experimentally derived
+    enthalpy and entropy parameters, and so resolves sequences of identical
+    base composition but different order. It supports salt and chemical
+    corrections, mismatches and dangling ends, and is the default.
+  \item \strong{GC content} (\code{tm_gc}) computes Tm as an empirical
+    function of GC percentage with corrections for length and ionic strength.
+    Cheaper than NN, but blind to sequence order.
+  \item \strong{Wallace rule} (\code{tm_wallace}) assigns a fixed
+    contribution per base. It is calibrated for short oligonucleotides,
+    typically 14 to 20 bp, and ignores sequence context and reaction
+    conditions, so it is not appropriate for long sequences or for
+    genome-wide windows.
+}
 }
 \details{
-The function calculates melting temperature using the specified method(s). For each method:
-- NN: Uses nearest neighbor thermodynamics with detailed sequence analysis
-- GC: Uses GC content-based calculation with various empirical formulas
-- Wallace: Uses the simple Wallace rule (2deg C per A/T, 4deg C per G/C)
+The input sequence is processed once and passed to the selected method, which
+is faster than calling the individual functions separately.
 
-The function processes the input sequence once and applies it to all selected methods,
-making it more efficient than calling each method separately.
+
+The three methods differ in resolution and in the range of sequence lengths
+over which they are calibrated, so they are not interchangeable.
+
+\code{tm_nn} is the appropriate default. Because it sums sequence-dependent
+stacking terms, it distinguishes sequences of identical GC content but
+different base order, which the other two cannot. Its parameters were derived
+from short duplexes under a two-state assumption; when applied to long
+sequences or to fixed-width genomic windows the resulting value is best read
+as a relative measure of local thermodynamic stability for comparison across
+windows, rather than as an absolute experimental melting temperature.
+
+\code{tm_gc} computes Tm from GC percentage using one of several published
+empirical formulas selected by \code{variant}, with corrections for length
+and ionic strength. It extends to longer sequences at low computational cost
+but cannot resolve base order.
+
+\code{tm_wallace} applies the 2 + 4 rule, adding 2 \eqn{^{\circ}}C per A or T
+and 4 \eqn{^{\circ}}C per G or C. It is calibrated for short oligonucleotides,
+typically 14 to 20 bp, and takes no account of sequence context, salt or
+chemical additives. Accuracy degrades quickly with length, so it is retained
+for compatibility rather than recommended for genome-scale work.
+
+Salt and chemical corrections apply to \code{tm_nn} and \code{tm_gc} only.
+The input sequence is parsed and validated once and reused by the selected
+method, which is faster than calling the individual functions directly.
 }
+\section{Salt handling}{
+
+Most nearest-neighbor parameter sets were fitted at a single reference sodium
+concentration, and other conditions are reached through the
+\code{salt_method} correction formulas. The Weber/VarGibbs sets were instead
+fitted directly at a stated sodium concentration and are meant to replace
+salt correction. When such a set is selected and \code{Na} matches the
+concentration it was fitted at, correction is skipped automatically; when it
+does not, correction is applied with a warning. See \code{\link{tm_nn}} for
+details.
+}
+
 \section{Available Options}{
 
 
@@ -161,16 +223,21 @@ making it more efficient than calling each method separately.
 
 \strong{Nearest Neighbor (NN) Method Options:}
 \itemize{
-  \item \code{nn_table}: 
+  \item \code{nn_table}:
     \itemize{
-      \item "DNA_NN_Breslauer_1986"
-      \item "DNA_NN_Sugimoto_1996"
-      \item "DNA_NN_Allawi_1998"
-      \item "DNA_NN_SantaLucia_2004" (default)
-      \item "RNA_NN_Freier_1986"
-      \item "RNA_NN_Xia_1998"
-      \item "RNA_NN_Chen_2012"
-      \item "RNA_DNA_NN_Sugimoto_1995"
+      \item DNA/DNA: "DNA_NN_Breslauer_1986", "DNA_NN_Sugimoto_1996",
+        "DNA_NN_Allawi_1998", "DNA_NN_SantaLucia_2004" (default)
+      \item DNA/DNA, salt-optimized: "DNA_NN_Weber_2015" (1020 mM),
+        "DNA_NN_Weber_OW04_69", "..._119", "..._220", "..._621",
+        "..._1020" (fitted at 69 to 1020 mM sodium)
+      \item RNA/RNA: "RNA_NN_Freier_1986", "RNA_NN_Xia_1998",
+        "RNA_NN_Chen_2012"
+      \item RNA/RNA, salt-optimized: "RNA_NN_Weber_VIF_71", "..._121",
+        "..._221", "..._621", "..._1021" and the corresponding
+        "RNA_NN_Weber_FIF_*" sets
+      \item RNA/DNA: "RNA_DNA_NN_Sugimoto_1995",
+        "RNA_DNA_NN_Weber_2019_FT", "RNA_DNA_NN_Weber_2019_VH" (1000 mM),
+        "RNA_DNA_NN_Weber_2019_LS" (100 mM)
     }
   \item \code{tmm_table} (Terminal Mismatches):
     \itemize{
@@ -210,9 +277,10 @@ making it more efficient than calling each method separately.
       \item "Wetmur1991"
       \item "SantaLucia1996"
       \item "SantaLucia1998-1"
-      \item "SantaLucia1998-2"
       \item "Owczarzy2004"
       \item "Owczarzy2008"
+      \item "none" (also selected automatically when \code{nn_table} was
+        fitted at the requested \code{Na})
     }
 }
 
@@ -253,8 +321,21 @@ result <- tm_calculate(
   nn_table = "DNA_NN_SantaLucia_2004",
   salt_method = "Owczarzy2008"
 )
+
+# A hybrid parameter set fitted at 100 mM sodium. Salt correction is
+# skipped automatically because Na matches the fitted condition.
+result_ls <- tm_calculate(
+  input_seq,
+  method = "tm_nn",
+  nn_table = "RNA_DNA_NN_Weber_2019_LS",
+  Na = 100
+)
 }
 
+}
+\seealso{
+\code{\link{tm_nn}} for the nearest-neighbor method and the full
+  list of thermodynamic parameter sets.
 }
 \author{
 Junhui Li
