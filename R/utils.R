@@ -179,3 +179,42 @@ s2c <- function(strings){
   gr
 }
 
+#' Split 1:n into roughly equal contiguous index chunks
+#'
+#' One chunk per worker keeps per-task serialization overhead negligible,
+#' which matters because a single Tm evaluation is microseconds-cheap.
+#' @keywords internal
+.bp_chunk_indices <- function(n, nworkers) {
+  nchunks <- max(1L, min(as.integer(n), as.integer(nworkers)))
+  unname(split(seq_len(n), cut(seq_len(n), breaks = nchunks, labels = FALSE)))
+}
+
+#' Dispatch a per-sequence Tm computation over chunks, serially or in parallel
+#'
+#' @param n Number of sequences.
+#' @param make_chunk Function taking an index vector, returning the data one
+#'   worker needs (only its slice, to minimize serialization).
+#' @param worker Package-namespace function called on each chunk; must return
+#'   \code{list(Tm=, GC=)} vectors aligned with the chunk.
+#' @param BPPARAM A \code{BiocParallelParam} or \code{NULL}. With \code{NULL},
+#'   a \code{SerialParam}, or any single-worker backend, the worker is called
+#'   directly with no BiocParallel overhead, reproducing serial behavior
+#'   exactly.
+#' @param ... Passed through to \code{worker}.
+#' @keywords internal
+.bp_map_chunks <- function(n, make_chunk, worker, BPPARAM = NULL, ...) {
+  if (n == 0L) {
+    return(list(Tm = numeric(0), GC = numeric(0)))
+  }
+  nworkers <- if (is.null(BPPARAM)) 1L else BiocParallel::bpnworkers(BPPARAM)
+  if (nworkers <= 1L) {
+    return(worker(make_chunk(seq_len(n)), ...))
+  }
+  chunks <- lapply(.bp_chunk_indices(n, nworkers), make_chunk)
+  res <- BiocParallel::bplapply(chunks, worker, ..., BPPARAM = BPPARAM)
+  list(
+    Tm = unlist(lapply(res, `[[`, "Tm"), use.names = FALSE),
+    GC = unlist(lapply(res, `[[`, "GC"), use.names = FALSE)
+  )
+}
+

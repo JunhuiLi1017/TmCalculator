@@ -76,9 +76,11 @@
 #'   \code{N} bases tolerated per window.  Windows exceeding this
 #'   threshold are dropped.  Only used when \code{trim_N = "filter"}.
 #'   Default \code{0.1}.
-#' @param N_scan_block Integer.  Block size (bp) for the coarse N-end
-#'   detection scan used by \code{trim_N = "ends"}.  Larger values are
-#'   faster but less precise.  Default \code{10000L}.
+#' @param N_scan_block Integer.  Block size (bp) for the in-memory N-end
+#'   detection scan used by \code{trim_N = "ends"}.  The chromosome range
+#'   is loaded once and scanned block by block at C speed; values below
+#'   1 Mb are raised to 1 Mb.  The detected positions are exact regardless
+#'   of block size.  Default: \code{window}.
 #' @param region_prefix Character.  Prefix for region IDs embedded in
 #'   the coordinate string.  Default \code{"region"} (producing
 #'   \code{region1}, \code{region2}, ...).
@@ -457,58 +459,50 @@ make_genomiccoord <- function(
 #' @keywords internal
 .find_N_bounds <- function(bsgenome, chr, chr_start, chr_end, block_size) {
 
+  ## Load the requested range ONCE, then scan it in memory. The previous
+  ## implementation issued one getSeq() per block (default 200 bp); on
+  ## chromosomes with multi-megabase terminal N gaps (e.g. hg38 chr21
+  ## starts with ~5 Mb of N) that meant tens of thousands of getSeq()
+  ## round-trips and took ~30 s. In-memory blocks are pure C scans.
   chr_seq_len <- chr_end - chr_start + 1L
+  block_size  <- max(as.integer(block_size), 1000000L)
   block_size  <- min(block_size, chr_seq_len)
+
+  chr_seq <- Biostrings::getSeq(
+    bsgenome,
+    names  = chr,
+    start  = chr_start,
+    end    = chr_end,
+    as.character = FALSE
+  )
+  len <- length(chr_seq)
 
   ## -- Scan from the LEFT to find first non-N position ---------------------
   first_nonN <- chr_start   # default: start right away
-  scan_start <- chr_start
-
-  while (scan_start <= chr_end) {
-    scan_end <- min(scan_start + block_size - 1L, chr_end)
-    block    <- Biostrings::getSeq(
-      bsgenome,
-      names  = chr,
-      start  = scan_start,
-      end    = scan_end,
-      as.character = FALSE
-    )
-    ## Count non-N bases in the block
-    acgt <- Biostrings::letterFrequency(block, letters = "ACGT", as.prob = FALSE)
-    if (sum(acgt) > 0L) {
-      ## Found non-N in this block  --  find the exact position
-      block_str <- as.character(block)
-      block_chars <- strsplit(block_str, "", fixed = TRUE)[[1]]
-      rel_pos    <- which(block_chars != "N")[1L]
-      first_nonN <- scan_start + rel_pos - 1L
+  off <- 1L
+  while (off <= len) {
+    end_off <- min(off + block_size - 1L, len)
+    block   <- Biostrings::subseq(chr_seq, start = off, end = end_off)
+    if (sum(Biostrings::letterFrequency(block, letters = "ACGT")) > 0L) {
+      rel_pos    <- as.integer(regexpr("[^N]", as.character(block)))
+      first_nonN <- chr_start + off - 1L + rel_pos - 1L
       break
     }
-    scan_start <- scan_end + 1L
+    off <- end_off + 1L
   }
 
   ## -- Scan from the RIGHT to find last non-N position ----------------------
   last_nonN <- chr_end   # default: end right at chr_end
-  scan_end2 <- chr_end
-
-  while (scan_end2 >= chr_start) {
-    scan_start2 <- max(scan_end2 - block_size + 1L, chr_start)
-    block2 <- Biostrings::getSeq(
-      bsgenome,
-      names  = chr,
-      start  = scan_start2,
-      end    = scan_end2,
-      as.character = FALSE
-    )
-    acgt2 <- Biostrings::letterFrequency(block2, letters = "ACGT", as.prob = FALSE)
-    if (sum(acgt2) > 0L) {
-      block_str2  <- as.character(block2)
-      block_chars2 <- strsplit(block_str2, "", fixed = TRUE)[[1]]
-      ## Last non-N: search from the end of the block
-      rel_pos2   <- max(which(block_chars2 != "N"))
-      last_nonN  <- scan_start2 + rel_pos2 - 1L
+  end_off2 <- len
+  while (end_off2 >= 1L) {
+    off2   <- max(end_off2 - block_size + 1L, 1L)
+    block2 <- Biostrings::subseq(chr_seq, start = off2, end = end_off2)
+    if (sum(Biostrings::letterFrequency(block2, letters = "ACGT")) > 0L) {
+      pos_all   <- gregexpr("[^N]", as.character(block2))[[1L]]
+      last_nonN <- chr_start + off2 - 1L + max(pos_all) - 1L
       break
     }
-    scan_end2 <- scan_start2 - 1L
+    end_off2 <- off2 - 1L
   }
 
   list(first_nonN = first_nonN, last_nonN = last_nonN)

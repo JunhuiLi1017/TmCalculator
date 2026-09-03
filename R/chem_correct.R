@@ -85,6 +85,45 @@ chem_correct <- function(DMSO = 0,
       corr <- corr + (0.453*(pt_gc/100)-2.88)*formamide_unit$value
     }
   }
-  
+
   return(corr)
+}
+
+#' Vectorized chemical correction over per-sequence GC percent
+#'
+#' Mirrors \code{chem_correct()} exactly (including argument validation) but
+#' accepts a vector of GC percentages, returning one correction per sequence.
+#' Used by the Rcpp-backed \code{tm_nn} path.
+#' @keywords internal
+.chem_correct_vec <- function(DMSO = 0,
+                              formamide_unit = list(value = 0, unit = "percent"),
+                              dmso_factor = 0.75,
+                              formamide_factor = 0.65,
+                              pt_gc = NULL) {
+  if (DMSO < 0 || formamide_unit$value < 0) {
+    stop("all parameters 'DMSO','formamide_unit$value' should not be less than 0")
+  }
+  if (!any(dmso_factor %in% c(0.75, 0.5, 0.6, 0.65, 0.675))) {
+    stop("'dmso_factor' shoule be one of 0.5,0.6,0.65,0.675,0.75")
+  }
+  if (!any(formamide_factor %in% c(0.65, 0.6, 0.72))) {
+    stop("'formamide_factor' shoule be one of 0.6,0.65,0.72")
+  }
+  if (!formamide_unit$unit %in% c("percent", "molar")) {
+    stop("formamide_unit$unit must be either 'percent' or 'molar'")
+  }
+
+  n <- length(pt_gc)
+  corr <- rep(0, n)
+  if (DMSO > 0) {
+    corr <- corr - dmso_factor * DMSO
+  }
+  if (formamide_unit$value > 0) {
+    if (formamide_unit$unit == "percent") {
+      corr <- corr - formamide_factor * formamide_unit$value
+    } else {
+      corr <- corr + (0.453 * (pt_gc / 100) - 2.88) * formamide_unit$value
+    }
+  }
+  corr
 }

@@ -8,3 +8,6 @@
 .quarto
 /doc/
 /Meta/
+src/*.o
+src/*.so
+src/*.dll

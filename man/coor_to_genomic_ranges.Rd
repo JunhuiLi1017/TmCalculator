@@ -35,10 +35,12 @@ from \code{sequence}.}
 \item{method}{Sequence extraction strategy:
 \describe{
   \item{\code{"vectorized"}}{One \code{getSeq()} call per genome package
-    (default).}
-  \item{\code{"preload_chr"}}{Load each chromosome once and extract windows
-    with \code{subseq()}. Faster for dense whole-chromosome tiling; uses
-    more memory.}
+    (default). Best when windows are scattered across many chromosomes.}
+  \item{\code{"preload_chr"}}{Load each chromosome once and extract all
+    of its windows in a single \code{extractAt()} call. Recommended for
+    dense tiling of one or a few chromosomes (e.g. genome-wide sliding
+    windows), where it is several times faster than \code{getSeq()};
+    holds one chromosome in memory at a time.}
 }}
 }
 \value{

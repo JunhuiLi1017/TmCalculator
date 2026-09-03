@@ -137,3 +137,62 @@ salt_correct <- function(Na=0,
   }
   return(corr)
 }
+
+#' Vectorized salt correction over per-sequence GC percent and length
+#'
+#' Mirrors \code{salt_correct()} exactly, but takes precomputed per-sequence
+#' GC percent (gc() semantics: GC/(A+C+G+T)) and sequence lengths instead of
+#' sequences, so one call covers a whole chunk. Used by the Rcpp-backed
+#' \code{tm_nn} path.
+#' @keywords internal
+.salt_correct_vec <- function(Na, K, Tris, Mg, dNTPs, method,
+                              gc_pct, seq_len) {
+  if (Na < 0 | K < 0 | Tris < 0 | Mg < 0 | dNTPs < 0) {
+    stop("all parameters 'Na','K','Tris','Mg','dNTP' should not be less than 0")
+  }
+  n <- length(gc_pct)
+  Mon <- Na + K + Tris / 2
+  mg <- Mg / 1000
+  if (sum(c(K, Mg, Tris, dNTPs)) > 0 & method != "Owczarzy2008" & dNTPs < Mg) {
+    Mon <- Mon + 120 * sqrt(Mg - dNTPs)
+  }
+  mon <- Mon / 1000
+  if (mon == 0) {
+    return(rep(0, n))
+  }
+  if (method == "Schildkraut2010") {
+    rep(16.6 * log10(mon), n)
+  } else if (method == "Wetmur1991") {
+    rep(16.6 * log10(mon / (1.0 + 0.7 * mon)), n)
+  } else if (method == "SantaLucia1996") {
+    rep(12.5 * log10(mon), n)
+  } else if (method == "SantaLucia1998-1") {
+    rep(11.7 * log10(mon), n)
+  } else if (method == "SantaLucia1998-2") {
+    0.368 * (seq_len - 1) * log(mon)
+  } else if (method == "Owczarzy2004") {
+    (4.29 * gc_pct / 100 - 3.95) * 1e-5 * log(mon) + 9.40e-6 * log(mon)^2
+  } else if (method == "Owczarzy2008") {
+    dntps <- dNTPs * 1e-3
+    ka <- 3e4
+    mg <- (sqrt((ka * dntps - ka * mg + 1)^2 + 4 * ka * mg) -
+             (ka * dntps - ka * mg + 1)) / (2 * ka)
+    R <- sqrt(mg) / mon
+    if (R < 0.22) {
+      (4.29 * gc_pct / 100 - 3.95) * 1e-5 * log(mon) + 9.40e-6 * log(mon)^2
+    } else if (R < 6.0) {
+      m1 <- 3.92 * (0.843 - 0.352 * sqrt(mon) * log(mon))
+      m4 <- 1.42 * (1.279 - 4.03e-3 * log(mon) - 8.03e-3 * log(mon)^2)
+      m7 <- 8.31 * (0.486 - 0.258 * log(mon) + 5.25e-3 * log(mon)^3)
+      (m1 - 0.911 * log(mg) + (gc_pct / 100) * (6.26 + m4 * log(mg)) +
+         (1 / (2.0 * (seq_len - 1))) *
+           (-48.2 + 52.5 * log(mg) + m7 * log(mg)^2)) * 1e-5
+    } else {
+      # scalar salt_correct() leaves 'corr' undefined here (error caught to
+      # NA per sequence); reproduce as NA so Tm becomes NA
+      rep(NA_real_, n)
+    }
+  } else {
+    stop("unknown salt correction method: ", method)
+  }
+}

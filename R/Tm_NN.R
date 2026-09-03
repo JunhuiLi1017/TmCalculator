@@ -15,7 +15,8 @@
 #' at a single reference sodium concentration, and other conditions are reached
 #' by applying one of the \code{salt_method} correction formulas.
 #'
-#' \strong{Condition-specific sets} (the Weber/VarGibbs series) were instead
+#' \strong{Condition-specific sets} (the Weber/VarGibbs series and
+#' Banerjee 2020) were instead
 #' fitted directly at a stated sodium concentration and are intended to
 #' \emph{replace} salt correction rather than be corrected. Each carries a
 #' \code{salt_mM} attribute. When the requested \code{Na} matches that value,
@@ -57,7 +58,7 @@
 #'   - Specific alignment positions are needed
 #' 
 #' @param nn_table Thermodynamic nearest-neighbor parameters for different nucleic acid hybridizations.
-#'   Twenty-seven parameter sets are available, organized by hybridization type.
+#'   Thirty-one parameter sets are available, organized by hybridization type.
 #'   Sets marked with a sodium concentration were fitted at that condition and
 #'   are not salt-corrected further (see the "Choosing a parameter set" section).
 #'
@@ -73,10 +74,20 @@
 #'   - "DNA_NN_Weber_OW04_69", "...119", "...220", "...621", "...1020":
 #'     fitted independently at 69, 119, 220, 621 and 1020 mM sodium
 #'
+#'   DNA/DNA under molecular crowding (cell-like rather than dilute solution):
+#'   - "DNA_NN_Ghosh_2020_PEG200": fitted in 40 wt% PEG200 with 100 mM NaCl
+#'
 #'   RNA/RNA hybridizations, reference salt:
 #'   - "RNA_NN_Freier_1986": Original RNA/RNA parameters
 #'   - "RNA_NN_Xia_1998": Improved RNA/RNA parameters
 #'   - "RNA_NN_Chen_2012": Updated RNA/RNA parameters with GU pair corrections
+#'   - "RNA_NN_Zuber_2022": Successor to Xia 1998 with improved end effects.
+#'     The terminal-AU penalty is replaced by end terms that depend on the
+#'     penultimate base pair, applied automatically from a companion table
+#'
+#'   RNA/RNA under molecular crowding (cell-like rather than dilute solution):
+#'   - "RNA_NN_Ghosh_2023_PEG200": fitted in 40 wt% PEG200 with 100 mM NaCl,
+#'     and shown to describe duplexes in an intracellular cation composition
 #'
 #'   RNA/RNA hybridizations, salt-optimized (Ferreira 2019). VIF (variable
 #'   initiation factors) gave better cross-validation than FIF (fixed):
@@ -89,6 +100,8 @@
 #'     performing high-salt hybrid set in Basilio Barbosa (2019)
 #'   - "RNA_DNA_NN_Weber_2019_VH": van't Hoff derived, 1000 mM
 #'   - "RNA_DNA_NN_Weber_2019_LS": low salt, 100 mM
+#'   - "RNA_DNA_NN_Banerjee_2020": improved hybrid parameters fitted at a
+#'     physiological condition (100 mM NaCl), Banerjee et al. (2020)
 #' 
 #' @param tmm_table Thermodynamic parameters for terminal mismatches. Default: "DNA_TMM_Bommarito_2000"
 #'   These parameters account for mismatches at the ends of the duplex.
@@ -131,7 +144,8 @@
 #'   - "Owczarzy2008": Updated comprehensive salt correction
 #'   - "none": Disables salt correction entirely
 #'   Note: Parameter sets fitted at a specific sodium concentration (those
-#'   carrying a "salt_mM" attribute, i.e. the Weber/VarGibbs series) already
+#'   carrying a "salt_mM" attribute, e.g. the Weber/VarGibbs series and
+#'   Banerjee 2020) already
 #'   account for salt. When the requested \code{Na} matches the concentration
 #'   such a set was fitted at, salt correction is skipped automatically; when
 #'   it does not, a warning is issued.
@@ -151,8 +165,17 @@
 #' @param formamide_factor Coefficient of melting temperature (Tm) decrease per percent formamide.
 #'   Default: 0.65
 #'   Literature reports values ranging from 0.6 to 0.72
-#' 
-#' @details 
+#'
+#' @param BPPARAM A \code{\link[BiocParallel]{BiocParallelParam}} object
+#'   specifying the parallel backend. \code{BiocParallel::SnowParam(n)} is
+#'   recommended; \code{BiocParallel::MulticoreParam} can be slower than
+#'   serial on large inputs because copy-on-write interacts badly with R's
+#'   garbage collector (see \code{\link{tm_calculate}}). The default,
+#'   \code{BiocParallel::SerialParam()}, runs serially. Sequences are split
+#'   into one chunk per worker, so parallelization pays off for large inputs
+#'   (e.g. genome-wide windows) rather than a handful of primers.
+#'
+#' @details
 #' 
 #'  DNA_NN_Breslauer_1986: Breslauer K J (1986) <doi:10.1073/pnas.83.11.3746>
 #'  
@@ -192,6 +215,14 @@
 #'
 #'  RNA_DNA_NN_Weber_2019_FT (1000 mM), RNA_DNA_NN_Weber_2019_VH (1000 mM),
 #'  RNA_DNA_NN_Weber_2019_LS (100 mM): Basilio Barbosa V (2019) <doi:10.1016/j.bpc.2019.106189>
+#'
+#'  RNA_DNA_NN_Banerjee_2020 (100 mM): Banerjee D (2020) <doi:10.1093/nar/gkaa572>
+#'
+#'  RNA_NN_Zuber_2022: Zuber J (2022) <doi:10.1093/nar/gkac261>
+#'
+#'  RNA_NN_Ghosh_2023_PEG200 (100 mM, 40 wt% PEG200): Ghosh S (2023) <doi:10.1093/nar/gkad020>
+#'
+#'  DNA_NN_Ghosh_2020_PEG200 (100 mM, 40 wt% PEG200): Ghosh S (2020) <doi:10.1073/pnas.1920886117>
 #'
 #'  DNA_TMM_Bommarito_2000: Bommarito S (2000)  <doi:10.1093/nar/28.9.1929>
 #'  
@@ -235,6 +266,14 @@
 #'
 #' Basilio Barbosa V, de Oliveira Martins E, Weber G. Nearest-neighbour parameters optimized for melting temperature prediction of DNA/RNA hybrids at high and low salt concentrations[J]. Biophysical Chemistry, 2019, 251:106189.
 #'
+#' Banerjee D, Tateishi-Karimata H, Ohyama T, Ghosh S, Endoh T, Takahashi S, Sugimoto N. Improved nearest-neighbor parameters for the stability of RNA/DNA hybrids under a physiological condition[J]. Nucleic Acids Research, 2020, 48(21):12042-12054.
+#'
+#' Zuber J, Schroeder S J, Sun H, Turner D H, Mathews D H. Nearest neighbor rules for RNA helix folding thermodynamics: improved end effects[J]. Nucleic Acids Research, 2022, 50(9):5251-5262.
+#'
+#' Ghosh S, Takahashi S, Banerjee D, Ohyama T, Endoh T, Tateishi-Karimata H, Sugimoto N. Nearest-neighbor parameters for the prediction of RNA duplex stability in diverse in vitro and cellular-like crowding conditions[J]. Nucleic Acids Research, 2023, 51(9):4101-4111.
+#'
+#' Ghosh S, Takahashi S, Ohyama T, Endoh T, Tateishi-Karimata H, Sugimoto N. Nearest-neighbor parameters for predicting DNA duplex stability in diverse molecular crowding conditions[J]. Proceedings of the National Academy of Sciences, 2020, 117(25):14194-14201.
+#'
 #' @return A \code{TmCalculator} list with:
 #'   \item{\code{gr}}{The input \code{GRanges} with metadata columns \code{Tm}
 #'     and \code{GC} (melting temperature in \eqn{^{\circ}}C and GC percent).
@@ -251,6 +290,8 @@
 #'   nearest-neighbor, GC-content and Wallace methods.
 #'
 #' @author Junhui Li
+#'
+#' @importFrom BiocParallel bplapply bpnworkers SerialParam
 #'
 #' @examples
 #'
@@ -273,12 +314,15 @@ tm_nn <- function(gr_seq,
                   ambiguous     = FALSE,
                   shift         = 0,
                   nn_table      = c("DNA_NN_SantaLucia_2004",
+                                     "DNA_NN_Ghosh_2020_PEG200",
                                      "DNA_NN_Breslauer_1986",
                                      "DNA_NN_Sugimoto_1996",
                                      "DNA_NN_Allawi_1998",
                                      "RNA_NN_Freier_1986",
                                      "RNA_NN_Xia_1998",
                                      "RNA_NN_Chen_2012",
+                                     "RNA_NN_Zuber_2022",
+                                     "RNA_NN_Ghosh_2023_PEG200",
                                      "RNA_DNA_NN_Sugimoto_1995",
                                      "DNA_NN_Weber_2015",
                                      "DNA_NN_Weber_OW04_69",
@@ -298,7 +342,8 @@ tm_nn <- function(gr_seq,
                                      "RNA_NN_Weber_FIF_1021",
                                      "RNA_DNA_NN_Weber_2019_FT",
                                      "RNA_DNA_NN_Weber_2019_VH",
-                                     "RNA_DNA_NN_Weber_2019_LS"),
+                                     "RNA_DNA_NN_Weber_2019_LS",
+                                     "RNA_DNA_NN_Banerjee_2020"),
                   tmm_table      = "DNA_TMM_Bommarito_2000",
                   imm_table      = "DNA_IMM_Peyret_1999",
                   de_table       = c("DNA_DE_Bommarito_2000",
@@ -321,7 +366,8 @@ tm_nn <- function(gr_seq,
                   DMSO           = 0,
                   formamide_unit = list(value = 0, unit = "percent"),
                   dmso_factor    = 0.75,
-                  formamide_factor     = 0.65) {
+                  formamide_factor     = 0.65,
+                  BPPARAM        = BiocParallel::SerialParam()) {
 
   # -- Validate args once ----------------------------------------------------
   nn_table <- match.arg(nn_table)
@@ -337,6 +383,10 @@ tm_nn <- function(gr_seq,
   tmm_tbl <- get_table(tmm_table)
   imm_tbl <- get_table(imm_table)
   de_tbl <- get_table(de_table)
+  # Companion end-effect table, if the selected parameter set ships one
+  # (currently only Zuber 2022). Empty matrix otherwise, which leaves the
+  # calculation identical to previous releases.
+  end_tbl <- get_end_table(nn_table)
 
   # -- Salt-correction guard -------------------------------------------------
   # Some parameter sets (the Weber/VarGibbs series) are fitted AT a specific
@@ -361,59 +411,49 @@ tm_nn <- function(gr_seq,
     }
   }
 
-  # Process sequence with pairwise N filtering
-  region_ids <- names(gr_seq)
-  if (is.null(region_ids)) {
-    region_ids <- rep("", length(gr_seq))
-  }
-  empty_id <- is.na(region_ids) | region_ids == ""
-  if (any(empty_id)) {
-    region_ids[empty_id] <- paste0(
-      as.character(GenomicRanges::seqnames(gr_seq))[empty_id], ":",
-      GenomicRanges::start(gr_seq)[empty_id], "-",
-      GenomicRanges::end(gr_seq)[empty_id]
+  # -- Pairwise N filtering (fast path; the per-base cleaning that used to
+  # -- happen here now runs inside the C++ core, on the workers) -------------
+  has_n <- .col_has_n(gr_seq$sequence) | .col_has_n(gr_seq$complement)
+  if (any(has_n)) {
+    warning(
+      sprintf(
+        "Skipped %d region(s) because sequence or complement contains 'N'. See your_output$options$'Skipped regions containing N' for details",
+        sum(has_n)
+      ),
+      call. = FALSE
     )
   }
-  
-  filtered_seq <- check_filter_seq(
-    list(
-      sequence = gr_seq$sequence,
-      complement = gr_seq$complement,
-      region_ids = region_ids
-    ),
-    method = "tm_nn"
-  )
-  
-  gr_seq_dropoff <- gr_seq[!filtered_seq$kept]
-  gr_seq <- gr_seq[filtered_seq$kept]
-  gr_seq$sequence <- filtered_seq$sequence
-  gr_seq$complement <- filtered_seq$complement
-  
-  # -- Process all sequences -------------------------------------------------
-  n   <- length(gr_seq)
-  tm  <- numeric(n)
-  gc <- numeric(n)
+  gr_seq_dropoff <- gr_seq[has_n]
+  gr_seq <- gr_seq[!has_n]
+  if (length(gr_seq) == 0) {
+    stop("No valid regions left for tm_nn calculation after filtering sequences with 'N'.")
+  }
 
-  all_seqs  <- as.character(mcols(gr_seq)$sequence)
-  all_cseqs <- as.character(mcols(gr_seq)$complement)
-  
-  for (i in seq_len(n)) {
-    seq_str  <- all_seqs[i]
-    cseq_str <- all_cseqs[i]
-    
-    if (nchar(seq_str) < 2L ) {
-      tm[i] <- NA_real_
-      gc[i] <- NA_real_
-      next
-    }
-    result <- tryCatch(
-      .tm_nn_core(seq_str, cseq_str, ambiguous, shift, nn_tbl=nn_tbl, tmm_tbl=tmm_tbl, imm_tbl=imm_tbl, de_tbl=de_tbl, dnac_high, dnac_low, self_comp,
-                  Na, K, Tris, Mg, dNTPs, salt_fn=salt_fn_eff, DMSO, dmso_factor, formamide_factor, formamide_unit),
-      error = function(e) NA_real_
-    )
-    tm[i] <- result$Tm
-    gc[i] <- result$GC
-  }
+  # -- Process all sequences (chunked, optionally in parallel) ---------------
+  n   <- length(gr_seq)
+
+  # Keep the raw columns (possibly DNAStringSet); slices are coerced to
+  # character per chunk so PSOCK workers never receive an XVector whose
+  # serialization would drag the whole shared pool along.
+  all_seqs  <- mcols(gr_seq)$sequence
+  all_cseqs <- mcols(gr_seq)$complement
+
+  chunk_res <- .bp_map_chunks(
+    n = n,
+    make_chunk = function(idx) list(sequence = as.character(all_seqs[idx]),
+                                    complement = as.character(all_cseqs[idx])),
+    worker = .tm_nn_chunk,
+    BPPARAM = BPPARAM,
+    ambiguous = ambiguous, shift = shift,
+    nn_tbl = nn_tbl, tmm_tbl = tmm_tbl, imm_tbl = imm_tbl, de_tbl = de_tbl,
+    end_tbl = end_tbl,
+    dnac_high = dnac_high, dnac_low = dnac_low, self_comp = self_comp,
+    Na = Na, K = K, Tris = Tris, Mg = Mg, dNTPs = dNTPs,
+    salt_fn = salt_fn_eff, DMSO = DMSO, dmso_factor = dmso_factor,
+    formamide_factor = formamide_factor, formamide_unit = formamide_unit
+  )
+  tm <- chunk_res$Tm
+  gc <- chunk_res$GC
   if (!"GC" %in% names(GenomicRanges::mcols(gr_seq))) {
     gr_seq$GC <- gc
   }
@@ -449,7 +489,11 @@ tm_nn <- function(gr_seq,
                         "RNA_NN_Weber_FIF_1021" = "Ferreira I (2019) <doi:10.1016/j.chemphys.2019.01.016>, FIF, 1021 mM [Na+]",
                         "RNA_DNA_NN_Weber_2019_FT" = "Basilio Barbosa V (2019) <doi:10.1016/j.bpc.2019.106189>, curve fitting, 1000 mM [Na+]",
                         "RNA_DNA_NN_Weber_2019_VH" = "Basilio Barbosa V (2019) <doi:10.1016/j.bpc.2019.106189>, van't Hoff, 1000 mM [Na+]",
-                        "RNA_DNA_NN_Weber_2019_LS" = "Basilio Barbosa V (2019) <doi:10.1016/j.bpc.2019.106189>, low salt, 100 mM [Na+]")
+                        "RNA_DNA_NN_Weber_2019_LS" = "Basilio Barbosa V (2019) <doi:10.1016/j.bpc.2019.106189>, low salt, 100 mM [Na+]",
+                        "RNA_DNA_NN_Banerjee_2020" = "Banerjee D (2020) <doi:10.1093/nar/gkaa572>, physiological condition, 100 mM [Na+]",
+                        "RNA_NN_Zuber_2022" = "Zuber J (2022) <doi:10.1093/nar/gkac261>, improved end effects",
+                        "RNA_NN_Ghosh_2023_PEG200" = "Ghosh S (2023) <doi:10.1093/nar/gkad020>, 40 wt% PEG200 crowding, 100 mM [Na+]",
+                        "DNA_NN_Ghosh_2020_PEG200" = "Ghosh S (2020) <doi:10.1073/pnas.1920886117>, 40 wt% PEG200 crowding, 100 mM [Na+]")
   
   # Create result list with proper structure
   
@@ -489,10 +533,153 @@ tm_nn <- function(gr_seq,
   return(result_list)
 }
 
+# -- Fast per-column N detection ----------------------------------------------
+# vcountPattern works directly on XStringSet without character coercion.
+#' @keywords internal
+.col_has_n <- function(x) {
+  if (inherits(x, "XStringSet")) {
+    Biostrings::vcountPattern("N", x) > 0
+  } else {
+    grepl("N", toupper(as.character(x)), fixed = FALSE)
+  }
+}
+
+# -- Table -> C++ handoff -----------------------------------------------------
+#' @keywords internal
+.tbl_to_cpp <- function(tbl) {
+  keys <- rownames(tbl)
+  # A zero-row table (e.g. the end table of a set without end effects) has
+  # NULL rownames; hand C++ a zero-length character vector instead of NULL.
+  if (is.null(keys)) keys <- character(0)
+  list(keys = keys,
+       dh = as.numeric(tbl[, 1]),
+       ds = as.numeric(tbl[, 2]))
+}
+
+# -- Chunk worker: NN Tm/GC over a block of sequences (Rcpp-backed) -----------
+# Called by .bp_map_chunks(), either directly (serial) or on a BiocParallel
+# worker. `chunk` is list(sequence=, complement=) for this worker's block.
+#
+# The C++ core (src/tm_nn_core.cpp) uppercases each sequence, strips
+# characters outside A/C/G/T/I (the former check_filter_seq step, now on the
+# workers), accumulates delta_H/delta_S and base counts; the two-state Tm
+# formula plus salt and chemical corrections are applied here, vectorized.
+# After cleaning, sequences contain only A/C/G/T/I, so the `ambiguous` flag
+# cannot change GC values on this path.
+#' @keywords internal
+.tm_nn_chunk <- function(chunk, ambiguous, shift, nn_tbl, tmm_tbl, imm_tbl,
+                         de_tbl, end_tbl, dnac_high, dnac_low, self_comp,
+                         Na, K, Tris, Mg, dNTPs, salt_fn,
+                         DMSO, dmso_factor, formamide_factor, formamide_unit) {
+  self_comp_eff <- isTRUE(self_comp) && ("sym" %in% rownames(nn_tbl))
+
+  res <- cpp_tm_nn_dhds(
+    as.character(chunk$sequence), as.character(chunk$complement),
+    as.integer(shift),
+    .tbl_to_cpp(nn_tbl), .tbl_to_cpp(tmm_tbl),
+    .tbl_to_cpp(imm_tbl), .tbl_to_cpp(de_tbl),
+    self_comp_eff, .tbl_to_cpp(end_tbl)
+  )
+
+  dh  <- res[, "dh"]
+  ds  <- res[, "ds"]
+  nGC <- res[, "nG"] + res[, "nC"]
+  acgt <- res[, "nA"] + res[, "nC"] + res[, "nG"] + res[, "nT"]
+  len <- res[, "len"]
+  ok  <- res[, "ok"] > 0
+
+  # GC as computed by .GC_fast(): (G+C)/length (I counts in the denominator)
+  gc_fast <- ifelse(len > 0, 100 * nGC / len, NA_real_)
+  # GC as computed by gc() inside salt_correct(): (G+C)/(A+C+G+T)
+  gc_salt <- ifelse(acgt > 0, 100 * nGC / acgt, NA_real_)
+
+  k <- if (self_comp_eff) dnac_high * 1e-9 else
+    (dnac_high - (dnac_low / 2.0)) * 1e-9
+  R <- 1.987
+
+  corr_salt <- NULL
+  if (!is.null(salt_fn) && !identical(salt_fn, "none")) {
+    corr_salt <- .salt_correct_vec(Na = Na, K = K, Tris = Tris, Mg = Mg,
+                                   dNTPs = dNTPs, method = salt_fn,
+                                   gc_pct = gc_salt, seq_len = len)
+    if (identical(salt_fn, "SantaLucia1998-2")) {
+      ds <- ds + corr_salt
+    }
+    tm <- (1000 * dh) / (ds + (R * log(k))) - 273.15
+    if (salt_fn %in% c("Schildkraut2010", "Wetmur1991",
+                       "SantaLucia1996", "SantaLucia1998-1")) {
+      tm <- tm + corr_salt
+    }
+    if (salt_fn %in% c("Owczarzy2004", "Owczarzy2008")) {
+      tm <- (1 / (1 / (tm + 273.15) + corr_salt) - 273.15)
+    }
+  } else {
+    tm <- (1000 * dh) / (ds + (R * log(k))) - 273.15
+  }
+
+  tm <- tm + .chem_correct_vec(DMSO = DMSO,
+                               formamide_unit = formamide_unit,
+                               dmso_factor = dmso_factor,
+                               formamide_factor = formamide_factor,
+                               pt_gc = gc_fast)
+
+  # Reproduce the R core's failure semantics: any sequence whose evaluation
+  # errored (short/missing init rows) or whose salt correction is undefined
+  # (e.g. Owczarzy2008 with sqrt(Mg)/mon >= 6) gets NA for BOTH Tm and GC,
+  # exactly as tryCatch() around .tm_nn_core() did.
+  bad <- !ok
+  if (!is.null(corr_salt)) {
+    bad <- bad | is.na(corr_salt)
+  }
+  tm[bad] <- NA_real_
+  gc_out <- gc_fast
+  gc_out[bad] <- NA_real_
+  list(Tm = unname(tm), GC = unname(gc_out))
+}
+
+# -- Pure-R chunk worker, kept as reference implementation --------------------
+# Used by unit tests to verify the Rcpp path reproduces the original R
+# results exactly; not called in normal operation.
+#' @keywords internal
+.tm_nn_chunk_r <- function(chunk, ambiguous, shift, nn_tbl, tmm_tbl, imm_tbl,
+                           de_tbl, end_tbl, dnac_high, dnac_low, self_comp,
+                           Na, K, Tris, Mg, dNTPs, salt_fn,
+                           DMSO, dmso_factor, formamide_factor, formamide_unit) {
+  m  <- length(chunk$sequence)
+  tm <- rep(NA_real_, m)
+  gc <- rep(NA_real_, m)
+  for (j in seq_len(m)) {
+    seq_str  <- chunk$sequence[j]
+    cseq_str <- chunk$complement[j]
+    if (is.na(seq_str) || is.na(cseq_str)) {
+      next
+    }
+    # Same cleaning as the C++ core: uppercase, keep only A/C/G/T/I
+    seq_str  <- gsub("[^ACGTI]", "", toupper(seq_str), perl = TRUE)
+    cseq_str <- gsub("[^ACGTI]", "", toupper(cseq_str), perl = TRUE)
+    if (nchar(seq_str) < 2L) {
+      next
+    }
+    result <- tryCatch(
+      .tm_nn_core(seq_str, cseq_str, ambiguous, shift, nn_tbl = nn_tbl,
+                  tmm_tbl = tmm_tbl, imm_tbl = imm_tbl, de_tbl = de_tbl,
+                  end_tbl = end_tbl,
+                  dnac_high, dnac_low, self_comp,
+                  Na, K, Tris, Mg, dNTPs, salt_fn = salt_fn,
+                  DMSO, dmso_factor, formamide_factor, formamide_unit),
+      error = function(e) list(Tm = NA_real_, GC = NA_real_)
+    )
+    tm[j] <- result$Tm
+    gc[j] <- result$GC
+  }
+  list(Tm = unname(tm), GC = unname(gc))
+}
+
 # -- Core single-sequence NN computation --------------------------------------
 # All table lookups are vectorized (no per-base loop)
 
 .tm_nn_core <- function(seq_str, cseq_str, ambiguous, shift, nn_tbl, tmm_tbl, imm_tbl, de_tbl, dnac_high, dnac_low, self_comp,
+                        end_tbl = matrix(numeric(0), nrow = 0, ncol = 2),
                         Na, K, Tris, Mg, dNTPs, salt_fn, DMSO, dmso_factor, formamide_factor, formamide_unit) {
 
 
@@ -583,6 +770,19 @@ tm_nn <- function(gr_seq,
     tmp_cseq <- substring(tmp_cseq, 1, n)
   }
   
+  # for end effects (Zuber 2022): added, terminal pair NOT consumed
+  if (nrow(end_tbl) > 0L) {
+    if (length(keys_fr) > 0L && keys_fr[1] %in% rownames(end_tbl)) {
+      delta_h <- end_tbl[keys_fr[1], 1] + delta_h
+      delta_s <- end_tbl[keys_fr[1], 2] + delta_s
+    }
+    key_e_right <- .right_key(tmp_seq, tmp_cseq, nchar(tmp_seq))
+    if (key_e_right %in% rownames(end_tbl)) {
+      delta_h <- end_tbl[key_e_right, 1] + delta_h
+      delta_s <- end_tbl[key_e_right, 2] + delta_s
+    }
+  }
+
   # for initial of nearest neighbor
   delta_h <- nn_tbl['init', 1] + delta_h
   delta_s <- nn_tbl['init', 2] + delta_s
@@ -693,6 +893,19 @@ tm_nn <- function(gr_seq,
 
 # Package-private cache for thermodynamic tables (not .GlobalEnv)
 .TM_TABLE_CACHE <- new.env(parent = emptyenv())
+
+# -- Helper: companion end-effect table for a parameter set ------------------
+# Returns the "<nn_table>_END" entry when the set defines penultimate-pair
+# dependent end terms (Zuber 2022), otherwise a zero-row matrix.
+#' @keywords internal
+get_end_table <- function(table_name) {
+  end_name <- paste0(table_name, "_END")
+  if (!is.null(.TM_CONSTANTS[[end_name]])) {
+    return(get_table(end_name))
+  }
+  matrix(numeric(0), nrow = 0, ncol = 2,
+         dimnames = list(NULL, c("left", "right")))
+}
 
 # -- Helper: get table (package data or build) ------------------------------
 get_table <- function(table_name) {

@@ -62,9 +62,11 @@ See section \emph{N-base trimming} above.}
 threshold are dropped.  Only used when \code{trim_N = "filter"}.
 Default \code{0.1}.}
 
-\item{N_scan_block}{Integer.  Block size (bp) for the coarse N-end
-detection scan used by \code{trim_N = "ends"}.  Larger values are
-faster but less precise.  Default \code{10000L}.}
+\item{N_scan_block}{Integer.  Block size (bp) for the in-memory N-end
+detection scan used by \code{trim_N = "ends"}.  The chromosome range
+is loaded once and scanned block by block at C speed; values below
+1 Mb are raised to 1 Mb.  The detected positions are exact regardless
+of block size.  Default: \code{window}.}
 
 \item{region_prefix}{Character.  Prefix for region IDs embedded in
 the coordinate string.  Default \code{"region"} (producing

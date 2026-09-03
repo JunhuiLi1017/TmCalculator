@@ -134,80 +134,80 @@ vec_to_genomic_ranges <- function(input_seq) {
     stop("Input sequence cannot be NULL or empty")
   }
   seq_name <- names(input_seq)
-  seq_length <- length(input_seq)
+  n <- length(input_seq)
 
-  # Check if name matches the pattern "chr:start-end:strand:name"
-  suppressWarnings({
-    gr_merged <- do.call(c, sapply(seq_along(input_seq), function(x) {
-      sub_seq_name <- seq_name[x]
-      # if the name is not null, parse the name
-      if (!is.null(sub_seq_name)) {        # if the name matches the pattern "chr:start-end:strand:name", parse the name
-        if (grepl("^[^:]+:[0-9]+-[0-9]+:[+-\\*]:[^:]+:[^:]$", sub_seq_name)) {
-          parts <- strsplit(sub_seq_name, ":")[[1]]
-          range_parts <- as.integer(strsplit(parts[2], "-")[[1]])
-          # Validate start and end positions
-          if (as.integer(range_parts[1]) > as.integer(range_parts[2])) {
-            stop("Start positions must be less than or equal to end positions")
-          }
-          gr <- GenomicRanges::GRanges(
-            seqnames = parts[1],
-            ranges = IRanges(start = range_parts[1], end = range_parts[2]),
-            strand = parts[3]
-          )
-          names(gr) <- x
-          GenomeInfoDb::genome(gr) <- strsplit(parts[4], "\\.")[[1]][4]
-        # if the name matches the pattern "chr:start-end:strand", parse the name
-        } else if (grepl("^[^:]+:[0-9]+-[0-9]+:[+-\\*]:[^:]+$", sub_seq_name)) {
-          parts <- strsplit(sub_seq_name, ":")[[1]]
-          range_parts <- as.integer(strsplit(parts[2], "-")[[1]])
-          gr <- GenomicRanges::GRanges(
-            seqnames = parts[1],
-            ranges = IRanges(start = range_parts[1], end = range_parts[2]),
-            strand = parts[3]
-          )
-          names(gr) <- x
-          GenomeInfoDb::genome(gr) <- strsplit(parts[4], "\\.")[[1]][4]
-        } else if (grepl("^[^:]+:[0-9]+-[0-9]+:[+-\\*]$", sub_seq_name)) {
-          parts <- strsplit(sub_seq_name, ":")[[1]]
-          range_parts <- as.integer(strsplit(parts[2], "-")[[1]])
-          gr <- GenomicRanges::GRanges(
-            seqnames = parts[1],
-            ranges = IRanges(start = range_parts[1], end = range_parts[2]),
-            strand = parts[3]
-          )
-          names(gr) <- x
-        # if the name matches the pattern "chr:start-end", parse the name
-        } else if (grepl("^[^:]+:[0-9]+-[0-9]+$", sub_seq_name)) {
-          parts <- strsplit(sub_seq_name, ":")[[1]]
-          range_parts <- as.integer(strsplit(parts[2], "-")[[1]])
-          gr <- GenomicRanges::GRanges(
-            seqnames = parts[1],
-            ranges = IRanges(start = range_parts[1], end = range_parts[2]),
-            strand = "*"
-          )
-          names(gr) <- x
-        # if the name is not matched, use the default values
-        } else {
-          gr <- GRanges(
-            seqnames = "chr1",
-            ranges = IRanges(start = 1, end = nchar(input_seq[x])),
-            strand = "*"
-          )
-          names(gr) <- x
-        }
-      } else {
-        gr <- GRanges(
-          seqnames = "chr1",
-          ranges = IRanges(start = 1, end = nchar(input_seq[x])),
-          strand = "*"
-        )
-        names(gr) <- x
+  ## Vectorised construction. The previous implementation built one GRanges
+  ## per sequence and combined them with do.call(c, ...), which cost
+  ## milliseconds per sequence and dominated genome-scale runs; the parsing
+  ## rules below are unchanged.
+
+  ## Defaults for unnamed sequences, or names that match no pattern
+  chr    <- rep("chr1", n)
+  starts <- rep(1L, n)
+  ends   <- as.integer(nchar(input_seq))
+  strand <- rep("*", n)
+  gen    <- rep(NA_character_, n)
+
+  if (!is.null(seq_name)) {
+    nm <- ifelse(is.na(seq_name), "", seq_name)
+
+    ## Patterns are tried from most to least specific, exactly as before.
+    p5 <- grepl("^[^:]+:[0-9]+-[0-9]+:[+-\\*]:[^:]+:[^:]$", nm)
+    p4 <- !p5 & grepl("^[^:]+:[0-9]+-[0-9]+:[+-\\*]:[^:]+$", nm)
+    p3 <- !p5 & !p4 & grepl("^[^:]+:[0-9]+-[0-9]+:[+-\\*]$", nm)
+    p2 <- !p5 & !p4 & !p3 & grepl("^[^:]+:[0-9]+-[0-9]+$", nm)
+    hit <- p5 | p4 | p3 | p2
+
+    if (any(hit)) {
+      idx   <- which(hit)
+      parts <- strsplit(nm[idx], ":", fixed = TRUE)
+      rng   <- strsplit(vapply(parts, `[`, character(1), 2L), "-", fixed = TRUE)
+
+      chr[idx]    <- vapply(parts, `[`, character(1), 1L)
+      starts[idx] <- as.integer(vapply(rng, `[`, character(1), 1L))
+      ends[idx]   <- as.integer(vapply(rng, `[`, character(1), 2L))
+
+      ## strand is field 3 for the three patterns that carry it, "*" for p2
+      has_strand <- (p5 | p4 | p3)[idx]
+      strand[idx][has_strand] <-
+        vapply(parts[has_strand], `[`, character(1), 3L)
+      strand[idx][!has_strand] <- "*"
+
+      ## genome is taken from field 4 for patterns p5 and p4
+      has_gen <- (p5 | p4)[idx]
+      if (any(has_gen)) {
+        gen[idx][has_gen] <- vapply(
+          strsplit(vapply(parts[has_gen], `[`, character(1), 4L), ".",
+                   fixed = TRUE),
+          function(z) if (length(z) >= 4L) z[4L] else NA_character_,
+          character(1))
       }
-      S4Vectors::mcols(gr)$sequence <- input_seq[x]
-      return(gr)
-    }))
-  })
-  return(gr_merged)
+
+      bad <- starts[idx] > ends[idx]
+      if (any(bad)) {
+        stop("Start positions must be less than or equal to end positions")
+      }
+    }
+  }
+
+  gr <- GenomicRanges::GRanges(
+    seqnames = chr,
+    ranges   = IRanges::IRanges(start = starts, end = ends),
+    strand   = strand
+  )
+  names(gr) <- as.character(seq_len(n))
+  S4Vectors::mcols(gr)$sequence <- input_seq
+
+  ## GenomeInfoDb::genome() is per seqlevel, not per range; set it when the
+  ## parsed names agree on a single genome, as the previous per-sequence
+  ## code effectively did.
+  gen_ok <- gen[!is.na(gen)]
+  if (length(gen_ok) && length(unique(gen_ok)) == 1L) {
+    suppressWarnings(try(
+      GenomeInfoDb::genome(gr) <- unique(gen_ok), silent = TRUE))
+  }
+
+  gr
 }
 
 #' Convert FASTA file to GenomicRanges object

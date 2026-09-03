@@ -45,17 +45,21 @@
 #'     \itemize{
 #'       \item DNA/DNA: "DNA_NN_Breslauer_1986", "DNA_NN_Sugimoto_1996",
 #'         "DNA_NN_Allawi_1998", "DNA_NN_SantaLucia_2004" (default)
+#'       \item DNA/DNA, molecular crowding: "DNA_NN_Ghosh_2020_PEG200"
+#'         (40 wt% PEG200, 100 mM NaCl)
 #'       \item DNA/DNA, salt-optimized: "DNA_NN_Weber_2015" (1020 mM),
 #'         "DNA_NN_Weber_OW04_69", "..._119", "..._220", "..._621",
 #'         "..._1020" (fitted at 69 to 1020 mM sodium)
 #'       \item RNA/RNA: "RNA_NN_Freier_1986", "RNA_NN_Xia_1998",
-#'         "RNA_NN_Chen_2012"
+#'         "RNA_NN_Chen_2012", "RNA_NN_Zuber_2022" (improved end effects),
+#'         "RNA_NN_Ghosh_2023_PEG200" (molecular crowding, cell-like)
 #'       \item RNA/RNA, salt-optimized: "RNA_NN_Weber_VIF_71", "..._121",
 #'         "..._221", "..._621", "..._1021" and the corresponding
 #'         "RNA_NN_Weber_FIF_*" sets
 #'       \item RNA/DNA: "RNA_DNA_NN_Sugimoto_1995",
 #'         "RNA_DNA_NN_Weber_2019_FT", "RNA_DNA_NN_Weber_2019_VH" (1000 mM),
-#'         "RNA_DNA_NN_Weber_2019_LS" (100 mM)
+#'         "RNA_DNA_NN_Weber_2019_LS" (100 mM),
+#'         "RNA_DNA_NN_Banerjee_2020" (100 mM)
 #'     }
 #'   \item \code{tmm_table} (Terminal Mismatches):
 #'     \itemize{
@@ -224,7 +228,27 @@
 #' 
 #' @param mismatch Logical. If TRUE, every '.' in the sequence is counted as a mismatch.
 #'   Only applicable for the GC method. Default: TRUE
-#' 
+#'
+#' @param BPPARAM A \code{\link[BiocParallel]{BiocParallelParam}} object
+#'   specifying the parallel backend used to distribute per-window Tm
+#'   computation across workers. \code{BiocParallel::SnowParam(n)} (socket
+#'   clusters, all platforms including Windows) is recommended: workers are
+#'   fresh processes that receive only their own chunk of sequences.
+#'   \code{BiocParallel::MulticoreParam(n)} (forked processes, Unix/macOS) is
+#'   NOT recommended for large inputs: forked workers inherit the parent
+#'   session via copy-on-write, and R's garbage collector then forces the
+#'   kernel to duplicate inherited pages in every worker, which can consume
+#'   more time than the computation itself. \code{n} should not exceed the
+#'   number of physical cores. The default,
+#'   \code{BiocParallel::SerialParam()}, runs serially and reproduces
+#'   previous behavior exactly. Sequences are split into one contiguous chunk
+#'   per worker, so results are identical to the serial run. With the
+#'   compiled nearest-neighbor core, the serial default is typically fastest
+#'   up to around a million windows: worker startup and sequence
+#'   serialization outweigh the parallel gain. Reserve \code{BPPARAM} for
+#'   substantially larger jobs, or parallelize at a coarser level (e.g. one
+#'   chromosome per worker, each a serial \code{tm_calculate} call).
+#'
 #' @details
 #' The three methods differ in resolution and in the range of sequence lengths
 #' over which they are calibrated, so they are not interchangeable.
@@ -286,6 +310,13 @@
 #'   nn_table = "RNA_DNA_NN_Weber_2019_LS",
 #'   Na = 100
 #' )
+#'
+#' # Genome-wide windows: distribute computation across 4 workers
+#' result_par <- tm_calculate(
+#'   input_seq,
+#'   method = "tm_nn",
+#'   BPPARAM = BiocParallel::SnowParam(workers = 4)
+#' )
 #' }
 #'
 #' @seealso \code{\link{tm_nn}} for the nearest-neighbor method and the full
@@ -298,12 +329,15 @@ tm_calculate <- function(input_seq,
                         ambiguous = FALSE,
                         shift = 0,
                         nn_table = c("DNA_NN_SantaLucia_2004",
+                                    "DNA_NN_Ghosh_2020_PEG200",
                                     "DNA_NN_Breslauer_1986",
                                     "DNA_NN_Sugimoto_1996",
                                     "DNA_NN_Allawi_1998",
                                     "RNA_NN_Freier_1986",
                                     "RNA_NN_Xia_1998",
                                     "RNA_NN_Chen_2012",
+                                    "RNA_NN_Zuber_2022",
+                                    "RNA_NN_Ghosh_2023_PEG200",
                                     "RNA_DNA_NN_Sugimoto_1995",
                                     "DNA_NN_Weber_2015",
                                     "DNA_NN_Weber_OW04_69",
@@ -323,7 +357,8 @@ tm_calculate <- function(input_seq,
                                     "RNA_NN_Weber_FIF_1021",
                                     "RNA_DNA_NN_Weber_2019_FT",
                                     "RNA_DNA_NN_Weber_2019_VH",
-                                    "RNA_DNA_NN_Weber_2019_LS"),
+                                    "RNA_DNA_NN_Weber_2019_LS",
+                                    "RNA_DNA_NN_Banerjee_2020"),
                         tmm_table = "DNA_TMM_Bommarito_2000",
                         imm_table = "DNA_IMM_Peyret_1999",
                         de_table = c("DNA_DE_Bommarito_2000",
@@ -356,9 +391,16 @@ tm_calculate <- function(input_seq,
                         formamide_unit = list(value = 0, unit = "percent"),
                         dmso_factor = 0.75,
                         formamide_factor = 0.65,
-                        mismatch = TRUE) {
+                        mismatch = TRUE,
+                        BPPARAM = BiocParallel::SerialParam()) {
   # Validate method argument
   method <- match.arg(method, several.ok = FALSE)
+
+  # Validate salt_method once and pass a scalar down. Without this, the
+  # full default candidate vector reached tm_gc(), whose own match.arg()
+  # (which has no "none" choice) then failed with "'arg' must be of
+  # length 1" for any tm_gc call relying on defaults.
+  salt_method <- match.arg(salt_method)
   
   # convert input_seq to genomic ranges
   if (inherits(input_seq, "GRanges")) {
@@ -393,10 +435,11 @@ tm_calculate <- function(input_seq,
       DMSO = DMSO,
       formamide_unit = formamide_unit,
       dmso_factor = dmso_factor,
-      formamide_factor = formamide_factor
+      formamide_factor = formamide_factor,
+      BPPARAM = BPPARAM
     )
   }
-  
+
   if ("tm_gc" %in% method) {
     result <- tm_gc(
       gr_seq = gr,
@@ -413,21 +456,21 @@ tm_calculate <- function(input_seq,
       DMSO = DMSO,
       formamide_unit = formamide_unit,
       dmso_factor = dmso_factor,
-      formamide_factor = formamide_factor
+      formamide_factor = formamide_factor,
+      BPPARAM = BPPARAM
     )
   }
-  
+
   if ("tm_wallace" %in% method) {
     result <- tm_wallace(
       gr_seq = gr,
-      ambiguous = ambiguous
+      ambiguous = ambiguous,
+      BPPARAM = BPPARAM
     )
   }
 
-  # Ensure a data.frame representation is always available
-  if (!is.null(result$gr) && is.null(result$df)) {
-    result$df <- as.data.frame(result$gr)
-  }
-
+  # A data.frame representation is available lazily via result$df
+  # (see `$.TmCalculator` in print.TmCalculator.R); converting
+  # genome-scale GRanges eagerly here cost seconds per call.
   result
 }

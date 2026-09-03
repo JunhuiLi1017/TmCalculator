@@ -336,7 +336,7 @@
         -6.9985, -18.5138,    -9.5341, -26.2352,   -14.4129, -38.8461,    -6.7989, -15.8173,
        -11.0161, -29.2985
   ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
-  attr(DNA_NN_Weber_OW04_1020, "salt_mM") <- 1021
+  attr(DNA_NN_Weber_OW04_1020, "salt_mM") <- 1020
 
   # ---- DNA, general purpose ----
   # AOP-CMB, combined dataset (recommended DNA set)
@@ -499,6 +499,129 @@
   ), ncol=2, byrow=TRUE, dimnames=list(hybrid_rows, nn_col))
   attr(RNA_DNA_NN_Weber_2019_LS, "salt_mM") <- 100
 
+  # ---- RNA/DNA hybrid, Banerjee et al. 2020 (Sugimoto lab) ----------------
+  # Improved nearest-neighbor parameters for RNA/DNA hybrids under a
+  # physiological condition (100 mM NaCl). Banerjee D et al. (2020)
+  # Nucleic Acids Res 48:12042, doi:10.1093/nar/gkaa572, Table 2.
+  # Row keys follow the package hybrid convention (RNA top strand in
+  # T-alphabet / DNA bottom strand 3'->5'): paper rAC/dGT -> "AC/TG", etc.
+  # Initiation: per-end terms only (init_G/C for rG-dC/rC-dG ends,
+  # init_A/T for rA-dT/rU-dA ends); no global init term in this model.
+  RNA_DNA_NN_Banerjee_2020 <- matrix(c(
+       0.0,    0.0,       0.0,   -7.0,       0.0,   -4.9,       0.0,    0.0,
+       0.0,    0.0,       0.0,    0.0,       0.0,    0.0,      -7.8,  -22.9,
+     -10.1,  -27.3,      -9.4,  -26.2,      -5.8,  -17.5,      -9.8,  -27.4,
+      -9.5,  -24.8,      -9.0,  -24.3,      -6.1,  -17.9,      -8.6,  -22.7,
+     -10.6,  -27.7,     -13.3,  -35.7,      -9.3,  -25.5,      -6.6,  -19.7,
+      -6.5,  -16.3,      -8.9,  -23.3,      -7.4,  -24.3
+  ), ncol=2, byrow=TRUE, dimnames=list(hybrid_rows, nn_col))
+  attr(RNA_DNA_NN_Banerjee_2020, "salt_mM") <- 100
+
+  # ---- RNA/RNA, Zuber et al. 2022 (improved end effects) ------------------
+  # Zuber J, Schroeder SJ, Sun H, Turner DH, Mathews DH (2022)
+  # Nucleic Acids Res 50:5251, doi:10.1093/nar/gkac261, Tables 1A and 1B
+  # ("New Model" columns). A direct successor to RNA_NN_Xia_1998: the
+  # parameters come from optical melting of RNA duplexes analysed with the
+  # two-state relation, and the paper's comparison column reproduces the
+  # Xia 1998 values stored above.
+  #
+  # The distinctive feature of this set is that the terminal-AU penalty is
+  # replaced by end terms that depend on the penultimate base pair. Those
+  # live in the companion table RNA_NN_Zuber_2022_END (below), so init_A/T
+  # is zero here rather than carrying a single averaged penalty.
+  RNA_NN_Zuber_2022 <- .complete_nn_rc(matrix(c(
+     4.66,  1.78,   0,0,  0,0,  0,0,  0,0,  0,0,  0,-1.38,
+    -7.44,-20.98,  -8.91,-25.22,  -9.16,-25.40, -10.47,-27.08, -11.98,-31.37,
+    -9.34,-23.66, -13.75,-36.53,  -9.61,-23.46, -16.52,-42.13, -13.94,-34.41,
+    -7.66,-24.11,  -9.06,-28.57,  -5.10,-16.53,  -2.72, -8.08, -10.58,-32.19,
+    -8.76,-27.04,  -9.23,-27.32,  -5.64,-14.83,  -9.26,-23.64, -12.41,-34.23,
+   -14.73,-40.32
+  ), ncol=2, byrow=TRUE, dimnames=list(chen_rows, nn_col)),
+  skip_rows = c("init","init_A/T","init_G/C","init_oneG/C","init_allA/T",
+                "init_5T/A","sym",
+                "GT/TG","GG/TT","AG/TT","TG/AT","TT/AG","TG/GT",
+                "AT/TG","CG/GT","CT/GG","GG/CT","GT/CG"))
+
+  # Companion end-effect table for RNA_NN_Zuber_2022. Keyed on the terminal
+  # dinucleotide stack written with the terminal base pair first, so that the
+  # same table serves both duplex ends (the right end is rewritten into this
+  # orientation by .right_key()). Values are added without consuming the
+  # terminal pair. Terminal GC pairs carry no penalty and are absent.
+  end_rows <- c("AA/TT", "AT/TA", "AG/TC", "AC/TG",
+                "AG/TT", "AT/TG", "TA/AT", "TT/AA",
+                "TG/AC", "TC/AG", "TG/AT", "TT/AG",
+                "GA/TT", "GT/TA", "GG/TC", "GC/TG",
+                "GG/TT", "GT/TG", "TA/GT", "TT/GA",
+                "TG/GC", "TC/GG", "TG/GT", "TT/GG")
+  RNA_NN_Zuber_2022_END <- matrix(c(
+     4.36,  13.35,   # AA/TT    AU end on AU
+     4.36,  13.35,   # AT/TA    AU end on AU
+     3.17,   8.79,   # AG/TC    AU end on CG
+     3.17,   8.79,   # AC/TG    AU end on CG
+     5.16,  18.96,   # AG/TT    AU end on GU
+     5.16,  18.96,   # AT/TG    AU end on GU
+     4.36,  13.35,   # TA/AT    AU end on AU
+     4.36,  13.35,   # TT/AA    AU end on AU
+     3.17,   8.79,   # TG/AC    AU end on CG
+     3.17,   8.79,   # TC/AG    AU end on CG
+     5.16,  18.96,   # TG/AT    AU end on GU
+     5.16,  18.96,   # TT/AG    AU end on GU
+     3.65,  12.78,   # GA/TT    GU end on AU
+     3.65,  12.78,   # GT/TA    GU end on AU
+     3.91,  12.17,   # GG/TC    GU end on CG
+     3.91,  12.17,   # GC/TG    GU end on CG
+     6.23,  22.47,   # GG/TT    GU end on GU
+     6.23,  22.47,   # GT/TG    GU end on GU
+     3.65,  12.78,   # TA/GT    GU end on AU
+     3.65,  12.78,   # TT/GA    GU end on AU
+     3.91,  12.17,   # TG/GC    GU end on CG
+     3.91,  12.17,   # TC/GG    GU end on CG
+     6.23,  22.47,   # TG/GT    GU end on GU
+     6.23,  22.47    # TT/GG    GU end on GU
+  ), ncol=2, byrow=TRUE, dimnames=list(end_rows, nn_col))
+
+  # ---- RNA/RNA under molecular crowding (Ghosh et al. 2023) ---------------
+  # Ghosh S, Takahashi S, Banerjee D, Ohyama T, Endoh T, Tateishi-Karimata H,
+  # Sugimoto N (2023) Nucleic Acids Res 51:4101, doi:10.1093/nar/gkad020,
+  # Table 1. Fitted from 45 RNA duplexes in 40 wt% PEG200 with 100 mM NaCl,
+  # i.e. a cellular-like crowding condition rather than dilute solution. The
+  # authors show the same parameters also describe duplexes measured in an
+  # exact intracellular cation composition (their Table S16).
+  #
+  # Use this set when the question is duplex stability inside a crowded,
+  # cell-like environment; the reference-salt RNA sets (Xia 1998, Chen 2012,
+  # Zuber 2022) describe dilute solution.
+  RNA_NN_Ghosh_2023_PEG200 <- .complete_nn_rc(matrix(c(
+      4.6, -2.9,    6.5,18.2,  0,0,  0,0,  0,0,  0,0,  0,-1.4,
+    -10.0,-30.4,  -10.1,-30.8,  -11.1,-31.5,  -12.1,-32.1,  -10.7,-28.7,
+    -11.2,-30.4,  -11.7,-30.5,  -11.1,-28.8,  -13.8,-34.6,  -14.8,-38.4
+  ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
+  attr(RNA_NN_Ghosh_2023_PEG200, "salt_mM") <- 100
+
+  # ---- DNA/DNA under molecular crowding (Ghosh et al. 2020) ---------------
+  # Ghosh S, Takahashi S, Ohyama T, Endoh T, Tateishi-Karimata H, Sugimoto N
+  # (2020) Proc Natl Acad Sci USA 117:14194, doi:10.1073/pnas.1920886117.
+  # Measured in 40 wt% PEG200 with 100 mM NaCl (a cell-like crowding
+  # condition) rather than dilute solution.
+  #
+  # Derivation: the paper's SI reports the crowding effect as an increment.
+  # Absolute values used here are the sum of the two columns of Tables S7
+  # (enthalpy) and S8 (entropy): dH = dH[cation] + dH[40 wt% PEG200], where
+  # dH[cation] equals the no-cosolute reference of Table S3. Verified by
+  # re-predicting duplexes in Table S4, e.g. d(GGCAGTTC) gives
+  # dH = -65.5 / dS = -194.1 against the published -65.7 / -195.0, and the
+  # self-complementary d(GGACGTCC) gives -62.8 / -185.1 against -63.0 /
+  # -185.7 (differences are rounding of the tabulated one-decimal inputs).
+  #
+  # Initiation is per duplex end (per G-C end and per A-T end), so the global
+  # init term and the oneG/C, allA/T, 5T/A terms are zero.
+  DNA_NN_Ghosh_2020_PEG200 <- .complete_nn_rc(matrix(c(
+      0.0,  0.0,   -2.9,-12.7,  -10.1,-35.1,  0,0,  0,0,  0,0,  0,-1.4,
+     -6.5,-19.2,   -9.4,-29.4,   -4.3,-13.3,  -13.1,-38.8,   -9.2,-26.8,
+     -3.4, -7.9,   -4.9,-13.0,   -6.4,-16.1,   -4.2, -9.3,   -4.0, -8.9
+  ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
+  attr(DNA_NN_Ghosh_2020_PEG200, "salt_mM") <- 100
+
   # -- Return assembled list ------------------------------------------------
   list(
     DNA_NN_Breslauer_1986    = DNA_NN_Breslauer_1986,
@@ -534,7 +657,12 @@
     RNA_NN_Weber_FIF_1021    = RNA_NN_Weber_FIF_1021,
     RNA_DNA_NN_Weber_2019_FT = RNA_DNA_NN_Weber_2019_FT,
     RNA_DNA_NN_Weber_2019_VH = RNA_DNA_NN_Weber_2019_VH,
-    RNA_DNA_NN_Weber_2019_LS = RNA_DNA_NN_Weber_2019_LS
+    RNA_DNA_NN_Weber_2019_LS = RNA_DNA_NN_Weber_2019_LS,
+    RNA_DNA_NN_Banerjee_2020 = RNA_DNA_NN_Banerjee_2020,
+    RNA_NN_Zuber_2022        = RNA_NN_Zuber_2022,
+    RNA_NN_Zuber_2022_END    = RNA_NN_Zuber_2022_END,
+    RNA_NN_Ghosh_2023_PEG200 = RNA_NN_Ghosh_2023_PEG200,
+    DNA_NN_Ghosh_2020_PEG200 = DNA_NN_Ghosh_2020_PEG200
   )
 }
 

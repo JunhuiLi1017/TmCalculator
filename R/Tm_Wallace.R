@@ -5,8 +5,14 @@
 #' @param gr_seq Pre-processed sequence(s) in 5' to 3' direction. This should be the output from
 #'   to_genomic_ranges() function.
 #'    
-#' @param ambiguous Ambiguous bases are taken into account to compute the G and C content when ambiguous is TRUE. 
-#'    
+#' @param ambiguous Ambiguous bases are taken into account to compute the G and C content when ambiguous is TRUE.
+#'
+#' @param BPPARAM A \code{\link[BiocParallel]{BiocParallelParam}} object
+#'   specifying the parallel backend, e.g.
+#'   \code{BiocParallel::MulticoreParam(4)} (Unix/macOS) or
+#'   \code{BiocParallel::SnowParam(4)} (all platforms). The default,
+#'   \code{BiocParallel::SerialParam()}, runs serially.
+#'
 #' @returns Returns a list of sequences with updated Tm attributes
 #' 
 #' @export
@@ -30,29 +36,28 @@
 #' 
 #' @export tm_wallace
 
-tm_wallace <- function(gr_seq, ambiguous = FALSE) {
+tm_wallace <- function(gr_seq, ambiguous = FALSE,
+                       BPPARAM = BiocParallel::SerialParam()) {
   # Filter sequence
   gr_seq$sequence <- check_filter_seq(gr_seq$sequence, method = "tm_wallace")
-  # Calculate Tm for each sequence in the list
-  seq_tm <- sapply(seq_along(gr_seq), function(i) {
-    filter_seq <- gr_seq$sequence[i]
-    n_seq <- length(s2c(filter_seq))
-    pt_gc <- gc(filter_seq, ambiguous = ambiguous)
-    n_gc <- n_seq * pt_gc / 100
-    n_at <- n_seq - n_gc
-    tm <- 4 * n_gc + 2 * n_at
-    return(list(Tm = tm, GC = pt_gc))
-  })
+  # Calculate Tm for each sequence (chunked, optionally in parallel)
+  all_seqs <- as.character(gr_seq$sequence)
+  chunk_res <- .bp_map_chunks(
+    n = length(gr_seq),
+    make_chunk = function(idx) list(sequence = all_seqs[idx]),
+    worker = .tm_wallace_chunk,
+    BPPARAM = BPPARAM,
+    ambiguous = ambiguous
+  )
 
-  gr_seq$GC <- unlist(seq_tm[2,])
-  gr_seq$Tm <- unlist(seq_tm[1,])
+  gr_seq$GC <- chunk_res$GC
+  gr_seq$Tm <- chunk_res$Tm
   gr_seq <- .normalize_tm_gc_metadata(gr_seq)
 
   # Create result list with proper structure
-  df_gr <- as.data.frame(gr_seq)
+  # (result$df is computed lazily via `$.TmCalculator`)
   result_list <- list(
     gr = gr_seq,
-    df = df_gr,
     options = list(
       Ambiguous = ambiguous,
       Method = "tm_wallace (Thein & Wallace 1986)"
@@ -64,4 +69,24 @@ tm_wallace <- function(gr_seq, ambiguous = FALSE) {
   attr(result_list, "nonhidden") <- "gr"
 
   return(result_list)
+}
+
+# -- Chunk worker: Wallace-rule Tm over a block of sequences ------------------
+# Called by .bp_map_chunks(), either directly (serial) or on a BiocParallel
+# worker. `chunk` is list(sequence=) for this worker's block.
+#' @keywords internal
+.tm_wallace_chunk <- function(chunk, ambiguous) {
+  m   <- length(chunk$sequence)
+  tm  <- rep(NA_real_, m)
+  gcv <- rep(NA_real_, m)
+  for (j in seq_len(m)) {
+    filter_seq <- chunk$sequence[j]
+    n_seq <- length(s2c(filter_seq))
+    pt_gc <- gc(filter_seq, ambiguous = ambiguous)
+    n_gc <- n_seq * pt_gc / 100
+    n_at <- n_seq - n_gc
+    tm[j]  <- 4 * n_gc + 2 * n_at
+    gcv[j] <- pt_gc
+  }
+  list(Tm = tm, GC = gcv)
 }

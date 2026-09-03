@@ -5,13 +5,19 @@
 \alias{tm_wallace}
 \title{Calculate the melting temperature using the 'Wallace rule'}
 \usage{
-tm_wallace(gr_seq, ambiguous = FALSE)
+tm_wallace(gr_seq, ambiguous = FALSE, BPPARAM = BiocParallel::SerialParam())
 }
 \arguments{
 \item{gr_seq}{Pre-processed sequence(s) in 5' to 3' direction. This should be the output from
 to_genomic_ranges() function.}
 
 \item{ambiguous}{Ambiguous bases are taken into account to compute the G and C content when ambiguous is TRUE.}
+
+\item{BPPARAM}{A \code{\link[BiocParallel]{BiocParallelParam}} object
+specifying the parallel backend, e.g.
+\code{BiocParallel::MulticoreParam(4)} (Unix/macOS) or
+\code{BiocParallel::SnowParam(4)} (all platforms). The default,
+\code{BiocParallel::SerialParam()}, runs serially.}
 }
 \value{
 Returns a list of sequences with updated Tm attributes

@@ -8,16 +8,18 @@ tm_nn(
   gr_seq,
   ambiguous = FALSE,
   shift = 0,
-  nn_table = c("DNA_NN_SantaLucia_2004", "DNA_NN_Breslauer_1986", "DNA_NN_Sugimoto_1996",
-    "DNA_NN_Allawi_1998", "RNA_NN_Freier_1986", "RNA_NN_Xia_1998", "RNA_NN_Chen_2012",
-    "RNA_DNA_NN_Sugimoto_1995", "DNA_NN_Weber_2015", "DNA_NN_Weber_OW04_69",
-    "DNA_NN_Weber_OW04_119", "DNA_NN_Weber_OW04_220", "DNA_NN_Weber_OW04_621",
-    "DNA_NN_Weber_OW04_1020", "RNA_NN_Weber_VIF_71", "RNA_NN_Weber_VIF_121",
-    "RNA_NN_Weber_VIF_221", "RNA_NN_Weber_VIF_621", "RNA_NN_Weber_VIF_1021",
-    "RNA_NN_Weber_FIF_71", "RNA_NN_Weber_FIF_121", 
-     "RNA_NN_Weber_FIF_221",
-    "RNA_NN_Weber_FIF_621", "RNA_NN_Weber_FIF_1021", "RNA_DNA_NN_Weber_2019_FT",
-    "RNA_DNA_NN_Weber_2019_VH", "RNA_DNA_NN_Weber_2019_LS"),
+  nn_table = c("DNA_NN_SantaLucia_2004", "DNA_NN_Ghosh_2020_PEG200",
+    "DNA_NN_Breslauer_1986", "DNA_NN_Sugimoto_1996", "DNA_NN_Allawi_1998",
+    "RNA_NN_Freier_1986", "RNA_NN_Xia_1998", "RNA_NN_Chen_2012", "RNA_NN_Zuber_2022",
+    "RNA_NN_Ghosh_2023_PEG200", "RNA_DNA_NN_Sugimoto_1995", "DNA_NN_Weber_2015",
+    "DNA_NN_Weber_OW04_69", "DNA_NN_Weber_OW04_119", "DNA_NN_Weber_OW04_220",
+    "DNA_NN_Weber_OW04_621", "DNA_NN_Weber_OW04_1020", "RNA_NN_Weber_VIF_71",
+    "RNA_NN_Weber_VIF_121", "RNA_NN_Weber_VIF_221", "RNA_NN_Weber_VIF_621", 
+    
+    "RNA_NN_Weber_VIF_1021", "RNA_NN_Weber_FIF_71", "RNA_NN_Weber_FIF_121",
+    "RNA_NN_Weber_FIF_221", "RNA_NN_Weber_FIF_621", "RNA_NN_Weber_FIF_1021",
+    "RNA_DNA_NN_Weber_2019_FT", "RNA_DNA_NN_Weber_2019_VH", "RNA_DNA_NN_Weber_2019_LS",
+    "RNA_DNA_NN_Banerjee_2020"),
   tmm_table = "DNA_TMM_Bommarito_2000",
   imm_table = "DNA_IMM_Peyret_1999",
   de_table = c("DNA_DE_Bommarito_2000", "RNA_DE_Turner_2010"),
@@ -34,7 +36,8 @@ tm_nn(
   DMSO = 0,
   formamide_unit = list(value = 0, unit = "percent"),
   dmso_factor = 0.75,
-  formamide_factor = 0.65
+  formamide_factor = 0.65,
+  BPPARAM = BiocParallel::SerialParam()
 )
 }
 \arguments{
@@ -68,7 +71,7 @@ to_genomic_ranges() function.}
   - Specific alignment positions are needed}
 
 \item{nn_table}{Thermodynamic nearest-neighbor parameters for different nucleic acid hybridizations.
-  Twenty-seven parameter sets are available, organized by hybridization type.
+  Thirty-one parameter sets are available, organized by hybridization type.
   Sets marked with a sodium concentration were fitted at that condition and
   are not salt-corrected further (see the "Choosing a parameter set" section).
 
@@ -84,10 +87,20 @@ to_genomic_ranges() function.}
   - "DNA_NN_Weber_OW04_69", "...119", "...220", "...621", "...1020":
     fitted independently at 69, 119, 220, 621 and 1020 mM sodium
 
+  DNA/DNA under molecular crowding (cell-like rather than dilute solution):
+  - "DNA_NN_Ghosh_2020_PEG200": fitted in 40 wt% PEG200 with 100 mM NaCl
+
   RNA/RNA hybridizations, reference salt:
   - "RNA_NN_Freier_1986": Original RNA/RNA parameters
   - "RNA_NN_Xia_1998": Improved RNA/RNA parameters
   - "RNA_NN_Chen_2012": Updated RNA/RNA parameters with GU pair corrections
+  - "RNA_NN_Zuber_2022": Successor to Xia 1998 with improved end effects.
+    The terminal-AU penalty is replaced by end terms that depend on the
+    penultimate base pair, applied automatically from a companion table
+
+  RNA/RNA under molecular crowding (cell-like rather than dilute solution):
+  - "RNA_NN_Ghosh_2023_PEG200": fitted in 40 wt% PEG200 with 100 mM NaCl,
+    and shown to describe duplexes in an intracellular cation composition
 
   RNA/RNA hybridizations, salt-optimized (Ferreira 2019). VIF (variable
   initiation factors) gave better cross-validation than FIF (fixed):
@@ -99,7 +112,9 @@ to_genomic_ranges() function.}
   - "RNA_DNA_NN_Weber_2019_FT": curve-fitting derived, 1000 mM. Best
     performing high-salt hybrid set in Basilio Barbosa (2019)
   - "RNA_DNA_NN_Weber_2019_VH": van't Hoff derived, 1000 mM
-  - "RNA_DNA_NN_Weber_2019_LS": low salt, 100 mM}
+  - "RNA_DNA_NN_Weber_2019_LS": low salt, 100 mM
+  - "RNA_DNA_NN_Banerjee_2020": improved hybrid parameters fitted at a
+    physiological condition (100 mM NaCl), Banerjee et al. (2020)}
 
 \item{tmm_table}{Thermodynamic parameters for terminal mismatches. Default: "DNA_TMM_Bommarito_2000"
 These parameters account for mismatches at the ends of the duplex.}
@@ -142,7 +157,8 @@ Available options:
 - "Owczarzy2008": Updated comprehensive salt correction
 - "none": Disables salt correction entirely
 Note: Parameter sets fitted at a specific sodium concentration (those
-carrying a "salt_mM" attribute, i.e. the Weber/VarGibbs series) already
+carrying a "salt_mM" attribute, e.g. the Weber/VarGibbs series and
+Banerjee 2020) already
 account for salt. When the requested \code{Na} matches the concentration
 such a set was fitted at, salt correction is skipped automatically; when
 it does not, a warning is issued.}
@@ -162,6 +178,15 @@ Other published values: 0.5, 0.6, 0.675}
 \item{formamide_factor}{Coefficient of melting temperature (Tm) decrease per percent formamide.
 Default: 0.65
 Literature reports values ranging from 0.6 to 0.72}
+
+\item{BPPARAM}{A \code{\link[BiocParallel]{BiocParallelParam}} object
+specifying the parallel backend. \code{BiocParallel::SnowParam(n)} is
+recommended; \code{BiocParallel::MulticoreParam} can be slower than
+serial on large inputs because copy-on-write interacts badly with R's
+garbage collector (see \code{\link{tm_calculate}}). The default,
+\code{BiocParallel::SerialParam()}, runs serially. Sequences are split
+into one chunk per worker, so parallelization pays off for large inputs
+(e.g. genome-wide windows) rather than a handful of primers.}
 }
 \value{
 A \code{TmCalculator} list with:
@@ -224,6 +249,14 @@ DNA_NN_Breslauer_1986: Breslauer K J (1986) <doi:10.1073/pnas.83.11.3746>
  RNA_DNA_NN_Weber_2019_FT (1000 mM), RNA_DNA_NN_Weber_2019_VH (1000 mM),
  RNA_DNA_NN_Weber_2019_LS (100 mM): Basilio Barbosa V (2019) <doi:10.1016/j.bpc.2019.106189>
 
+ RNA_DNA_NN_Banerjee_2020 (100 mM): Banerjee D (2020) <doi:10.1093/nar/gkaa572>
+
+ RNA_NN_Zuber_2022: Zuber J (2022) <doi:10.1093/nar/gkac261>
+
+ RNA_NN_Ghosh_2023_PEG200 (100 mM, 40 wt% PEG200): Ghosh S (2023) <doi:10.1093/nar/gkad020>
+
+ DNA_NN_Ghosh_2020_PEG200 (100 mM, 40 wt% PEG200): Ghosh S (2020) <doi:10.1073/pnas.1920886117>
+
  DNA_TMM_Bommarito_2000: Bommarito S (2000)  <doi:10.1093/nar/28.9.1929>
  
  DNA_IMM_Peyret_1999: Peyret N (1999) <doi:10.1021/bi9825091> & Allawi H T (1997) <doi:10.1021/bi962590c> & Santalucia N (2005) <doi:10.1093/nar/gki918>
@@ -241,7 +274,8 @@ SantaLucia 2004, Freier 1986, Xia 1998, Chen 2012, Sugimoto 1995) were fitted
 at a single reference sodium concentration, and other conditions are reached
 by applying one of the \code{salt_method} correction formulas.
 
-\strong{Condition-specific sets} (the Weber/VarGibbs series) were instead
+\strong{Condition-specific sets} (the Weber/VarGibbs series and
+Banerjee 2020) were instead
 fitted directly at a stated sodium concentration and are intended to
 \emph{replace} salt correction rather than be corrected. Each carries a
 \code{salt_mM} attribute. When the requested \code{Na} matches that value,
@@ -302,6 +336,14 @@ Weber G. Optimization method for obtaining nearest-neighbour DNA entropies and e
 Ferreira I, Jolley E A, Znosko B M, et al. Replacing salt correction factors with optimized RNA nearest-neighbour enthalpy and entropy parameters[J]. Chemical Physics, 2019, 521:69-76.
 
 Basilio Barbosa V, de Oliveira Martins E, Weber G. Nearest-neighbour parameters optimized for melting temperature prediction of DNA/RNA hybrids at high and low salt concentrations[J]. Biophysical Chemistry, 2019, 251:106189.
+
+Banerjee D, Tateishi-Karimata H, Ohyama T, Ghosh S, Endoh T, Takahashi S, Sugimoto N. Improved nearest-neighbor parameters for the stability of RNA/DNA hybrids under a physiological condition[J]. Nucleic Acids Research, 2020, 48(21):12042-12054.
+
+Zuber J, Schroeder S J, Sun H, Turner D H, Mathews D H. Nearest neighbor rules for RNA helix folding thermodynamics: improved end effects[J]. Nucleic Acids Research, 2022, 50(9):5251-5262.
+
+Ghosh S, Takahashi S, Banerjee D, Ohyama T, Endoh T, Tateishi-Karimata H, Sugimoto N. Nearest-neighbor parameters for the prediction of RNA duplex stability in diverse in vitro and cellular-like crowding conditions[J]. Nucleic Acids Research, 2023, 51(9):4101-4111.
+
+Ghosh S, Takahashi S, Ohyama T, Endoh T, Tateishi-Karimata H, Sugimoto N. Nearest-neighbor parameters for predicting DNA duplex stability in diverse molecular crowding conditions[J]. Proceedings of the National Academy of Sciences, 2020, 117(25):14194-14201.
 }
 \seealso{
 \code{\link{tm_calculate}} for a single entry point to the

@@ -11,16 +11,18 @@ tm_calculate(
   complement_seq = NULL,
   ambiguous = FALSE,
   shift = 0,
-  nn_table = c("DNA_NN_SantaLucia_2004", "DNA_NN_Breslauer_1986", "DNA_NN_Sugimoto_1996",
-    "DNA_NN_Allawi_1998", "RNA_NN_Freier_1986", "RNA_NN_Xia_1998", "RNA_NN_Chen_2012",
-    "RNA_DNA_NN_Sugimoto_1995", "DNA_NN_Weber_2015", "DNA_NN_Weber_OW04_69",
-    "DNA_NN_Weber_OW04_119", "DNA_NN_Weber_OW04_220", "DNA_NN_Weber_OW04_621",
-    "DNA_NN_Weber_OW04_1020", "RNA_NN_Weber_VIF_71", "RNA_NN_Weber_VIF_121",
-    "RNA_NN_Weber_VIF_221", "RNA_NN_Weber_VIF_621", "RNA_NN_Weber_VIF_1021",
-    "RNA_NN_Weber_FIF_71", "RNA_NN_Weber_FIF_121", 
-     "RNA_NN_Weber_FIF_221",
-    "RNA_NN_Weber_FIF_621", "RNA_NN_Weber_FIF_1021", "RNA_DNA_NN_Weber_2019_FT",
-    "RNA_DNA_NN_Weber_2019_VH", "RNA_DNA_NN_Weber_2019_LS"),
+  nn_table = c("DNA_NN_SantaLucia_2004", "DNA_NN_Ghosh_2020_PEG200",
+    "DNA_NN_Breslauer_1986", "DNA_NN_Sugimoto_1996", "DNA_NN_Allawi_1998",
+    "RNA_NN_Freier_1986", "RNA_NN_Xia_1998", "RNA_NN_Chen_2012", "RNA_NN_Zuber_2022",
+    "RNA_NN_Ghosh_2023_PEG200", "RNA_DNA_NN_Sugimoto_1995", "DNA_NN_Weber_2015",
+    "DNA_NN_Weber_OW04_69", "DNA_NN_Weber_OW04_119", "DNA_NN_Weber_OW04_220",
+    "DNA_NN_Weber_OW04_621", "DNA_NN_Weber_OW04_1020", "RNA_NN_Weber_VIF_71",
+    "RNA_NN_Weber_VIF_121", "RNA_NN_Weber_VIF_221", "RNA_NN_Weber_VIF_621", 
+    
+    "RNA_NN_Weber_VIF_1021", "RNA_NN_Weber_FIF_71", "RNA_NN_Weber_FIF_121",
+    "RNA_NN_Weber_FIF_221", "RNA_NN_Weber_FIF_621", "RNA_NN_Weber_FIF_1021",
+    "RNA_DNA_NN_Weber_2019_FT", "RNA_DNA_NN_Weber_2019_VH", "RNA_DNA_NN_Weber_2019_LS",
+    "RNA_DNA_NN_Banerjee_2020"),
   tmm_table = "DNA_TMM_Bommarito_2000",
   imm_table = "DNA_IMM_Peyret_1999",
   de_table = c("DNA_DE_Bommarito_2000", "RNA_DE_Turner_2010"),
@@ -41,7 +43,8 @@ tm_calculate(
   formamide_unit = list(value = 0, unit = "percent"),
   dmso_factor = 0.75,
   formamide_factor = 0.65,
-  mismatch = TRUE
+  mismatch = TRUE,
+  BPPARAM = BiocParallel::SerialParam()
 )
 }
 \arguments{
@@ -140,6 +143,26 @@ Several papers report factors between 0.6 and 0.72.}
 
 \item{mismatch}{Logical. If TRUE, every '.' in the sequence is counted as a mismatch.
 Only applicable for the GC method. Default: TRUE}
+
+\item{BPPARAM}{A \code{\link[BiocParallel]{BiocParallelParam}} object
+specifying the parallel backend used to distribute per-window Tm
+computation across workers. \code{BiocParallel::SnowParam(n)} (socket
+clusters, all platforms including Windows) is recommended: workers are
+fresh processes that receive only their own chunk of sequences.
+\code{BiocParallel::MulticoreParam(n)} (forked processes, Unix/macOS) is
+NOT recommended for large inputs: forked workers inherit the parent
+session via copy-on-write, and R's garbage collector then forces the
+kernel to duplicate inherited pages in every worker, which can consume
+more time than the computation itself. \code{n} should not exceed the
+number of physical cores. The default,
+\code{BiocParallel::SerialParam()}, runs serially and reproduces
+previous behavior exactly. Sequences are split into one contiguous chunk
+per worker, so results are identical to the serial run. With the
+compiled nearest-neighbor core, the serial default is typically fastest
+up to around a million windows: worker startup and sequence
+serialization outweigh the parallel gain. Reserve \code{BPPARAM} for
+substantially larger jobs, or parallelize at a coarser level (e.g. one
+chromosome per worker, each a serial \code{tm_calculate} call).}
 }
 \value{
 A \code{TmCalculator} list with:
@@ -227,17 +250,21 @@ details.
     \itemize{
       \item DNA/DNA: "DNA_NN_Breslauer_1986", "DNA_NN_Sugimoto_1996",
         "DNA_NN_Allawi_1998", "DNA_NN_SantaLucia_2004" (default)
+      \item DNA/DNA, molecular crowding: "DNA_NN_Ghosh_2020_PEG200"
+        (40 wt% PEG200, 100 mM NaCl)
       \item DNA/DNA, salt-optimized: "DNA_NN_Weber_2015" (1020 mM),
         "DNA_NN_Weber_OW04_69", "..._119", "..._220", "..._621",
         "..._1020" (fitted at 69 to 1020 mM sodium)
       \item RNA/RNA: "RNA_NN_Freier_1986", "RNA_NN_Xia_1998",
-        "RNA_NN_Chen_2012"
+        "RNA_NN_Chen_2012", "RNA_NN_Zuber_2022" (improved end effects),
+        "RNA_NN_Ghosh_2023_PEG200" (molecular crowding, cell-like)
       \item RNA/RNA, salt-optimized: "RNA_NN_Weber_VIF_71", "..._121",
         "..._221", "..._621", "..._1021" and the corresponding
         "RNA_NN_Weber_FIF_*" sets
       \item RNA/DNA: "RNA_DNA_NN_Sugimoto_1995",
         "RNA_DNA_NN_Weber_2019_FT", "RNA_DNA_NN_Weber_2019_VH" (1000 mM),
-        "RNA_DNA_NN_Weber_2019_LS" (100 mM)
+        "RNA_DNA_NN_Weber_2019_LS" (100 mM),
+        "RNA_DNA_NN_Banerjee_2020" (100 mM)
     }
   \item \code{tmm_table} (Terminal Mismatches):
     \itemize{
@@ -329,6 +356,13 @@ result_ls <- tm_calculate(
   method = "tm_nn",
   nn_table = "RNA_DNA_NN_Weber_2019_LS",
   Na = 100
+)
+
+# Genome-wide windows: distribute computation across 4 workers
+result_par <- tm_calculate(
+  input_seq,
+  method = "tm_nn",
+  BPPARAM = BiocParallel::SnowParam(workers = 4)
 )
 }
 

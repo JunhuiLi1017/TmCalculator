@@ -1,0 +1,454 @@
+---
+title: "Runtime and Memory for Genome-Scale Tm Profiling: an hg38 Benchmark Guide"
+author: "Junhui Li, Lihua Julie Zhu"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Runtime and Memory for Genome-Scale Tm Profiling: an hg38 Benchmark Guide}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  eval    = FALSE,   # requires BSgenome.Hsapiens.UCSC.hg38 and long runtimes
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+# Introduction
+
+This vignette answers two practical questions that come up as soon as Tm
+profiling is scaled from a bacterial genome to the human genome (hg38):
+
+1. For a **single chromosome** (chr1), how long does the pipeline take, how
+   much memory does it use, and why does supplying a multi-worker
+   `BPPARAM` to `tm_calculate()` **not** make it faster?
+2. For the **whole genome**, how should the work be parallelized, what are
+   sensible parameter settings, and what runtime and memory should be
+   budgeted?
+
+All timings below were measured on a 6-core (12-thread) Intel MacBook Pro
+with 16 GB RAM, R 4.4, macOS, with the package's compiled (Rcpp)
+nearest-neighbor core. Absolute numbers will differ on other machines; the
+*structure* of the results — which parts scale, which parts do not — will
+not. None of the chunks are evaluated when the vignette is built; run them
+interactively to reproduce the measurements on your own hardware.
+
+```{r libraries}
+library(TmCalculator)
+library(BiocParallel)
+
+pkg <- "BSgenome.Hsapiens.UCSC.hg38"
+suppressPackageStartupMessages(library(pkg, character.only = TRUE))
+genome <- get(pkg, envir = asNamespace(pkg))
+```
+
+# Measuring time and memory
+
+Three tools cover almost every need. Wall-clock time comes from
+`system.time()` (read the `elapsed` column; for parallel runs `user` and
+`system` only reflect the manager process). The peak of R-managed memory
+over a code block comes from the `gc(reset = TRUE)` idiom. The true
+resident size of the current process — including C++ allocations that R's
+GC does not see — comes from `ps::ps_memory_info()`.
+
+```{r measuring}
+base::gc(reset = TRUE)                # reset the "max used" high-water mark
+## ... run the code to be measured ...
+base::gc()                            # read peak from the "max used" column
+
+ps::ps_memory_info()[["rss"]] / 1e9   # current process resident set, GB
+```
+
+Note the `base::` prefix: TmCalculator exports a `gc()` function of its
+own (GC *content* of a sequence), which masks R's garbage collector once
+the package is attached.
+
+For `SnowParam()` workers the manager cannot see worker memory at all;
+record it inside the worker function and return it with the result (this
+pattern is used in the whole-genome section below).
+
+# A ten-second warm-up: chr21
+
+Before committing to chr1, verify your setup on chr21 — at 46.7 Mb it is
+the smallest hg38 autosome and the whole pipeline finishes in about ten
+seconds. It is also a deliberately instructive choice: chr21 *begins*
+with a ~5 Mb assembly gap of `N` bases, so it exercises the N-trimming
+machinery that most chromosomes only touch lightly.
+
+```{r chr21-warmup}
+chr_len21 <- GenomeInfoDb::seqlengths(genome)[["chr21"]]
+
+t21 <- system.time({
+  bins21 <- make_genomiccoord(bsgenome = pkg, chromosomes = "chr21",
+                              window = 200L, slide = 200L,
+                              start = 1, end = chr_len21, strand = "+")
+  gr21   <- to_genomic_ranges_fast(list(pkg_name = pkg, seq = bins21),
+                                   method = "preload_chr")
+  tm21   <- tm_calculate(gr21, method = "tm_nn",
+                         nn_table = "DNA_NN_SantaLucia_2004", Na = 50)
+})
+t21["elapsed"]        # ~10-15 s cold, ~6 s warm, on the test machine
+head(tm21$gr)
+```
+
+Watch the `make_genomiccoord()` messages: N-trimming reports an effective
+range starting at position 5,010,001 — the leading 5 Mb of `N`s is
+detected in a single in-memory scan and excluded before any windows are
+built, leaving 208,449 windows instead of 233,549. The first run in a
+session pays one-time costs (reading the genome from disk, loading the
+thermodynamic tables); subsequent runs are roughly twice as fast. If this
+warm-up runs cleanly, your BSgenome installation, compiled core and
+memory headroom are all in working order, and the chr1 numbers below
+should reproduce within noise.
+
+One benchmarking caveat that bites easily: `devtools::load_all()`
+compiles the C++ core at `-O0` (a debug build, ~6x slower) and leaves a
+mixed session state even after reinstalling. Always benchmark in a fresh
+session with a plain `library(TmCalculator)`; confirm with
+`"devtools_shims" %in% search()` returning `FALSE`.
+
+# Part 1: a single chromosome (chr1)
+
+## The pipeline and its serial cost
+
+chr1 is 248,956,422 bp. Non-overlapping 200 bp windows after N-trimming
+give 1,244,682 windows.
+
+```{r chr1-serial}
+chr_len <- GenomeInfoDb::seqlengths(genome)[["chr1"]]
+
+t_coord <- system.time({
+  bins <- make_genomiccoord(bsgenome = pkg, chromosomes = "chr1",
+                            window = 200L, slide = 200L,
+                            start = 1, end = chr_len, strand = "+")
+})
+
+t_extract <- system.time({
+  gr_batch <- to_genomic_ranges_fast(list(pkg_name = pkg, seq = bins),
+                                     method = "preload_chr")
+})
+
+base::gc(reset = TRUE)
+t_tm <- system.time({
+  tm_chr1 <- tm_calculate(gr_batch, method = "tm_nn",
+                          nn_table = "DNA_NN_SantaLucia_2004", Na = 50)
+})
+base::gc()   # "max used" = peak R memory during the Tm step
+
+rbind(t_coord, t_extract, t_tm)[, "elapsed"]
+## t_coord t_extract      t_tm
+##     5.5      15.4      30.8     (freshly booted, otherwise idle machine)
+```
+
+Measured on the test machine (`R --vanilla`, freshly booted, no other
+applications):
+
+| step | function | elapsed | notes |
+|---|---|---|---|
+| window coordinates | `make_genomiccoord()` | ~5.5 s | N-end scan loads the 249 Mb chromosome once |
+| sequence extraction | `to_genomic_ranges_fast(method = "preload_chr")` | ~15 s | `extractAt()` itself is ~4 s; the rest is complement generation, the GC column and `GRanges` assembly |
+| Tm calculation | `tm_calculate(method = "tm_nn")` | ~31 s | compiled core, 1.24M windows |
+| **total** | | **~52 s** | |
+
+On a machine with normal background load the same steps run 20-35%
+slower (we measured 7.3 / 19.3 / 41.5 s in an ordinary desktop session);
+comparisons within one section below were always measured in a single
+session.
+
+Memory: `base::gc()` reported a peak of ~1.9 GB of R-managed heap during
+the Tm step, and a dedicated worker process running the whole chr1
+pipeline reaches **~3.5-4 GB resident** (sequences, complements, a
+character copy handed to the compiled core, `GRanges` metadata, plus
+loaded packages). A useful planning figure: **budget ~4 GB per
+chr1-sized pipeline**, tapering to well under 2 GB for small
+chromosomes.
+
+Two extraction details matter at this scale. Pass the input as
+`list(pkg_name = ..., seq = ...)` so the genome package is loaded once,
+and use `method = "preload_chr"` for dense tiling of few chromosomes
+(`getSeq()`-based `"vectorized"` is better for windows scattered across
+many chromosomes).
+
+## Why `BPPARAM` does not accelerate a single chromosome
+
+`tm_calculate()` accepts a `BPPARAM` and it does exactly what it
+advertises — yet on chr1 it does not help:
+
+```{r chr1-parallel}
+system.time({
+  tm_serial <- tm_calculate(gr_batch, method = "tm_nn", Na = 50)
+})
+## elapsed ~ 30 s
+
+system.time({
+  tm_snow <- tm_calculate(gr_batch, method = "tm_nn", Na = 50,
+                          BPPARAM = SnowParam(workers = 5))
+})
+## elapsed ~ 55 s on the idle machine (33-80 s across repeated sessions)
+## -- NEVER faster than serial
+```
+
+The serial time is stable across sessions; the parallel time is not,
+because its added costs (spawning workers, serializing half a gigabyte
+of sequence, loading packages in each worker) are highly sensitive to
+machine state. The decomposition explains why even its best case cannot
+win. Of the ~30 s serial runtime, only the per-window Tm loop (~9 s with
+the compiled core) is divided among workers. The rest is inherently
+serial or is *new* cost created by parallelization:
+
+| component | ~time | scales with workers? |
+|---|---|---|
+| serial preprocessing (N filtering, coercion, result assembly) | ~21 s | no — runs once in the manager |
+| shipping ~0.5 GB of sequence to workers and results back | ~5 s | no — serialization is serial |
+| worker startup + package loading | ~3+ s | fixed cost, *added* by parallelism |
+| compiled Tm loop | ~9 s / n workers | **yes** |
+
+This is Amdahl's law with an unusually small parallel fraction (~30%):
+even with infinitely many workers the floor is ~29 s — essentially the
+serial runtime — and on a loaded machine the added costs balloon well
+past it. With the pure-R core of previous releases the loop
+dominated (minutes for an input of this size) and the same
+`SnowParam(5)` call gave a 2.8x speedup; compiling the loop moved the
+bottleneck into the serial part and made within-call parallelism
+unprofitable. **With the compiled core, the serial default
+(`SerialParam()`) is the fastest way to run inputs up to roughly a
+million windows.**
+
+A stronger warning applies to `MulticoreParam()` on large inputs. Forked
+workers share the manager's memory copy-on-write, but R's garbage
+collector *writes* to every object header it marks, so each worker's GC
+forces the kernel to physically duplicate inherited pages. On a
+chr1-scale input (measured with the pure-R core, where the effect is
+easiest to see), `MulticoreParam(5)` ran *slower than serial* while
+burning ~18 CPU-minutes of `system` time on page duplication. If you
+parallelize at all, prefer `SnowParam()`.
+
+# Part 2: the whole genome
+
+## Parallelize at the chromosome level
+
+The serial preprocessing that defeats within-call parallelism is itself
+embarrassingly parallel *across chromosomes*: window building, extraction,
+filtering and assembly for chr2 are independent of chr1. So for
+genome-scale work, give each worker one whole chromosome and run the
+entire pipeline — coordinates, extraction, `tm_calculate()` with the
+serial default — inside the worker:
+
+```{r genome-parallel}
+chrs <- paste0("chr", c(1:22, "X", "Y"))
+## Better: sort largest-first for load balance -- see "Choosing the
+## worker count" below for the one-liner.
+n_workers <- 5   # see "Choosing the worker count" below
+
+runtime <- system.time({
+  res_list <- bplapply(chrs, function(chr, pkg) {
+    ## SnowParam workers are fresh R processes: load packages HERE,
+    ## not in the manager session.
+    suppressPackageStartupMessages(library(TmCalculator))
+    suppressPackageStartupMessages(library(pkg, character.only = TRUE))
+
+    genome  <- get(pkg, envir = asNamespace(pkg))
+    chr_len <- GenomeInfoDb::seqlengths(genome)[[chr]]
+
+    bins <- make_genomiccoord(bsgenome = pkg, chromosomes = chr,
+                              window = 200L, slide = 200L,
+                              start = 1, end = chr_len, strand = "+",
+                              verbose = FALSE)
+    gr  <- to_genomic_ranges_fast(list(pkg_name = pkg, seq = bins),
+                                  method = "preload_chr")
+    out <- tm_calculate(gr, method = "tm_nn",
+                        nn_table = "DNA_NN_SantaLucia_2004",
+                        Na = 50)$gr        # serial inside the worker
+
+    ## Drop sequence columns before returning: Tm/GC are what we keep,
+    ## and this cuts per-chromosome serialization from ~500 MB to a few MB.
+    out$sequence   <- NULL
+    out$complement <- NULL
+
+    ## Record this worker's peak resident memory (GB) for budgeting.
+    attr(out, "worker_rss_gb") <- ps::ps_memory_info()[["rss"]] / 1e9
+    out
+  }, pkg = pkg, BPPARAM = SnowParam(workers = n_workers))
+
+  tm_genome <- unlist(GenomicRanges::GRangesList(res_list))
+})
+
+runtime
+sapply(res_list, attr, "worker_rss_gb")   # per-worker memory check
+length(tm_genome)                         # 14,687,330 windows
+summary(tm_genome$Tm)
+## Min. 47.2  1st Qu. 68.9  Median 71.5  Mean 72.0  3rd Qu. 74.8  Max. 101.1
+```
+
+Measured on the test machine (all 24 chromosomes, 14,687,330 windows,
+freshly booted, `R --vanilla`), sweeping the worker count:
+
+| workers | elapsed | note |
+|---|---|---|
+| 3 | 387 s | |
+| 4 | 356 s | |
+| 5 | **295 s** | optimum = physical cores − 1 |
+| 6 | 338 s | slower: core contention begins |
+| 7 | 346 s | slower still |
+
+So the whole genome takes **just under 5 minutes** at the optimum,
+versus roughly 10 minutes run serially (estimated from the
+per-chromosome costs) — about **2x**. Unlike within-call `BPPARAM`, this
+scheme parallelizes *everything* — window building, extraction,
+filtering and assembly, not just the Tm loop — and per-task
+communication is a chromosome name in and a slim `GRanges` out, so
+Amdahl's law has little serial residue to bite on. The speedup is
+bounded near 2x on this laptop by load imbalance (chr1 alone takes
+~50 s), disk contention while several workers read the genome file, and
+the 16 GB memory ceiling. Per-worker resident memory in the sweep ranged
+from ~0.3 GB (small chromosomes) to ~4.1 GB (chr1/chr2), consistent with
+the ~4 GB planning figure from Part 1.
+
+## Finer grain: segment-level parallelism
+
+The same pattern works below the chromosome level, and it is the answer
+to "so how *do* I parallelize a single chromosome?": ship coordinates,
+not sequences. Each worker receives a `(start, end)` pair — a few dozen
+bytes — and runs the entire pipeline on its own segment. Every row of
+the Part 1 cost table becomes parallel except worker startup, because
+the preprocessing happens inside the workers and the half-gigabyte
+serialization never occurs.
+
+```{r segment-parallel}
+chr_len <- GenomeInfoDb::seqlengths(genome)[["chr1"]]
+
+## Segment length must be a multiple of `slide` so the window grid stays
+## aligned across segment boundaries (50 Mb = 250,000 x 200).
+seg_starts <- seq(1, chr_len, by = 50e6)
+seg <- data.frame(start = seg_starts,
+                  end   = pmin(seg_starts + 50e6 - 1, chr_len))
+
+t_seg <- system.time({
+  res_seg <- bplapply(seq_len(nrow(seg)), function(i, seg, pkg) {
+    suppressPackageStartupMessages(library(TmCalculator))
+    suppressPackageStartupMessages(library(pkg, character.only = TRUE))
+    bins <- make_genomiccoord(bsgenome = pkg, chromosomes = "chr1",
+                              window = 200L, slide = 200L,
+                              start = seg$start[i], end = seg$end[i],
+                              strand = "+", trim_N = "none",
+                              verbose = FALSE)
+    gr <- to_genomic_ranges_fast(list(pkg_name = pkg, seq = bins),
+                                 method = "preload_chr")
+    out <- tm_calculate(gr, method = "tm_nn",
+                        nn_table = "DNA_NN_SantaLucia_2004", Na = 50)$gr
+    out$sequence <- NULL; out$complement <- NULL
+    out
+  }, seg = seg, pkg = pkg, BPPARAM = SnowParam(workers = 5))
+
+  tm_chr1_seg <- sort(unlist(GenomicRanges::GRangesList(res_seg)))
+})
+
+t_seg["elapsed"]      # 38 s measured, vs ~52 s for the serial FULL pipeline
+length(tm_chr1_seg)   # 1,152,300
+```
+
+Mind the comparison scope: 38 s covers the *entire* pipeline (windows,
+extraction, Tm), so the serial reference is the ~52 s pipeline total from
+Part 1 — a **1.35x** speedup — not the 30 s Tm-only figure. Modest, but
+it is the only single-chromosome parallelization that wins at all
+(within-call `SnowParam` *lost* to serial above), and the result is
+verifiably identical: 1,152,300 windows equals the serial run's
+1,244,682 generated minus its 92,382 N-gap windows, exactly. That
+equivalence is by construction — `trim_N = "none"` keeps the window grid
+identical across segments (the "Skipped ... regions" warning from
+`tm_calculate()` is expected; hg38 chr1 carries an ~18 Mb interior
+centromeric gap), and the 50 Mb segment length is a multiple of `slide`.
+
+The gain is capped well below worker-count because each worker pays
+fixed costs the serial run pays once: loading packages and reading the
+same 249 Mb chromosome to extract its segment (five workers contending
+for the same file). Per-worker memory stays moderate (~1-2 GB, since
+only a 50 Mb segment is windowed). For whole-genome runs this scheme is
+the natural refinement anyway: segmenting the large chromosomes removes
+the ~50 s chr1 straggler that limits the per-chromosome scheme's load
+balance.
+
+## Choosing the worker count
+
+Each worker's peak memory is governed by its largest chromosome —
+measured at **~4 GB for a chr1-sized task**, tapering to well under 1 GB
+for the small chromosomes. Two constraints, take the minimum:
+
+```{r workers}
+mem_gb    <- 16                                     # your machine
+cores     <- parallel::detectCores(logical = FALSE) # physical cores
+n_workers <- min(cores - 1L, floor((mem_gb - 4) / 3))
+n_workers
+## 16 GB / 6 cores  -> 4 workers (safe); the sweep above found 5 fastest
+## 32 GB / 8 cores  -> 7 workers
+## 64 GB / 10 cores -> 9 workers
+```
+
+The worker sweep above pins down both halves of the formula. The core
+bound is exact: the optimum was `cores - 1 = 5`, and adding a 6th or 7th
+worker made the run *slower*, not faster. The memory term is
+deliberately conservative: it assumes every worker holds a large
+chromosome at once, which rarely happens, so on this 16 GB machine 5
+workers (one more than the formula's 4) was in practice both safe and
+fastest — but 4 is the defensible default for an unattended run. Do not
+count hyperthreads: the compiled core is CPU-bound and logical cores add
+little beyond scheduler overhead. And treat the memory bound as a hard
+one — not every worker holds a large chromosome simultaneously (which is
+why 5 workers survived on 16 GB), but when they do collide the system
+swaps, and a swapping parallel run is *slower than serial* (we measured
+19 GB of swap and a wedged machine in exactly this state, aggravated by
+leftover workers from interrupted runs). Sorting chromosomes
+largest-first also helps load balance, since the default scheduler deals
+them out in order:
+
+```{r sort-chrs}
+sl   <- GenomeInfoDb::seqlengths(genome)
+chrs <- names(sort(sl[paste0("chr", c(1:22, "X", "Y"))], decreasing = TRUE))
+```
+
+## Housekeeping
+
+Four operational notes. First, benchmark in a session that did *not*
+restore a saved workspace (`[Workspace loaded from ~/.RData]` at startup
+means gigabytes of old objects are already resident); disable
+"Restore .RData at startup" in RStudio or start `R --vanilla`. Second,
+`SnowParam()` workers load the *installed* package: after
+`devtools::load_all()` development changes, run `devtools::install()`
+before benchmarking, and note that `load_all()` compiles C++ at `-O0` —
+time only the installed build. The same applies to
+`devtools::build_vignettes()`, which evaluates vignette code against a
+`-O0` debug build (timings come out ~6x slow); set
+`options(pkg.build_extra_flags = FALSE)` to disable the debug flags, or
+rely on `R CMD build` / `devtools::check()`, which install with normal
+optimization before running vignettes. Changing the flag option does
+*not* trigger recompilation — stale `-O0` object files in `src/` are
+reused as long as sources are unchanged — so run `pkgbuild::clean_dll()`
+after changing it.
+Third, if a parallel run errors or is interrupted, workers can linger
+and hold gigabytes; check for orphaned `R` processes (Activity Monitor on
+macOS, `ps aux | grep R` elsewhere) before rerunning. Fourth, worker
+`message()` output is buffered until each task finishes — a silent
+console does not mean a hung run; watch the worker processes' CPU
+instead.
+
+# Summary
+
+For hg38 with the compiled nearest-neighbor core: run single chromosomes
+serially (`BPPARAM` left at its default — within-call parallelism cannot
+beat Amdahl's law when the parallel fraction is ~30%), and run the whole
+genome as one chromosome per `SnowParam()` worker with the worker count
+set by `min(physical cores - 1, memory budget)`. Measured on a
+6-core/16 GB laptop: ~52 s and up to ~4 GB per chr1-sized
+chromosome-worker, and 295 s (just under 5 minutes) for the full genome
+(14.7 million windows) at the measured optimum of 5 workers, versus
+~10 minutes serially.
+
+# Session info
+
+```{r sessioninfo, eval=TRUE}
+sessionInfo()
+```

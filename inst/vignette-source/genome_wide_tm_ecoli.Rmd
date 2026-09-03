@@ -26,7 +26,13 @@ This vignette demonstrates how to compute melting temperature (Tm) across an
 entire bacterial genome and visualise the results using **TmCalculator**. We
 use *Escherichia coli* K-12 MG1655 (NCBI assembly GCF\_000005845.2 / ASM584v2)
 as the reference organism, calculating Tm for every non-overlapping 200 bp
-window along the single circular chromosome.
+window along the single circular chromosome (the bin size used by
+Hasenauer *et al.* 2025). A window-size sensitivity
+analysis (50, 100, 200 and 500 bp) shows that absolute Tm scales with
+window length as expected from duplex thermodynamics, while the spatial
+landscape (cross-scale correlations >= 0.975) and the MutL-AR association
+(~1 degree C lower median Tm, ~2.7 percentage points lower GC in peaks,
+all p < 1e-12) are reproduced at every window size.
 
 The workflow covers five steps:
 
@@ -101,17 +107,20 @@ cat("Length:    ", format(chr_length, big.mark = ","), "bp\n")
 `make_genomiccoord()` tiles the chromosome into non-overlapping 200 bp bins.
 
 ```{r make-coord}
-bins_gc <- make_genomiccoord(
-  bsgenome    = genome_name,
-  chromosomes = chr_name,
-  window      = 200L,
-  slide       = 200L,
-  start       = 1,
-  end         = chr_length,
-  strand      = "+"
-)
+runtime0 <- system.time({
+  bins_gc <- make_genomiccoord(
+    bsgenome    = genome_name,
+    chromosomes = chr_name,
+    window      = 200L,
+    slide       = 200L,
+    start       = 1,
+    end         = chr_length,
+    strand      = "+"
+  )
+})
 
 cat("Total windows:", length(bins_gc), "\n")
+cat(sprintf("Window generation: %.2f s (elapsed)\n", runtime0["elapsed"]))
 ```
 
 Resolve coordinates against the BSgenome package:
@@ -132,14 +141,16 @@ cat(sprintf(
 
 # Step 3 — Compute Genome-wide Tm
 
-We use the nearest-neighbour method (SantaLucia & Hicks 2004) at 50 mM Na+.
+We use nearest-neighbour thermodynamics with the Breslauer *et al.* (1986)
+parameter set at 50 mM Na+, matching the Methods of Hasenauer *et al.*
+(2025), who computed Tm with this package and the same parameters.
 
 ```{r tm-calculate}
 runtime2 <- system.time({
   tm_ASM584v2 <- tm_calculate(
     gr_batch,
     method   = "tm_nn",
-    nn_table = "DNA_NN_SantaLucia_2004",
+    nn_table = "DNA_NN_Breslauer_1986",
     Na       = 50            # mM; standard PCR-like conditions
   )
 })
@@ -385,8 +396,10 @@ res$summary
 
 # Interpreting the Results
 
-MutL-AR-associated windows have lower Tm and higher GC content than the rest
-of the genome (p < 0.001 for both). MutL-AR peaks cluster near the
+MutL-AR-associated windows have lower Tm and lower GC content than the rest
+of the genome (p < 0.001 for both; median Tm about 1 degree C lower and
+mean GC 0.48 vs 0.51 inside peaks), consistent with the enrichment of
+low-thermal-stability, AT-rich sequence reported by Hasenauer *et al.* MutL-AR peaks cluster near the
 replication terminus, where replication forks converge and mismatch density is
 highest. This spatial coincidence with locally elevated microsatellite density
 and cruciform-forming sequences is consistent with the replication stress
@@ -398,20 +411,209 @@ sequence context requirements for Dam methyltransferase (5'-GATC-3').
 
 ---
 
+# Window-Size Sensitivity Analysis
+
+The 200 bp window used above is a design compromise, not a constraint of
+the data: the external annotation layers have their own native
+resolutions (1 kb bins for the microsatellite, cruciform and GATC density
+tracks; variable-width intervals for MutL-AR peaks and ssDNA regions),
+and both `plot_genome_track()` and the overlap-based statistics operate
+across mixed resolutions. Here we recompute the Tm/GC profile at 50, 100,
+200 and 500 bp and ask two questions: does the window size change the
+thermodynamic landscape, and does it change the biological conclusion?
+
+```{r window-sensitivity}
+window_sizes <- c(50L, 100L, 200L, 500L)
+
+sens <- lapply(window_sizes, function(w) {
+  bins_w <- make_genomiccoord(
+    bsgenome = genome_name, chromosomes = chr_name,
+    window = w, slide = w, start = 1, end = chr_length,
+    strand = "+", verbose = FALSE
+  )
+  gr_w <- to_genomic_ranges_fast(list(pkg_name = genome_name, seq = bins_w))
+  tm_w <- tm_calculate(gr_w, method = "tm_nn",
+                       nn_table = "DNA_NN_Breslauer_1986", Na = 50)$gr
+
+  ann <- integrate_granges(gr_tm = tm_w, gr_features = mutH_peaks,
+                           strategy = "overlap", feature_cols = "peak_id",
+                           keep_unmatched = TRUE)
+  ann$in_mutH <- ifelse(is.na(ann$peak_id), "non_peak", "peak")
+  cg <- compare_groups(gr = ann, target = c("Tm", "GC"),
+                       method = "wilcoxon", group = "in_mutH",
+                       alternative = "greater", posthoc = FALSE)
+  list(gr = tm_w, ann = ann, test = cg)
+})
+names(sens) <- paste0("w", window_sizes)
+```
+
+### Distributional stability
+
+```{r sensitivity-distribution}
+dist_tbl <- do.call(rbind, lapply(seq_along(window_sizes), function(i) {
+  g <- sens[[i]]$gr
+  data.frame(
+    window_bp = window_sizes[i],
+    n_windows = length(g),
+    Tm_mean   = mean(g$Tm, na.rm = TRUE),
+    Tm_sd     = stats::sd(g$Tm, na.rm = TRUE),
+    Tm_IQR    = stats::IQR(g$Tm, na.rm = TRUE),
+    GC_mean   = mean(g$GC, na.rm = TRUE)
+  )
+}))
+knitr::kable(dist_tbl, digits = 3,
+             caption = "Tm/GC distribution by window size.")
+```
+
+Two systematic effects are visible, both expected. First, mean Tm rises
+with window length (66.4 to 78.9 degrees C from 50 to 500 bp): duplex
+stability increases with length in the nearest-neighbor model, so
+absolute Tm values are only comparable *within* one window size. Second,
+shorter windows widen the distribution (SD 4.13 at 50 bp vs 2.54 at
+500 bp) -- window size acts as a smoothing bandwidth. The mean GC is
+invariant (0.508 throughout), confirming that the composition landscape
+itself does not depend on the tiling.
+
+### Cross-scale agreement
+
+We aggregate each finer profile onto the 500 bp grid (mean Tm per bin)
+and correlate it with the directly computed 500 bp profile:
+
+```{r sensitivity-correlation}
+gr500  <- sens[["w500"]]$gr
+bin500 <- (start(gr500) - 1L) %/% 500L
+
+cor_tbl <- vapply(c("w50", "w100", "w200"), function(k) {
+  g   <- sens[[k]]$gr
+  agg <- tapply(g$Tm, (start(g) - 1L) %/% 500L, mean, na.rm = TRUE)
+  stats::cor(agg[match(bin500, as.integer(names(agg)))], gr500$Tm,
+             use = "complete.obs")
+}, numeric(1))
+round(cor_tbl, 3)
+```
+
+Aggregated onto a common 500 bp grid, the profiles are nearly
+interchangeable (r = 0.998, 0.999 and 0.975 for 50, 100 and 200 bp;
+the 200 bp grid does not nest evenly into 500 bp bins, which blurs its
+aggregate slightly). Window size rescales and smooths the profile but
+preserves the spatial landscape.
+
+### Robustness of the MutL-AR association
+
+Finally, the vignette's biological conclusion -- that Tm and GC differ
+between MutL-AR peak windows and the genomic background -- is re-tested
+at every window size:
+
+```{r sensitivity-tests}
+## Per-window-size test statistics
+test_results <- do.call(rbind, lapply(seq_along(window_sizes), function(i) {
+  data.frame(window_bp = window_sizes[i], sens[[i]]$test$results)
+}))
+test_results
+
+## Per-window-size group summaries, plus the median Tm effect size
+test_summary <- do.call(rbind, lapply(seq_along(window_sizes), function(i) {
+  ann <- sens[[i]]$ann
+  med <- tapply(ann$Tm, ann$in_mutH, stats::median, na.rm = TRUE)
+  data.frame(window_bp   = window_sizes[i],
+             n_peak      = sum(ann$in_mutH == "peak"),
+             Tm_med_diff = unname(med["peak"] - med["non_peak"]),
+             sens[[i]]$test$summary)
+}))
+test_summary
+```
+
+### Multi-scale tracks alongside the multi-omics layers
+
+Because every track keeps its native resolution, the four Tm/GC profiles
+can be drawn as concentric layers of one integrated figure, together
+with the annotation data:
+
+```{r sensitivity-tracks, fig.width=8, fig.height=8, fig.cap="Multi-scale integration. Concentric rings from outside in: MutL-AR peaks (ideogram), GC content at 50/100/200/500 bp (blues), Tm at 50/100/200/500 bp (reds), and microsatellite density (green). Yellow bands mark MutL-AR peaks."}
+## darkest = finest window (50 bp), lightest = coarsest (500 bp)
+scale_cols_gc <- c("#1A5276", "#2E86C1", "#5DADE2", "#AED6F1")
+scale_cols_tm <- c("#7B241C", "#CB4335", "#EC7063", "#F5B7B1")
+
+sens_dfs <- lapply(sens, function(x) as.data.frame(x$gr[, c("Tm", "GC")]))
+
+tracks_scale <- c(
+  list(list(type = "rect", data = ecoli_rep_hotspots$all_peaks_IP_mutH,
+            col = "#2C3E50", bg.col = "grey", name = "MutL-AR",
+            legend_font_col = "#2C3E50", ideogram = TRUE, height = 0.5)),
+  lapply(seq_along(window_sizes), function(i)
+    list(type = "line", data = sens_dfs[[i]], value_col = "GC",
+         name = paste0("GC ", window_sizes[i], " bp"),
+         col = scale_cols_gc[i], legend_font_col = scale_cols_gc[i])),
+  lapply(seq_along(window_sizes), function(i)
+    list(type = "line", data = sens_dfs[[i]], value_col = "Tm",
+         name = paste0("Tm ", window_sizes[i], " bp"),
+         col = scale_cols_tm[i], legend_font_col = scale_cols_tm[i])),
+  list(list(type = "line", data = ecoli_rep_hotspots$bins_rep,
+            value_col = "count", name = "Microsatellites", col = "#2ECC71",
+            legend_font_col = "#2ECC71"),
+       list(type = "highlight",
+            data = ecoli_rep_hotspots$all_peaks_IP_mutH,
+            col = "#F1C40F", alpha = 0.18))
+)
+
+plot_genome_track(
+  genome_name = genome_name,
+  genome_size = chr_length,
+  track_list  = tracks_scale,
+  circular    = TRUE,
+  label       = label
+)
+```
+
+At whole-genome scale the four bandwidths look nearly identical -- the
+landscape is invariant. The difference window size makes is local
+smoothing, best seen in a zoomed view:
+
+```{r sensitivity-zoom, fig.width=10, fig.height=7, fig.cap="Zoomed 1.5-1.7 Mb region. The 50 bp profile resolves single-window fluctuations that the 500 bp profile averages away; all four trace the same underlying landscape."}
+plot_genome_track(
+  genome_name = genome_name,
+  genome_size = chr_length,
+  track_list  = tracks_scale,
+  zoom        = "U00096.3:1500000-1700000"
+)
+```
+
+The association is reproduced at every scale: MutL-AR windows are about
+1 degree C lower in median Tm than the background (-1.28, -1.02, -1.05
+and -0.96 degrees C at 50, 100, 200 and 500 bp) and about 2.7 percentage
+points lower in GC (0.482 vs 0.509), with all eight Wilcoxon tests
+overwhelmingly significant (p from 1.5e-62 at 50 bp to 1.4e-12 at
+500 bp; p shrinks with n, as expected, while the effect size is
+essentially constant). The biological conclusion therefore does not
+depend on the window choice. The primary analysis uses 200 bp to match
+Hasenauer *et al.* (2025), whose Methods compute GC content and melting
+temperature in 200 bp bins (using TmCalculator) and bin the ChIP-seq
+coverage at the same 200 bp resolution.
+
+---
+
 # Computational Performance
 
-On a standard desktop computer (single core, R 4.3):
+On a standard desktop computer (single core, R 4.4, compiled Rcpp nearest-neighbor core):
 
 | Step | Function | Time (elapsed) |
 |------|----------|---------------|
-| Coordinate generation | `make_genomiccoord()` + `to_genomic_ranges_fast()` | ~1 s |
-| Tm calculation (23,208 windows) | `tm_calculate()` | ~7 s |
-| **Total** | | **~8 s** |
+| Window generation | `make_genomiccoord()` | ~0.1 s |
+| Sequence extraction | `to_genomic_ranges_fast()` | ~0.5 s |
+| Tm calculation (23,208 windows) | `tm_calculate()` | ~0.6 s |
+| **Total** | | **~1.2 s** |
 
 For human-scale analyses (non-overlapping 200 bp windows across the ~3.1 Gb
-haploid genome, ~15.5 M windows), we recommend running `tm_calculate()` in
-parallelly using `BiocParallel` and splitting input by chromosome. Memory
-requirements scale approximately linearly with the number of windows.
+haploid genome; 14.7 M windows after excluding assembly gaps), run the
+*entire pipeline* -- window building, sequence extraction and
+`tm_calculate()` -- inside one `BiocParallel::SnowParam()` worker per
+chromosome, keeping `tm_calculate()` itself at its serial default. On a
+6-core/16 GB laptop this completes all of hg38 in just under 5 minutes
+with 5 workers. Peak memory per worker is governed by its largest
+chromosome (~4 GB for chr1), not by the total window count. Measured
+timings, worker-count guidance and ready-to-run code are in the companion
+vignette *Runtime and Memory for Genome-Scale Tm Profiling: an hg38
+Benchmark Guide*.
 
 ---
 
