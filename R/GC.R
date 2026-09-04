@@ -30,89 +30,76 @@
 #' 
 #' @export gc
 gc <- function(input_seq, ambiguous = FALSE) {
-  if (length(input_seq) == 1 && is.na(input_seq)) {
-    return(NA)
-  }
-  
-  # Process input sequence
-  if (inherits(input_seq, "character")) {
-    input_seq <- toupper(input_seq)
-    if (length(input_seq) == 1) {
-      vec_seq <- s2c(input_seq)
-    } else {
-      vec_seq <- input_seq
-    }
-  } else {
+  if (length(input_seq) == 0) return(NA)
+  if (!inherits(input_seq, "character")) {
     stop("sequence must be a character string or vector")
   }
-  
-  # Check for valid nucleic acid bases
-  n_seq <- length(vec_seq)
-  if (!all(vec_seq %in% c("A","B","C","D","G","H","I","K","M","N","R","S","T","V","W","Y"))) {
-    warning("Non-nucleic acid bases found in input sequence")
+  if (length(input_seq) == 1 && is.na(input_seq)) return(NA)
+
+  # A vector of length > 1 is documented as one sequence supplied as separate
+  # characters, e.g. gc(c("a","t","c","g")); collapse it so that a single
+  # code path serves both forms. Everything below is .gc_vec(), so gc(),
+  # tm_gc(), tm_wallace() and salt_correct() now share one definition of GC
+  # and one implementation of the counting.
+  if (length(input_seq) > 1) {
+    input_seq <- paste0(input_seq, collapse = "")
   }
-  
-  # Count bases
-  nc <- sum(vec_seq %in% "C")
-  ng <- sum(vec_seq %in% "G")
-  na <- sum(vec_seq %in% "A")
-  nt <- sum(vec_seq %in% "T")
-  
-  if (ambiguous == FALSE) {
-    ngc <- ng + nc
-    nat <- na + nt
-  } else {
-    ngc <- ng + nc + sum(vec_seq %in% "S")
-    nat <- na + nt + sum(vec_seq %in% "W")
-    # for other ambiguous nucleatide acid base
-    if (na + nc != 0) {     #M
-      nm <- sum(vec_seq %in% "M")
-      ngc <- ngc + nm * nc/(na + nc)
-      nat <- nat + nm * na/(na + nc)
-    }
-    if (ng + nt != 0) {     #K
-      nk <- sum(vec_seq %in% "K")
-      ngc <- ngc + nk * ng/(ng + nt)
-      nat <- nat + nk * nt/(ng + nt)
-    }
-    if (ng + na != 0) {    #R
-      nr <- sum(vec_seq %in% "R")
-      ngc <- ngc + nr * ng/(ng + na)
-      nat <- nat + nr * na/(ng + na)
-    }
-    if (nc + nt != 0) {    #Y
-      ny <- sum(vec_seq %in% "Y")
-      ngc <- ngc + ny * nc/(nc + nt)
-      nat <- nat + ny * nt/(nc + nt)
-    }
-    if (na + nc + ng != 0) {    #V
-      nv <- sum(vec_seq %in% "V")
-      ngc <- ngc + nv * (nc + ng)/(na + nc + ng)
-      nat <- nat + nv * na/(na + nc + ng)
-    }
-    if (na + nc + nt != 0) {    #H
-      nh <- sum(vec_seq %in% "H")
-      ngc <- ngc + nh * nc/(na + nc + nt)
-      nat <- nat + nh * (na + nt)/(na + nc + nt)
-    }
-    if (na + ng + nt != 0) {    #D
-      nd <- sum(vec_seq %in% "D")
-      ngc <- ngc + nd * ng/(na + ng + nt)
-      nat <- nat + nd * (na + nt)/(na + ng + nt)
-    }
-    if (nc + ng + nt != 0) {    #B
-      nb <- sum(vec_seq %in% "B")
-      ngc <- ngc + nb * (nc + ng)/(nc + ng + nt)
-      nat <- nat + nb * nt/(nc + ng + nt)
-    }
-  }
-  
-  if (ngc + nat == 0) {
-    pt_gc <- NA
-  } else {
-    pt_gc <- 100 * ngc/(ngc + nat)
-  }
-  
-  return(pt_gc)
+  .gc_vec(input_seq, ambiguous = ambiguous)
 }
 
+
+
+
+#' Vectorized GC percent over a character vector of sequences
+#'
+#' Mirrors \code{gc()} exactly, including its ambiguity apportioning and its
+#' \code{GC/(A+C+G+T)} denominator, but counts every base in a single compiled
+#' pass per sequence (\code{cpp_base_counts()}) instead of splitting each
+#' sequence into a character vector with \code{s2c()} and scanning it five
+#' times. The apportioning arithmetic stays here, vectorised over the count
+#' matrix, so the published formula remains the readable one.
+#'
+#' @param input_seq Character vector of sequences.
+#' @param ambiguous Logical; apportion ambiguous IUPAC codes as \code{gc()} does.
+#' @return Numeric vector of GC percentages, \code{NA} where a sequence is
+#'   \code{NA} or contains no countable base.
+#' @keywords internal
+.gc_vec <- function(input_seq, ambiguous = FALSE) {
+  x <- as.character(input_seq)
+  m <- cpp_base_counts(x)          # uppercasing happens in the compiled pass
+
+  # gc() warns once per call; warn once for the whole vector instead.
+  if (any(m[, "other"] > 0L, na.rm = TRUE)) {
+    warning("Non-nucleic acid bases found in input sequence")
+  }
+
+  nA <- m[, "A"]; nC <- m[, "C"]; nG <- m[, "G"]; nT <- m[, "T"]
+
+  if (!isTRUE(ambiguous)) {
+    ngc <- nG + nC
+    nat <- nA + nT
+  } else {
+    ngc <- nG + nC + m[, "S"]
+    nat <- nA + nT + m[, "W"]
+    # gc() skips a code entirely when its denominator is zero, which is the
+    # same as adding zero; the mask reproduces that without dividing by 0.
+    apportion <- function(ngc, nat, k, denom, gc_part, at_part) {
+      ok <- !is.na(denom) & denom != 0
+      ngc[ok] <- ngc[ok] + k[ok] * gc_part[ok] / denom[ok]
+      nat[ok] <- nat[ok] + k[ok] * at_part[ok] / denom[ok]
+      list(ngc = ngc, nat = nat)
+    }
+    r <- apportion(ngc, nat, m[, "M"], nA + nC,      nC,      nA)      ; ngc <- r$ngc; nat <- r$nat
+    r <- apportion(ngc, nat, m[, "K"], nG + nT,      nG,      nT)      ; ngc <- r$ngc; nat <- r$nat
+    r <- apportion(ngc, nat, m[, "R"], nG + nA,      nG,      nA)      ; ngc <- r$ngc; nat <- r$nat
+    r <- apportion(ngc, nat, m[, "Y"], nC + nT,      nC,      nT)      ; ngc <- r$ngc; nat <- r$nat
+    r <- apportion(ngc, nat, m[, "V"], nA + nC + nG, nC + nG, nA)      ; ngc <- r$ngc; nat <- r$nat
+    r <- apportion(ngc, nat, m[, "H"], nA + nC + nT, nC,      nA + nT) ; ngc <- r$ngc; nat <- r$nat
+    r <- apportion(ngc, nat, m[, "D"], nA + nG + nT, nG,      nA + nT) ; ngc <- r$ngc; nat <- r$nat
+    r <- apportion(ngc, nat, m[, "B"], nC + nG + nT, nC + nG, nT)      ; ngc <- r$ngc; nat <- r$nat
+  }
+
+  tot <- ngc + nat
+  out <- ifelse(!is.na(tot) & tot == 0, NA_real_, 100 * ngc / tot)
+  as.numeric(out)
+}

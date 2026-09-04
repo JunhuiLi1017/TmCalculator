@@ -71,7 +71,7 @@ to_genomic_ranges() function.}
   - Specific alignment positions are needed}
 
 \item{nn_table}{Thermodynamic nearest-neighbor parameters for different nucleic acid hybridizations.
-  Thirty-one parameter sets are available, organized by hybridization type.
+  Parameter sets are listed below by hybridization type.
   Sets marked with a sodium concentration were fitted at that condition and
   are not salt-corrected further (see the "Choosing a parameter set" section).
 
@@ -269,16 +269,20 @@ DNA_NN_Breslauer_1986: Breslauer K J (1986) <doi:10.1073/pnas.83.11.3746>
 
 Parameter sets fall into two families that are handled differently.
 
-\strong{Reference-salt sets} (Breslauer 1986, Sugimoto 1996, Allawi 1998,
-SantaLucia 2004, Freier 1986, Xia 1998, Chen 2012, Sugimoto 1995) were fitted
-at a single reference sodium concentration, and other conditions are reached
-by applying one of the \code{salt_method} correction formulas.
+The two families are distinguished by one mechanical criterion: a set is
+condition-specific if and only if it carries a \code{salt_mM} attribute.
 
-\strong{Condition-specific sets} (the Weber/VarGibbs series and
-Banerjee 2020) were instead
+\strong{Reference-salt sets} (no \code{salt_mM}; Breslauer 1986,
+Sugimoto 1996, Allawi 1998, SantaLucia 2004, Freier 1986, Xia 1998,
+Chen 2012, Zuber 2022, Sugimoto 1995) were fitted at a single reference
+sodium concentration, and other conditions are reached by applying one of
+the \code{salt_method} correction formulas.
+
+\strong{Condition-specific sets} (the Weber/VarGibbs series, Banerjee 2020,
+and the molecular-crowding sets of Ghosh 2020 and Ghosh 2023) were instead
 fitted directly at a stated sodium concentration and are intended to
-\emph{replace} salt correction rather than be corrected. Each carries a
-\code{salt_mM} attribute. When the requested \code{Na} matches that value,
+\emph{replace} salt correction rather than be corrected. When the requested
+\code{Na} matches the set's \code{salt_mM} value,
 salt correction is skipped automatically; when it does not, the correction is
 still applied but a warning is issued, since correcting an already
 condition-specific set double-counts the ionic effect. Whether a correction
@@ -326,6 +330,20 @@ Turner D H , Mathews D H . NNDB: the nearest neighbor parameter database for pre
 Sugimoto N , Nakano S I , Katoh M , et al. Thermodynamic Parameters To Predict Stability of RNA/DNA Hybrid Duplexes[J]. Biochemistry, 1995, 34(35):11211-11216.
 
 Allawi H, SantaLucia J: Thermodynamics and NMR of internal G-T mismatches in DNA. Biochemistry 1997, 36:10581-10594.
+
+Weber G. Optimization method for obtaining nearest-neighbour DNA entropies and enthalpies directly from melting temperatures. Bioinformatics, 2015, 31(6):871-877.
+
+Ferreira I, Jolley E A, Znosko B M, Weber G. Replacing salt correction factors with optimized RNA nearest-neighbour enthalpy and entropy parameters. Chemical Physics, 2019, 521:69-76.
+
+Basilio Barbosa V, de Oliveira Martins E, Weber G. Nearest-neighbour parameters optimized for melting temperature prediction of DNA/RNA hybrids at high and low salt concentrations. Biophysical Chemistry, 2019, 251:106189.
+
+Banerjee D, Tateishi-Karimata H, Ohyama T, et al. Improved nearest-neighbor parameters for the stability of RNA/DNA hybrids under a physiological condition. Nucleic Acids Research, 2020, 48(21):12042-12054.
+
+Zuber J, Schroeder S J, Sun H, Turner D H, Mathews D H. Nearest neighbor rules for RNA helix folding thermodynamics: improved end effects. Nucleic Acids Research, 2022, 50(9):5251-5262.
+
+Ghosh S, Takahashi S, Ohyama T, et al. Nearest-neighbor parameters for predicting DNA duplex stability in diverse molecular crowding conditions. Proceedings of the National Academy of Sciences, 2020, 117(25):14194-14201.
+
+Ghosh S, Takahashi S, Banerjee D, et al. Nearest-neighbor parameters for the prediction of RNA duplex stability in diverse in vitro and cellular-like crowding conditions. Nucleic Acids Research, 2023, 51(9):4101-4111.
 
 Santalucia N E W J . Nearest-neighbor thermodynamics of deoxyinosine pairs in DNA duplexes[J]. Nucleic Acids Research, 2005, 33(19):6258-67.
 

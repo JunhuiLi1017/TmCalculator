@@ -10,3 +10,8 @@
 ^doc$
 ^Meta$
 ^ROADMAP\.md$
+^benchmark_tools_out$
+^isoGC_pairs\.csv$
+^bench_.*\.csv$
+^Figure2\.(png|tif)$
+^\.github$

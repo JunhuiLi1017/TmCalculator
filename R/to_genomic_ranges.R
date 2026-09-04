@@ -49,7 +49,7 @@
 #' 
 #' @export
 #' 
-#' @importFrom Biostrings getSeq
+#' @importFrom Biostrings getSeq readBStringSet
 #' @importFrom GenomicRanges GRanges
 #' @importFrom BSgenome available.genomes
 #' @importFrom IRanges IRanges
@@ -234,18 +234,24 @@ fa_to_genomic_ranges <- function(input_seq) {
     stop("Input FASTA file does not exist")
   }
   
-  # Read sequences from FASTA file
-  if (!requireNamespace("seqinr", quietly = TRUE))
-    stop("Package 'seqinr' is required to read FASTA files. ",
-         "Install it with: install.packages(\"seqinr\")", call. = FALSE)
-  seq_list <- seqinr::read.fasta(input_seq, as.string = TRUE, forceDNAtolower = FALSE)
-  if (length(seq_list) == 0) {
+  # Read with Biostrings, already a hard dependency, rather than seqinr, which
+  # was needed for this one call. readBStringSet() is used rather than
+  # readDNAStringSet() deliberately: the latter validates against the DNA
+  # alphabet and would reject RNA input, but this package ships twelve RNA
+  # parameter sets and inst/extdata/example1.fasta contains a U-bearing
+  # sequence. BStringSet imposes no alphabet and preserves case, so it matches
+  # seqinr::read.fasta(as.string = TRUE, forceDNAtolower = FALSE) exactly.
+  dss <- Biostrings::readBStringSet(input_seq)
+
+  if (length(dss) == 0) {
     stop("No sequences found in the FASTA file")
   }
-  
-  # Convert to named character vector
-  seq_vector <- unlist(lapply(seq_list, as.character))
-  
+
+  # seqinr named sequences by the first word of the header; keep that so that
+  # downstream region identifiers are unchanged.
+  seq_vector <- as.character(dss)
+  names(seq_vector) <- sub("\\s.*$", "", names(dss))
+
   # Create the GenomicRanges object
   gr <- vec_to_genomic_ranges(seq_vector)
   return(gr)

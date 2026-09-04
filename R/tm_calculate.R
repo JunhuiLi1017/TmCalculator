@@ -230,8 +230,8 @@
 #'   Only applicable for the GC method. Default: TRUE
 #'
 #' @param BPPARAM A \code{\link[BiocParallel]{BiocParallelParam}} object
-#'   specifying the parallel backend used to distribute per-window Tm
-#'   computation across workers. \code{BiocParallel::SnowParam(n)} (socket
+#'   specifying the parallel backend used to distribute the Tm computation
+#'   across workers. \code{BiocParallel::SnowParam(n)} (socket
 #'   clusters, all platforms including Windows) is recommended: workers are
 #'   fresh processes that receive only their own chunk of sequences.
 #'   \code{BiocParallel::MulticoreParam(n)} (forked processes, Unix/macOS) is
@@ -244,7 +244,7 @@
 #'   previous behavior exactly. Sequences are split into one contiguous chunk
 #'   per worker, so results are identical to the serial run. With the
 #'   compiled nearest-neighbor core, the serial default is typically fastest
-#'   up to around a million windows: worker startup and sequence
+#'   up to around a million sequences: worker startup and sequence
 #'   serialization outweigh the parallel gain. Reserve \code{BPPARAM} for
 #'   substantially larger jobs, or parallelize at a coarser level (e.g. one
 #'   chromosome per worker, each a serial \code{tm_calculate} call).

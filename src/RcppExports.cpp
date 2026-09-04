@@ -10,6 +10,17 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
+// cpp_base_counts
+IntegerMatrix cpp_base_counts(CharacterVector seqs);
+RcppExport SEXP _TmCalculator_cpp_base_counts(SEXP seqsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< CharacterVector >::type seqs(seqsSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_base_counts(seqs));
+    return rcpp_result_gen;
+END_RCPP
+}
 // cpp_tm_nn_dhds
 NumericMatrix cpp_tm_nn_dhds(CharacterVector seqs, CharacterVector cseqs, int shift, List nn, List tmm, List imm, List de, bool self_comp_eff, List end);
 RcppExport SEXP _TmCalculator_cpp_tm_nn_dhds(SEXP seqsSEXP, SEXP cseqsSEXP, SEXP shiftSEXP, SEXP nnSEXP, SEXP tmmSEXP, SEXP immSEXP, SEXP deSEXP, SEXP self_comp_effSEXP, SEXP endSEXP) {
@@ -31,6 +42,7 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_TmCalculator_cpp_base_counts", (DL_FUNC) &_TmCalculator_cpp_base_counts, 1},
     {"_TmCalculator_cpp_tm_nn_dhds", (DL_FUNC) &_TmCalculator_cpp_tm_nn_dhds, 9},
     {NULL, NULL, 0}
 };

@@ -26,37 +26,25 @@
 #' 
 #' @export generate_complement
 #' 
-generate_complement <- function(input_seq, reverse = FALSE) { 
-  # Define complement table
-  complement_table <- c(
-    "A" = "T", "T" = "A", "G" = "C", "C" = "G",
-    "M" = "K", "K" = "M", "R" = "Y", "Y" = "R",
-    "W" = "W", "S" = "S", "B" = "V", "V" = "B",
-    "D" = "H", "H" = "D", "N" = "N", "I" = "I"
-  )
+generate_complement <- function(input_seq, reverse = FALSE) {
+  # Complement map, identical to the lookup table this function used before:
+  #   A<->T  G<->C  M<->K  R<->Y  B<->V  D<->H   W, S, N, I self-complement
+  # Case-sensitive, as before: lowercase input matched no table entry and so
+  # became ".", and that behaviour is preserved rather than quietly improved.
+  from <- "ATGCMKRYWSBVDHNI"
+  to   <- "TACGKMYRWSVBHDNI"
 
-  # Process each sequence
-  result <- sapply(input_seq, function(seqs) {
-    # Convert to character vector
-    seq_vec <- s2c(seqs)
-    
-    # Get complement
-    comp_vec <- sapply(seq_vec, function(base) {
-      if (base %in% names(complement_table)) {
-        return(complement_table[base])
-      } else {
-        return(".")
-      }
-    })
-    
-    # Reverse if requested
-    if (reverse) {
-      comp_vec <- rev(comp_vec)
-    }
-    
-    # Convert back to string and preserve attributes
-    return(c2s(comp_vec))
-  })
-  
-  return(result)
+  x <- as.character(input_seq)
+  x <- gsub(paste0("[^", from, "]"), ".", x)   # unmatched characters -> "."
+  comp <- chartr(from, to, x)
+
+  if (reverse) {
+    comp <- vapply(strsplit(comp, "", fixed = TRUE),
+                   function(z) paste(rev(z), collapse = ""),
+                   character(1L), USE.NAMES = FALSE)
+  }
+  # sapply(USE.NAMES = TRUE) used to name the result after the input strings;
+  # kept so that callers relying on those names are unaffected.
+  names(comp) <- input_seq
+  comp
 }

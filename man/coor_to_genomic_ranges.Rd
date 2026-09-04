@@ -48,7 +48,8 @@ A \code{GRanges} object with metadata columns:
   \describe{
     \item{\code{sequence}}{Reference sequence for each interval.}
     \item{\code{complement}}{Complementary sequence.}
-    \item{\code{GC}}{GC fraction (0-1) per interval.}
+    \item{\code{GC}}{GC percentage (0-100) per interval, computed as
+      \code{100 * (G+C)/(A+C+G+T)} so that N is excluded from the denominator.}
     \item{\code{region_id}}{Region identifier from the coordinate string.}
     \item{\code{genome_pkg}}{BSgenome package name used.}
   }

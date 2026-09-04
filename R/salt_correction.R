@@ -87,12 +87,11 @@ salt_correct <- function(Na=0,
     if(is.null(input_seq)){
       stop("'input_seq' should not be NULL when method is one of 'SantaLucia1998-2','Owczarzy2004','Owczarzy2008'")
     }else{
-      if(length(input_seq)==1){
-        input_seq <- s2c(input_seq)
-      }
-      mySeq <- toupper(input_seq)
-      nSeq <- length(mySeq)
-      ptGC <- gc(mySeq,ambiguous=ambiguous)
+      # One counting implementation for the whole package; gc() itself now
+      # delegates here, so this avoids splitting the sequence a second time.
+      if (length(input_seq) > 1) input_seq <- paste0(input_seq, collapse = "")
+      nSeq <- nchar(input_seq)
+      ptGC <- .gc_vec(input_seq, ambiguous = ambiguous)
     }
   }
   if(Na < 0 | K < 0 | Tris < 0 | Mg < 0 | dNTPs < 0){

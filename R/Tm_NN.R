@@ -10,16 +10,20 @@
 #' @section Choosing a parameter set:
 #' Parameter sets fall into two families that are handled differently.
 #'
-#' \strong{Reference-salt sets} (Breslauer 1986, Sugimoto 1996, Allawi 1998,
-#' SantaLucia 2004, Freier 1986, Xia 1998, Chen 2012, Sugimoto 1995) were fitted
-#' at a single reference sodium concentration, and other conditions are reached
-#' by applying one of the \code{salt_method} correction formulas.
+#' The two families are distinguished by one mechanical criterion: a set is
+#' condition-specific if and only if it carries a \code{salt_mM} attribute.
 #'
-#' \strong{Condition-specific sets} (the Weber/VarGibbs series and
-#' Banerjee 2020) were instead
+#' \strong{Reference-salt sets} (no \code{salt_mM}; Breslauer 1986,
+#' Sugimoto 1996, Allawi 1998, SantaLucia 2004, Freier 1986, Xia 1998,
+#' Chen 2012, Zuber 2022, Sugimoto 1995) were fitted at a single reference
+#' sodium concentration, and other conditions are reached by applying one of
+#' the \code{salt_method} correction formulas.
+#'
+#' \strong{Condition-specific sets} (the Weber/VarGibbs series, Banerjee 2020,
+#' and the molecular-crowding sets of Ghosh 2020 and Ghosh 2023) were instead
 #' fitted directly at a stated sodium concentration and are intended to
-#' \emph{replace} salt correction rather than be corrected. Each carries a
-#' \code{salt_mM} attribute. When the requested \code{Na} matches that value,
+#' \emph{replace} salt correction rather than be corrected. When the requested
+#' \code{Na} matches the set's \code{salt_mM} value,
 #' salt correction is skipped automatically; when it does not, the correction is
 #' still applied but a warning is issued, since correcting an already
 #' condition-specific set double-counts the ionic effect. Whether a correction
@@ -58,7 +62,7 @@
 #'   - Specific alignment positions are needed
 #' 
 #' @param nn_table Thermodynamic nearest-neighbor parameters for different nucleic acid hybridizations.
-#'   Thirty-one parameter sets are available, organized by hybridization type.
+#'   Parameter sets are listed below by hybridization type.
 #'   Sets marked with a sodium concentration were fitted at that condition and
 #'   are not salt-corrected further (see the "Choosing a parameter set" section).
 #'
@@ -255,6 +259,20 @@
 #' Sugimoto N , Nakano S I , Katoh M , et al. Thermodynamic Parameters To Predict Stability of RNA/DNA Hybrid Duplexes[J]. Biochemistry, 1995, 34(35):11211-11216.
 #' 
 #' Allawi H, SantaLucia J: Thermodynamics and NMR of internal G-T mismatches in DNA. Biochemistry 1997, 36:10581-10594.
+#' 
+#' Weber G. Optimization method for obtaining nearest-neighbour DNA entropies and enthalpies directly from melting temperatures. Bioinformatics, 2015, 31(6):871-877.
+#' 
+#' Ferreira I, Jolley E A, Znosko B M, Weber G. Replacing salt correction factors with optimized RNA nearest-neighbour enthalpy and entropy parameters. Chemical Physics, 2019, 521:69-76.
+#' 
+#' Basilio Barbosa V, de Oliveira Martins E, Weber G. Nearest-neighbour parameters optimized for melting temperature prediction of DNA/RNA hybrids at high and low salt concentrations. Biophysical Chemistry, 2019, 251:106189.
+#' 
+#' Banerjee D, Tateishi-Karimata H, Ohyama T, et al. Improved nearest-neighbor parameters for the stability of RNA/DNA hybrids under a physiological condition. Nucleic Acids Research, 2020, 48(21):12042-12054.
+#' 
+#' Zuber J, Schroeder S J, Sun H, Turner D H, Mathews D H. Nearest neighbor rules for RNA helix folding thermodynamics: improved end effects. Nucleic Acids Research, 2022, 50(9):5251-5262.
+#' 
+#' Ghosh S, Takahashi S, Ohyama T, et al. Nearest-neighbor parameters for predicting DNA duplex stability in diverse molecular crowding conditions. Proceedings of the National Academy of Sciences, 2020, 117(25):14194-14201.
+#' 
+#' Ghosh S, Takahashi S, Banerjee D, et al. Nearest-neighbor parameters for the prediction of RNA duplex stability in diverse in vitro and cellular-like crowding conditions. Nucleic Acids Research, 2023, 51(9):4101-4111.
 #' 
 #' Santalucia N E W J . Nearest-neighbor thermodynamics of deoxyinosine pairs in DNA duplexes[J]. Nucleic Acids Research, 2005, 33(19):6258-67.
 #' 
@@ -588,9 +606,10 @@ tm_nn <- function(gr_seq,
   len <- res[, "len"]
   ok  <- res[, "ok"] > 0
 
-  # GC as computed by .GC_fast(): (G+C)/length (I counts in the denominator)
-  gc_fast <- ifelse(len > 0, 100 * nGC / len, NA_real_)
-  # GC as computed by gc() inside salt_correct(): (G+C)/(A+C+G+T)
+  # One definition of GC throughout the package: (G+C)/(A+C+G+T), i.e. gc()
+  # semantics. Previously this path reported (G+C)/length and salt-corrected
+  # with (G+C)/(A+C+G+T); the two diverge whenever inosine is present, since
+  # I counts in the length but is not a determinable base.
   gc_salt <- ifelse(acgt > 0, 100 * nGC / acgt, NA_real_)
 
   k <- if (self_comp_eff) dnac_high * 1e-9 else
@@ -621,7 +640,7 @@ tm_nn <- function(gr_seq,
                                formamide_unit = formamide_unit,
                                dmso_factor = dmso_factor,
                                formamide_factor = formamide_factor,
-                               pt_gc = gc_fast)
+                               pt_gc = gc_salt)
 
   # Reproduce the R core's failure semantics: any sequence whose evaluation
   # errored (short/missing init rows) or whose salt correction is undefined
@@ -632,7 +651,7 @@ tm_nn <- function(gr_seq,
     bad <- bad | is.na(corr_salt)
   }
   tm[bad] <- NA_real_
-  gc_out <- gc_fast
+  gc_out <- gc_salt
   gc_out[bad] <- NA_real_
   list(Tm = unname(tm), GC = unname(gc_out))
 }
@@ -879,7 +898,7 @@ tm_nn <- function(gr_seq,
   } else {
     tm <- (1000 * delta_h) / (delta_s + (R * (log(k)))) - 273.15
   }
-  pt_gc <- .GC_fast(seq_str, ambiguous = ambiguous)
+  pt_gc <- .gc_vec(seq_str, ambiguous = ambiguous)
   corr_chem <- chem_correct(
     DMSO = DMSO,
     formamide_unit = formamide_unit,
@@ -913,40 +932,6 @@ get_table <- function(table_name) {
     assign(table_name, .TM_CONSTANTS[[table_name]], envir = .TM_TABLE_CACHE)
   }
   get(table_name, envir = .TM_TABLE_CACHE, inherits = FALSE)
-}
-
-
-# -----------------------------------------------------------------------------
-# FIX 5: Fast GC calculation
-# Add to R/GC.R as an internal helper .GC_fast()
-# -----------------------------------------------------------------------------
-
-#' @keywords internal
-.GC_fast <- function(seq_upper, ambiguous = FALSE) {
-  # seq_upper: already uppercased character string
-  n <- nchar(seq_upper)
-  if (n == 0L) return(NA_real_)
-
-  if (!ambiguous) {
-    nGC <- n - nchar(gsub("[GC]", "", seq_upper, perl = TRUE))
-    return(100 * nGC / n)
-  }
-
-  # Ambiguous: count each IUPAC code's GC contribution
-  # G=1, C=1, S(G+C)=1, Y(C+T)=0.5, R(A+G)=0.5,
-  # K(G+T)=0.5, M(A+C)=0.5, B(CGT)=2/3, D(AGT)=1/3, H(ACT)=1/3, V(ACG)=2/3
-  nG <- n - nchar(gsub("G", "", seq_upper, fixed = TRUE))
-  nC <- n - nchar(gsub("C", "", seq_upper, fixed = TRUE))
-  nS <- n - nchar(gsub("S", "", seq_upper, fixed = TRUE))   # G+C = 1.0
-  nY <- n - nchar(gsub("Y", "", seq_upper, fixed = TRUE))   # C+T = 0.5
-  nR <- n - nchar(gsub("R", "", seq_upper, fixed = TRUE))   # A+G = 0.5
-  nK <- n - nchar(gsub("K", "", seq_upper, fixed = TRUE))   # G+T = 0.5
-  nM <- n - nchar(gsub("M", "", seq_upper, fixed = TRUE))   # A+C = 0.5
-  nB <- n - nchar(gsub("B", "", seq_upper, fixed = TRUE))   # C+G+T = 2/3
-  nV <- n - nchar(gsub("V", "", seq_upper, fixed = TRUE))   # A+C+G = 2/3
-
-  gc_count <- nG + nC + nS + 0.5*(nY + nR + nK + nM) + (2/3)*(nB + nV)
-  100 * gc_count / n
 }
 
 

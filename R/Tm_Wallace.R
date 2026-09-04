@@ -76,17 +76,21 @@ tm_wallace <- function(gr_seq, ambiguous = FALSE,
 # worker. `chunk` is list(sequence=) for this worker's block.
 #' @keywords internal
 .tm_wallace_chunk <- function(chunk, ambiguous) {
-  m   <- length(chunk$sequence)
-  tm  <- rep(NA_real_, m)
-  gcv <- rep(NA_real_, m)
-  for (j in seq_len(m)) {
-    filter_seq <- chunk$sequence[j]
-    n_seq <- length(s2c(filter_seq))
-    pt_gc <- gc(filter_seq, ambiguous = ambiguous)
-    n_gc <- n_seq * pt_gc / 100
-    n_at <- n_seq - n_gc
-    tm[j]  <- 4 * n_gc + 2 * n_at
-    gcv[j] <- pt_gc
-  }
-  list(Tm = tm, GC = gcv)
+  seqs <- chunk$sequence
+  m    <- length(seqs)
+  if (m == 0L) return(list(Tm = numeric(0), GC = numeric(0)))
+
+  # Was a per-sequence loop calling s2c() twice (once for the length, once
+  # inside gc()) and scanning the character vector five times. Counting now
+  # happens once per sequence in compiled code via .gc_vec(); the arithmetic
+  # below is unchanged, including the use of the full sequence length rather
+  # than the A+C+G+T count when converting the GC percentage back to a base
+  # count, so results are identical.
+  n_seq <- nchar(seqs)                       # == length(s2c(x))
+  pt_gc <- .gc_vec(seqs, ambiguous = ambiguous)
+
+  n_gc <- n_seq * pt_gc / 100
+  n_at <- n_seq - n_gc
+
+  list(Tm = as.numeric(4 * n_gc + 2 * n_at), GC = as.numeric(pt_gc))
 }

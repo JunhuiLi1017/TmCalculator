@@ -227,37 +227,43 @@ tm_gc <- function(gr_seq,
 .tm_gc_chunk <- function(chunk, ambiguous, gc_coef, mismatch, salt_method_eff,
                          Na, K, Tris, Mg, dNTPs,
                          DMSO, formamide_unit, dmso_factor, formamide_factor) {
-  m   <- length(chunk$sequence)
-  tm  <- rep(NA_real_, m)
-  gcv <- rep(NA_real_, m)
-  for (j in seq_len(m)) {
-    filtered_seq <- chunk$sequence[j]
-    n_seq <- nchar(filtered_seq)
-    pt_gc <- gc(filtered_seq, ambiguous = ambiguous)
-    tm_j <- gc_coef[1] + gc_coef[2] * pt_gc - gc_coef[3] / n_seq
-    if (mismatch == TRUE) {
-      mismatch_count <- sum(filtered_seq %in% 'X')
-      tm_j <- tm_j - gc_coef[4] * (mismatch_count * 100 / n_seq)
-    }
-    if (!is.na(salt_method_eff)) {
-      tm_j <- tm_j + salt_correct(Na = Na,
-                                  K = K,
-                                  Tris = Tris,
-                                  Mg = Mg,
-                                  dNTPs = dNTPs,
-                                  method = salt_method_eff,
-                                  input_seq = filtered_seq,
-                                  ambiguous = ambiguous)
-    }
-    if (DMSO > 0 | formamide_unit$value > 0) {
-      tm_j <- tm_j + chem_correct(DMSO = DMSO,
-                                  formamide_unit = formamide_unit,
-                                  dmso_factor = dmso_factor,
-                                  formamide_factor = formamide_factor,
-                                  pt_gc = pt_gc)
-    }
-    tm[j]  <- tm_j
-    gcv[j] <- pt_gc
+  seqs <- chunk$sequence
+  m    <- length(seqs)
+  if (m == 0L) return(list(Tm = numeric(0), GC = numeric(0)))
+
+  # Previously this was a per-sequence loop calling gc(), which split every
+  # sequence with s2c() and scanned it five times, and salt_correct(), which
+  # did the same again. On 23,208 E. coli windows that cost 51.7 s against
+  # 0.67 s for the compiled nearest-neighbor path. Both are now computed for
+  # the whole chunk at once.
+  n_seq <- nchar(seqs)
+  pt_gc <- .gc_vec(seqs, ambiguous = ambiguous)
+
+  tm <- gc_coef[1] + gc_coef[2] * pt_gc - gc_coef[3] / n_seq
+
+  if (isTRUE(mismatch)) {
+    # Behaviour preserved deliberately: `seqs %in% "X"` is TRUE only when an
+    # entire sequence is the single character "X", so this term is zero for
+    # any real input. Vectorising it as-is keeps results identical; the
+    # underlying counting bug is recorded in ROADMAP.md rather than changed
+    # here, where it would silently alter published values.
+    mismatch_count <- as.numeric(seqs %in% "X")
+    tm <- tm - gc_coef[4] * (mismatch_count * 100 / n_seq)
   }
-  list(Tm = tm, GC = gcv)
+
+  if (!is.na(salt_method_eff)) {
+    tm <- tm + .salt_correct_vec(Na = Na, K = K, Tris = Tris, Mg = Mg,
+                                 dNTPs = dNTPs, method = salt_method_eff,
+                                 gc_pct = pt_gc, seq_len = n_seq)
+  }
+
+  if (DMSO > 0 | formamide_unit$value > 0) {
+    tm <- tm + chem_correct(DMSO = DMSO,
+                            formamide_unit = formamide_unit,
+                            dmso_factor = dmso_factor,
+                            formamide_factor = formamide_factor,
+                            pt_gc = pt_gc)
+  }
+
+  list(Tm = as.numeric(tm), GC = as.numeric(pt_gc))
 }

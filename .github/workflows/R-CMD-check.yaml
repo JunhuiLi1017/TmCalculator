@@ -1,0 +1,69 @@
+# R CMD check on every push and pull request.
+#
+# Notes specific to this package:
+#  * Most dependencies are Bioconductor packages (BSgenome, Biostrings,
+#    GenomicRanges, IRanges, S4Vectors, GenomeInfoDb, BiocGenerics,
+#    BiocParallel, and karyoploteR/BSgenomeForge in Suggests), so the
+#    Bioconductor repository is added explicitly; the public RSPM mirror
+#    supplies binaries for the CRAN ones.
+#  * The package contains C++ (src/), so the runners need build tools. The
+#    r-lib actions install these, and R_KEEP_PKG_SOURCE keeps srcrefs so that
+#    failures point at readable line numbers.
+#  * The check is run with --as-cran but is allowed to pass with NOTEs
+#    (error-on: warning). At the time of writing the only NOTE seen locally
+#    is "unable to verify current time", which is an environment artefact.
+#  * BSgenome.Hsapiens.UCSC.hg38 is deliberately not a declared dependency
+#    (~850 MB); the hg38 examples are inside \dontrun{} and that vignette
+#    sets eval = FALSE, so nothing here needs it.
+
+on:
+  push:
+    branches: [main, master, dev]
+  pull_request:
+  workflow_dispatch:
+
+name: R-CMD-check
+
+permissions: read-all
+
+jobs:
+  R-CMD-check:
+    runs-on: ${{ matrix.config.os }}
+
+    name: ${{ matrix.config.os }} (${{ matrix.config.r }})
+
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {os: ubuntu-latest,   r: 'release'}
+          - {os: ubuntu-latest,   r: 'devel', http-user-agent: 'release'}
+          - {os: macos-latest,    r: 'release'}
+          - {os: windows-latest,  r: 'release'}
+
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      R_KEEP_PKG_SOURCE: yes
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.config.r }}
+          http-user-agent: ${{ matrix.config.http-user-agent }}
+          use-public-rspm: true
+          extra-repositories: https://bioconductor.org/packages/release/bioc
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::rcmdcheck
+          needs: check
+
+      - uses: r-lib/actions/check-r-package@v2
+        with:
+          args: 'c("--no-manual", "--as-cran")'
+          error-on: '"warning"'
+          upload-snapshots: true
