@@ -1,0 +1,313 @@
+---
+title: "Window-Size Sensitivity of Genome-Wide Tm Profiles"
+author: "Junhui Li, Lihua Julie Zhu"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Window-Size Sensitivity of Genome-Wide Tm Profiles}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo      = TRUE,
+  message   = FALSE,
+  warning   = FALSE,
+  fig.align = "center",
+  fig.width = 7,
+  fig.height = 6
+)
+```
+
+# Introduction
+
+Any window-based genomic profile depends on the window size, which acts as a
+smoothing bandwidth: too large and local signal is averaged away, too small
+and single-window noise dominates. This vignette quantifies that dependence
+for **TmCalculator** by recomputing the *Escherichia coli* K-12 MG1655
+Tm/GC profile at 50, 100, 200 and 500 bp and asking two separate questions.
+
+1. Does window size change the thermodynamic landscape itself?
+2. Does it change a biological conclusion drawn from that landscape?
+
+The companion vignette
+`vignette("genome_wide_tm_ecoli", package = "TmCalculator")` develops the
+full case study at the 200 bp resolution used by Hasenauer *et al.* (2025),
+including the MutL-associated region (MutL-AR) comparison that is re-tested
+here at every window size.
+
+# Setup
+
+We reproduce the minimum needed from the main case study: the genome, the
+MutL-AR peak coordinates, and the reference labels used for plotting.
+
+```{r packages}
+library(TmCalculator)
+library(GenomicRanges)
+library(IRanges)
+library(GenomeInfoDb)
+```
+
+The *E. coli* genome is supplied by the pre-forged
+`BSgenome.Ecoli.NCBI.ASM584v2` package. The chunk below installs it if it is
+not already available, exactly as in the main case-study vignette; see that
+vignette for how the package is forged from the NCBI assembly accession.
+
+```{r setup-ecoli-bsgenome, message=FALSE, warning=FALSE}
+ecoli_pkg  <- "BSgenome.Ecoli.NCBI.ASM584v2"
+genome_obj <- "Ecoli"   # BSgenomeObjname in DESCRIPTION; not the package name
+
+.ecoli_genome_ready <- function() {
+  if (!requireNamespace(ecoli_pkg, quietly = TRUE)) return(FALSE)
+  exists(genome_obj, envir = asNamespace(ecoli_pkg), inherits = FALSE)
+}
+
+if (!.ecoli_genome_ready()) {
+  if (!requireNamespace("remotes", quietly = TRUE)) {
+    utils::install.packages("remotes", repos = "https://cloud.r-project.org")
+  }
+  remotes::install_github(
+    "JunhuiLi1017/BSgenome.Ecoli.NCBI.ASM584v2",
+    upgrade = "never",
+    quiet = TRUE
+  )
+}
+
+if (!.ecoli_genome_ready()) {
+  stop(
+    "Could not load genome object '", genome_obj, "' from package '",
+    ecoli_pkg, "'.\n",
+    "See vignette(\"genome_wide_tm_ecoli\") for how to forge it locally.",
+    call. = FALSE
+  )
+}
+```
+
+```{r load-genome}
+suppressPackageStartupMessages(library(ecoli_pkg, character.only = TRUE))
+genome      <- base::get(genome_obj, envir = asNamespace(ecoli_pkg))
+genome_name <- ecoli_pkg
+chr_name    <- "U00096.3"
+chr_length  <- GenomeInfoDb::seqlengths(genome)[[chr_name]]
+
+data(ecoli_rep_hotspots)
+
+## MutL-AR peaks, as in the main case study
+mutH_peaks <- GRanges(
+  seqnames = ecoli_rep_hotspots$all_peaks_IP_mutH$chr,
+  ranges   = IRanges(start = ecoli_rep_hotspots$all_peaks_IP_mutH$start,
+                     end   = ecoli_rep_hotspots$all_peaks_IP_mutH$end)
+)
+seqlevels(mutH_peaks) <- chr_name
+mutH_peaks$peak_id <- paste0("mutH_", seq_along(mutH_peaks))
+
+## Reference labels: replication origin (ori) and terminus (dif)
+label <- data.frame(
+  seqnames = genome_name,
+  start    = c(3925804, 1590777),
+  end      = c(3925804, 1590777),
+  label    = c("ori", "dif")
+)
+```
+
+---
+
+# Sensitivity analysis
+
+For each window size we retile the chromosome, recompute Tm and GC, and
+re-run the MutL-AR comparison, keeping every other setting fixed. Nothing
+downstream needs to change: the annotation layers keep their own native
+resolutions (1 kb bins for the microsatellite, cruciform and GATC density
+tracks; variable-width intervals for MutL-AR peaks and ssDNA regions), and
+both `plot_genome_track()` and the overlap-based statistics work across
+mixed resolutions.
+
+```{r window-sensitivity}
+window_sizes <- c(50L, 100L, 200L, 500L)
+
+sens <- lapply(window_sizes, function(w) {
+  bins_w <- make_genomiccoord(
+    bsgenome = genome_name, chromosomes = chr_name,
+    window = w, slide = w, start = 1, end = chr_length,
+    strand = "+", verbose = FALSE
+  )
+  gr_w <- to_genomic_ranges_fast(list(pkg_name = genome_name, seq = bins_w))
+  tm_w <- tm_calculate(gr_w, method = "tm_nn",
+                       nn_table = "DNA_NN_Breslauer_1986", Na = 50)$gr
+
+  ann <- integrate_granges(gr_tm = tm_w, gr_features = mutH_peaks,
+                           strategy = "overlap", feature_cols = "peak_id",
+                           keep_unmatched = TRUE)
+  ann$in_mutH <- ifelse(is.na(ann$peak_id), "non_peak", "peak")
+  cg <- compare_groups(gr = ann, target = c("Tm", "GC"),
+                       method = "wilcoxon", group = "in_mutH",
+                       alternative = "greater", posthoc = FALSE)
+  list(gr = tm_w, ann = ann, test = cg)
+})
+names(sens) <- paste0("w", window_sizes)
+```
+
+### Distributional stability
+
+```{r sensitivity-distribution}
+dist_tbl <- do.call(rbind, lapply(seq_along(window_sizes), function(i) {
+  g <- sens[[i]]$gr
+  data.frame(
+    window_bp = window_sizes[i],
+    n_windows = length(g),
+    Tm_mean   = mean(g$Tm, na.rm = TRUE),
+    Tm_sd     = stats::sd(g$Tm, na.rm = TRUE),
+    Tm_IQR    = stats::IQR(g$Tm, na.rm = TRUE),
+    GC_mean   = mean(g$GC, na.rm = TRUE)
+  )
+}))
+knitr::kable(dist_tbl, digits = 3,
+             caption = "Tm/GC distribution by window size.")
+```
+
+Two systematic effects are visible, both expected. First, mean Tm rises
+with window length (`r sprintf("%.1f", dist_tbl$Tm_mean[1])` to
+`r sprintf("%.1f", dist_tbl$Tm_mean[nrow(dist_tbl)])` degrees C from
+`r dist_tbl$window_bp[1]` to `r dist_tbl$window_bp[nrow(dist_tbl)]` bp):
+duplex stability increases with length in the nearest-neighbor model, so
+absolute Tm values are only comparable *within* one window size. Second,
+shorter windows widen the distribution (SD
+`r sprintf("%.2f", dist_tbl$Tm_sd[1])` at `r dist_tbl$window_bp[1]` bp vs
+`r sprintf("%.2f", dist_tbl$Tm_sd[nrow(dist_tbl)])` at
+`r dist_tbl$window_bp[nrow(dist_tbl)]` bp) -- window size acts as a
+smoothing bandwidth. The mean GC is invariant
+(`r sprintf("%.3f", mean(dist_tbl$GC_mean))` throughout), confirming that
+the composition landscape itself does not depend on the tiling.
+
+### Cross-scale agreement
+
+We aggregate each finer profile onto the 500 bp grid (mean Tm per bin)
+and correlate it with the directly computed 500 bp profile:
+
+```{r sensitivity-correlation}
+gr500  <- sens[["w500"]]$gr
+bin500 <- (start(gr500) - 1L) %/% 500L
+
+cor_tbl <- vapply(c("w50", "w100", "w200"), function(k) {
+  g   <- sens[[k]]$gr
+  agg <- tapply(g$Tm, (start(g) - 1L) %/% 500L, mean, na.rm = TRUE)
+  stats::cor(agg[match(bin500, as.integer(names(agg)))], gr500$Tm,
+             use = "complete.obs")
+}, numeric(1))
+round(cor_tbl, 3)
+```
+
+Aggregated onto a common 500 bp grid, the profiles are nearly
+interchangeable (r =
+`r paste(sprintf("%.3f", cor_tbl), collapse = ", ")` for 50, 100 and
+200 bp respectively). Window size rescales and smooths the profile but
+preserves the spatial landscape.
+
+### Robustness of the MutL-AR association
+
+Finally, the vignette's biological conclusion -- that Tm and GC differ
+between MutL-AR peak windows and the genomic background -- is re-tested
+at every window size:
+
+```{r sensitivity-tests}
+## Per-window-size test statistics
+test_results <- do.call(rbind, lapply(seq_along(window_sizes), function(i) {
+  data.frame(window_bp = window_sizes[i], sens[[i]]$test$results)
+}))
+test_results
+
+## Per-window-size group summaries, plus the median Tm effect size
+test_summary <- do.call(rbind, lapply(seq_along(window_sizes), function(i) {
+  ann <- sens[[i]]$ann
+  med <- tapply(ann$Tm, ann$in_mutH, stats::median, na.rm = TRUE)
+  data.frame(window_bp   = window_sizes[i],
+             n_peak      = sum(ann$in_mutH == "peak"),
+             Tm_med_diff = unname(med["peak"] - med["non_peak"]),
+             sens[[i]]$test$summary)
+}))
+test_summary
+```
+
+### Multi-scale tracks alongside the multi-omics layers
+
+Because every track keeps its native resolution, the four Tm/GC profiles
+can be drawn as concentric layers of one integrated figure, together
+with the annotation data:
+
+```{r sensitivity-tracks, fig.width=8, fig.height=8, fig.cap="Multi-scale integration. Concentric rings from outside in: MutL-AR peaks (ideogram), GC content at 50/100/200/500 bp (blues), Tm at 50/100/200/500 bp (reds), and microsatellite density (green). Yellow bands mark MutL-AR peaks."}
+## darkest = finest window (50 bp), lightest = coarsest (500 bp)
+scale_cols_gc <- c("#1A5276", "#2E86C1", "#5DADE2", "#AED6F1")
+scale_cols_tm <- c("#7B241C", "#CB4335", "#EC7063", "#F5B7B1")
+
+sens_dfs <- lapply(sens, function(x) as.data.frame(x$gr[, c("Tm", "GC")]))
+
+tracks_scale <- c(
+  list(list(type = "rect", data = ecoli_rep_hotspots$all_peaks_IP_mutH,
+            col = "#2C3E50", bg.col = "grey", name = "MutL-AR",
+            legend_font_col = "#2C3E50", ideogram = TRUE, height = 0.5)),
+  lapply(seq_along(window_sizes), function(i)
+    list(type = "line", data = sens_dfs[[i]], value_col = "GC",
+         name = paste0("GC ", window_sizes[i], " bp"),
+         col = scale_cols_gc[i], legend_font_col = scale_cols_gc[i])),
+  lapply(seq_along(window_sizes), function(i)
+    list(type = "line", data = sens_dfs[[i]], value_col = "Tm",
+         name = paste0("Tm ", window_sizes[i], " bp"),
+         col = scale_cols_tm[i], legend_font_col = scale_cols_tm[i])),
+  list(list(type = "line", data = ecoli_rep_hotspots$bins_rep,
+            value_col = "count", name = "Microsatellites", col = "#2ECC71",
+            legend_font_col = "#2ECC71"),
+       list(type = "highlight",
+            data = ecoli_rep_hotspots$all_peaks_IP_mutH,
+            col = "#F1C40F", alpha = 0.18))
+)
+
+plot_genome_track(
+  genome_name = genome_name,
+  genome_size = chr_length,
+  track_list  = tracks_scale,
+  circular    = TRUE,
+  label       = label
+)
+```
+
+At whole-genome scale the four bandwidths look nearly identical -- the
+landscape is invariant. The difference window size makes is local
+smoothing, best seen in a zoomed view:
+
+```{r sensitivity-zoom, fig.width=10, fig.height=7, fig.cap="Zoomed 1.5-1.7 Mb region. The 50 bp profile resolves single-window fluctuations that the 500 bp profile averages away; all four trace the same underlying landscape."}
+plot_genome_track(
+  genome_name = genome_name,
+  genome_size = chr_length,
+  track_list  = tracks_scale,
+  zoom        = "U00096.3:1500000-1700000"
+)
+```
+
+```{r sensitivity-effect-sizes, echo=FALSE}
+eff <- unique(test_summary[, c("window_bp", "Tm_med_diff")])
+gc_rows <- test_summary[test_summary$target == "GC", ]
+```
+
+The association is reproduced at every scale. MutL-AR windows are lower
+in median Tm than the background at all four window sizes
+(`r paste(sprintf("%+.2f", eff$Tm_med_diff), collapse = ", ")` degrees C
+at `r paste(eff$window_bp, collapse = ", ")` bp) and lower in GC
+(`r sprintf("%.3f", mean(gc_rows$mean[gc_rows$group == "peak"]))` in peaks
+vs `r sprintf("%.3f", mean(gc_rows$mean[gc_rows$group == "non_peak"]))`
+in the background), and every Wilcoxon test is significant
+(largest p = `r format(max(test_results$p.value), digits = 2, scientific = TRUE)`).
+As expected, p values shrink with the number of windows while the effect
+size stays essentially constant, so the biological conclusion does not
+depend on the window choice. The primary analysis uses 200 bp to match
+Hasenauer *et al.* (2025), whose Methods compute GC content and melting
+temperature in 200 bp bins (using TmCalculator) and bin the ChIP-seq
+coverage at the same 200 bp resolution.
+
+---
+
+# Session Information
+
+```{r session-info}
+sessionInfo()
+```

@@ -32,18 +32,6 @@ with 5 workers.
    from Apple clang); RcppParallel/TBB is the portable route. With items
    1-3 combined, chr1 should drop from ~52 s to ~15 s single-process.
 
-## Thermodynamic models
-
-6. **Zuber et al. (2022) RNA end effects** (NAR 50:5251,
-   doi:10.1093/nar/gkac261; raised by a manuscript reviewer). Their
-   improved terminal terms depend on the penultimate base pair ("AU end
-   on AU" vs "AU end on CG", plus GU-end variants), which the current
-   core's initiation system cannot express. Requires a small core
-   extension: an optional end-stack table looked up on the terminal
-   dinucleotide keys and added without trimming (unlike tmm). The
-   companion Banerjee et al. (2020) hybrid set (gkaa572) is already
-   implemented as RNA_DNA_NN_Banerjee_2020 in 1.10.0.
-
 ## API hygiene
 
 4. **Rename `gc()` to `gc_content()`.** The exported `gc()` masks

@@ -71,9 +71,14 @@ rules for RNA helix folding thermodynamics: improved end effects.*
 Nucleic Acids Research 2022;50(9):5251–5262. doi:10.1093/nar/gkac261 —
 Tables 1A and 1B, "New Model" columns.
 
-**Status: not yet implemented** (see the end-effect note below).
+**Status: implemented** as `RNA_NN_Zuber_2022` (stacks, Tables 1A and 1B)
+together with its companion `RNA_NN_Zuber_2022_END` (penultimate-pair
+dependent end terms). See "End effects" below for how the end terms are
+applied, and section 2C for the one term that is deliberately omitted.
 
-Despite the title, these are duplex parameters: they are fitted from
+Despite the title — the paper says "helix folding", which in this
+literature means helix formation from two separated strands rather than
+intramolecular folding — these are duplex parameters: they are fitted from
 optical melting of short RNA duplexes using the two-state relation
 1/Tm = R·ln(Ct/4)/ΔH° + ΔS°/ΔH°, and the comparison column of Table 1A is
 Xia et al. (1998), i.e. this set is a direct successor to
@@ -111,24 +116,32 @@ GC/CG: −16.52 + 13.07 = −3.45 ≈ −3.46; Initiation: 4.66 − 0.55 = 4.11 
 `RNA_NN_Xia_1998` (AC/UG ↔ our `GT/CA` = −11.40; AG/UC ↔ our `CT/GA` =
 −10.48; CC/GG ↔ our `GG/CC` = −13.39).
 
-### The end-effect problem
+### End effects
 
 Xia 1998 applies one terminal-AU penalty per AU end, which the package
 stores in `init_A/T` (3.72, 10.5) and applies as
-`init_A/T × (number of AT ends)`. Zuber 2022 splits this into two terms
+`init_A/T × (number of AT ends)`. Zuber 2022 replaces this with terms
 that depend on the **penultimate** base pair: +4.36/+13.35 when the AU
-end sits on an AU pair, +3.17/+8.79 when it sits on a CG pair. The
-current core cannot express this, which is why the set is not yet
-shipped: entering either value alone would silently misrepresent the
-model.
+end sits on an AU pair, +3.17/+8.79 when it sits on a CG pair, plus four
+further values for GU ends. Entering any single value in `init_A/T`
+would misrepresent the model, so `init_A/T` is zero for this set and the
+end terms are carried by a companion table instead.
 
-The fix is small and well defined. The condition "terminal AU pair with
-penultimate X pair" is exactly a property of the **terminal dinucleotide
-stack**, and the core already computes those keys (`keys_fr[1]` and
-`.right_key()`) for the dangling-end and terminal-mismatch lookups. What
-is needed is an additional optional table looked up on those same keys
-whose contribution is **added without trimming** the terminal base pair
-(unlike `de_tbl`/`tmm_tbl`, which consume it). Scheduled in `ROADMAP.md`.
+The condition "terminal AU pair with penultimate X pair" is exactly a
+property of the **terminal dinucleotide stack**, and the core already
+computes those keys (`keys_fr[1]` and `.right_key()`) for the
+dangling-end and terminal-mismatch lookups. `RNA_NN_Zuber_2022_END` is
+looked up on those same keys, at both duplex ends, and its contribution
+is **added without trimming** the terminal base pair — unlike `de_tbl`
+and `tmm_tbl`, which consume it. Getting that distinction wrong produces
+a systematic offset rather than an obvious error, so it is covered by a
+dedicated test (`tests/testthat/test_tm_nn_rcpp.R`, "Zuber 2022 end
+effects are applied at both duplex ends"), and the compiled and
+reference implementations are checked against each other for this set.
+
+A parameter set supplies end terms simply by defining a table named
+`<set>_END`; `get_end_table()` returns it when present and an empty
+matrix otherwise, so sets without end terms are unaffected.
 
 ### 2B. GU-containing stacks (Table 1B)
 
@@ -153,44 +166,40 @@ whose contribution is **added without trimming** the terminal base pair
 These eleven stacks are the same eleven GU rows carried by
 `RNA_NN_Chen_2012`, under the strand-symmetry equivalences noted above
 (e.g. paper `GC/UG` ≡ package `GT/CG`), so Table 1B slots into the
-existing row set once the end table exists.
+existing row set. The four GU end terms are held in
+`RNA_NN_Zuber_2022_END` alongside the AU ones.
 
-Out of scope: Table 1B also lists a `GGUC/CUGG` term (−32.49, −92.57),
-a four-nucleotide motif correction rather than a nearest-neighbor stack.
-It cannot be represented in a dinucleotide model and is not planned.
+### 2C. Deliberately omitted: the GGUC/CUGG motif
+
+Table 1B also lists a `GGUC/CUGG` term (−32.49, −92.57). This is a
+four-nucleotide motif correction, not a nearest-neighbor stack, and a
+dinucleotide model cannot represent it: the correction is a property of
+the tetramer as a whole and is not decomposable into the two stacks that
+overlap it. It is therefore not implemented, and duplexes containing
+this motif will be predicted slightly less stable than the full Zuber
+model would give. This is a structural limitation of the nearest-neighbor
+formalism used throughout the package, not an omission from the
+transcription.
 
 ---
 
-## 3. Ready-to-paste table for Zuber 2022 (WCF)
+## 3. Where the Zuber 2022 tables live
 
-For use in `R/zzz.R` once the end table exists. Row order follows
-`rownames(DNA_NN_Breslauer_1986)`, as the other RNA sets do. The
-`init_A/T` value below is the AU-end-on-CG term; it is a placeholder and
-must be replaced by the two-term end table before release.
+An earlier revision of this document carried a draft table for pasting
+into `R/zzz.R`, in which `init_A/T` held the "AU end on CG" value as a
+stand-in because the core could not yet express penultimate-pair
+dependent ends. That draft has been removed: it is **not** what shipped,
+and using it would apply a single averaged penalty at both ends and at
+GU ends, which is precisely the approximation Zuber 2022 exists to
+replace.
 
-```r
-  RNA_NN_Zuber_2022 <- matrix(c(
-      4.66,   1.78,     # init
-      3.17,   8.79,     # init_A/T   PLACEHOLDER: AU end on CG only
-      0.00,   0.00,     # init_G/C
-      0.00,   0.00,     # init_oneG/C
-      0.00,   0.00,     # init_allA/T
-      0.00,   0.00,     # init_5T/A
-      0.00,  -1.38,     # sym
-     -7.44, -20.98,     # AA/TT
-     -8.91, -25.22,     # AT/TA
-     -9.16, -25.40,     # TA/AT
-    -10.47, -27.08,     # CA/GT
-    -11.98, -31.37,     # GT/CA
-     -9.34, -23.66,     # CT/GA
-    -13.75, -36.53,     # GA/CT
-     -9.61, -23.46,     # CG/GC
-    -16.52, -42.13,     # GC/CG
-    -13.94, -34.41      # GG/CC
-  ), ncol = 2, byrow = TRUE,
-     dimnames = list(rownames(DNA_NN_Breslauer_1986), nn_col))
-```
+The authoritative definitions are in `R/zzz.R`:
 
+- `RNA_NN_Zuber_2022` — stacks from Tables 1A and 1B, with `init_A/T`
+  set to zero because the end terms are not a single averaged penalty.
+- `RNA_NN_Zuber_2022_END` — the 24 end rows (12 AU-end, 12 GU-end),
+  keyed on the terminal dinucleotide with the terminal pair written
+  first, so one table serves both duplex ends.
 
 ---
 

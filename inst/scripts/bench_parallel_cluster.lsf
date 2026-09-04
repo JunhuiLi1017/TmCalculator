@@ -1,0 +1,55 @@
+#!/bin/bash
+# ===========================================================================
+# LSF submission for bench_parallel_cluster.R
+#
+#   bsub < inst/scripts/bench_parallel_cluster.lsf
+#
+# The two options that matter for the validity of the measurement are -x and
+# span[hosts=1]. Without exclusive use, other jobs compete for cores and
+# memory bandwidth on the same node and the scaling curve measures the
+# cluster's load rather than the software. Without span[hosts=1], LSF may
+# scatter the slots across machines, which SnowParam's PSOCK workers cannot
+# use anyway since they are started locally.
+# ===========================================================================
+#BSUB -J tmcalc_parbench
+#BSUB -q long                 # adjust to a queue whose limit exceeds -W
+#BSUB -W 8:00                 # 3 strategies x ~6 worker counts x 3 reps
+#BSUB -n 16                   # slots; the script sweeps up to n-1 workers
+#BSUB -R "span[hosts=1]"      # all slots on one machine (PSOCK is node-local)
+#BSUB -R "rusage[mem=8000]"   # MB per slot; segment mode needs ~1-2 GB per
+                              # worker, chromosome mode up to ~4.5 GB
+#BSUB -x                      # EXCLUSIVE node -- do not remove
+#BSUB -o logs/parbench.%J.out
+#BSUB -e logs/parbench.%J.err
+
+set -euo pipefail
+mkdir -p logs results
+
+# --- modules -------------------------------------------------------------
+# Adjust these two lines to your site. The R build must be the one where
+# TmCalculator and BSgenome.Hsapiens.UCSC.hg38 are installed.
+module load R/4.4.0 || true
+
+# --- node-local scratch --------------------------------------------------
+# LSF sets LSB_JOBTMPDIR on many sites; fall back to /tmp under the job id.
+# This must be LOCAL disk. If it resolves to a shared filesystem the whole
+# point of staging is lost -- check with `df -T "$SCRATCH"` before trusting
+# the numbers.
+SCRATCH="${LSB_JOBTMPDIR:-/tmp/$LSB_JOBID}"
+mkdir -p "$SCRATCH"
+trap 'rm -rf "$SCRATCH"' EXIT
+
+echo "host      : $(hostname)"
+echo "slots     : ${LSB_DJOB_NUMPROC:-unset}"
+echo "scratch   : $SCRATCH"
+df -T "$SCRATCH" || true      # confirm it is local, not nfs/gpfs/lustre
+lscpu | grep -E "^(Model name|Socket|Core|Thread)" || true
+
+# --- run -----------------------------------------------------------------
+Rscript inst/scripts/bench_parallel_cluster.R \
+  --outdir results \
+  --reps 3 \
+  --segsize 50e6 \
+  --scratch "$SCRATCH"
+
+echo "done: $(date)"
