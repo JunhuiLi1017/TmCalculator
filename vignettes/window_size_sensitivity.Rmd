@@ -166,6 +166,44 @@ knitr::kable(dist_tbl, digits = 3,
              caption = "Tm/GC distribution by window size.")
 ```
 
+The same two effects are easier to read as distributions than as summary
+statistics: the curve moves to the right as the window lengthens, and it
+narrows at the same time.
+
+```{r sensitivity-density, fig.width=7, fig.height=4.5, fig.cap="Tm distribution at each window size. The distribution shifts to higher Tm as the window lengthens and narrows at the same time; dotted vertical lines mark the group means. Colours match the multi-scale tracks below (darkest = 50 bp, lightest = 500 bp)."}
+## Palettes are defined here because they are used both by this panel and by
+## the multi-scale track figures further down.
+## darkest = finest window (50 bp), lightest = coarsest (500 bp)
+scale_cols_gc <- c("#1A5276", "#2E86C1", "#5DADE2", "#AED6F1")
+scale_cols_tm <- c("#7B241C", "#CB4335", "#EC7063", "#F5B7B1")
+
+## Densities are normalised, so the ~93,000 windows at 50 bp and the ~9,300
+## at 500 bp can be compared directly on one pair of axes.
+tm_by_size <- lapply(sens, function(x) x$gr$Tm[is.finite(x$gr$Tm)])
+dens <- lapply(tm_by_size, stats::density)
+
+xlim <- range(vapply(dens, function(z) range(z$x), numeric(2)))
+ylim <- c(0, max(vapply(dens, function(z) max(z$y), numeric(1))))
+
+op <- par(mar = c(4.2, 4.4, 0.8, 0.8), las = 1)
+plot(NA, xlim = xlim, ylim = ylim, bty = "n",
+     xlab = expression(italic(T)[m] ~ "(" * degree * "C)"),
+     ylab = "Density")
+for (i in seq_along(dens)) {
+  lines(dens[[i]], col = scale_cols_tm[i], lwd = 2)
+  abline(v = dist_tbl$Tm_mean[i], col = scale_cols_tm[i], lwd = 1, lty = 3)
+}
+legend("topleft", bty = "n", lwd = 2, seg.len = 1.6,
+       col = scale_cols_tm[seq_along(window_sizes)],
+       legend = sprintf("%d bp: mean %.1f, SD %.2f",
+                        dist_tbl$window_bp, dist_tbl$Tm_mean, dist_tbl$Tm_sd))
+par(op)
+
+## Spread of the finest window relative to the coarsest. This is the ratio
+## quoted in the manuscript, so both come from the same computation.
+sd_ratio <- dist_tbl$Tm_sd[1] / dist_tbl$Tm_sd[nrow(dist_tbl)]
+```
+
 Two systematic effects are visible, both expected. First, mean Tm rises
 with window length (`r sprintf("%.1f", dist_tbl$Tm_mean[1])` to
 `r sprintf("%.1f", dist_tbl$Tm_mean[nrow(dist_tbl)])` degrees C from
@@ -175,7 +213,8 @@ absolute Tm values are only comparable *within* one window size. Second,
 shorter windows widen the distribution (SD
 `r sprintf("%.2f", dist_tbl$Tm_sd[1])` at `r dist_tbl$window_bp[1]` bp vs
 `r sprintf("%.2f", dist_tbl$Tm_sd[nrow(dist_tbl)])` at
-`r dist_tbl$window_bp[nrow(dist_tbl)]` bp) -- window size acts as a
+`r dist_tbl$window_bp[nrow(dist_tbl)]` bp, a ratio of
+`r sprintf("%.2f", sd_ratio)`) -- window size acts as a
 smoothing bandwidth. The mean GC is invariant
 (`r sprintf("%.3f", mean(dist_tbl$GC_mean))` throughout), confirming that
 the composition landscape itself does not depend on the tiling.
@@ -236,10 +275,7 @@ can be drawn as concentric layers of one integrated figure, together
 with the annotation data:
 
 ```{r sensitivity-tracks, fig.width=8, fig.height=8, fig.cap="Multi-scale integration. Concentric rings from outside in: MutL-AR peaks (ideogram), GC content at 50/100/200/500 bp (blues), Tm at 50/100/200/500 bp (reds), and microsatellite density (green). Yellow bands mark MutL-AR peaks."}
-## darkest = finest window (50 bp), lightest = coarsest (500 bp)
-scale_cols_gc <- c("#1A5276", "#2E86C1", "#5DADE2", "#AED6F1")
-scale_cols_tm <- c("#7B241C", "#CB4335", "#EC7063", "#F5B7B1")
-
+## scale_cols_gc / scale_cols_tm are defined in the density-panel chunk above
 sens_dfs <- lapply(sens, function(x) as.data.frame(x$gr[, c("Tm", "GC")]))
 
 tracks_scale <- c(

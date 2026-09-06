@@ -44,7 +44,7 @@ tm_calculate(
   dmso_factor = 0.75,
   formamide_factor = 0.65,
   mismatch = TRUE,
-  BPPARAM = BiocParallel::SerialParam()
+  BPPARAM = NULL
 )
 }
 \arguments{
@@ -145,8 +145,8 @@ Several papers report factors between 0.6 and 0.72.}
 Only applicable for the GC method. Default: TRUE}
 
 \item{BPPARAM}{A \code{\link[BiocParallel]{BiocParallelParam}} object
-specifying the parallel backend used to distribute per-window Tm
-computation across workers. \code{BiocParallel::SnowParam(n)} (socket
+specifying the parallel backend used to distribute the Tm computation
+across workers. \code{BiocParallel::SnowParam(n)} (socket
 clusters, all platforms including Windows) is recommended: workers are
 fresh processes that receive only their own chunk of sequences.
 \code{BiocParallel::MulticoreParam(n)} (forked processes, Unix/macOS) is
@@ -154,12 +154,15 @@ NOT recommended for large inputs: forked workers inherit the parent
 session via copy-on-write, and R's garbage collector then forces the
 kernel to duplicate inherited pages in every worker, which can consume
 more time than the computation itself. \code{n} should not exceed the
-number of physical cores. The default,
-\code{BiocParallel::SerialParam()}, runs serially and reproduces
-previous behavior exactly. Sequences are split into one contiguous chunk
+number of physical cores. The default, \code{NULL}, runs serially in the
+calling process. Passing \code{BiocParallel::SerialParam()} gives the
+same result, but a \code{BiocParallelParam} is an S4 object that would
+then be constructed and queried on every call; that cost is invisible on
+a genome-scale call and noticeable when the function is invoked in a
+loop over short sequences. Sequences are split into one contiguous chunk
 per worker, so results are identical to the serial run. With the
 compiled nearest-neighbor core, the serial default is typically fastest
-up to around a million windows: worker startup and sequence
+up to around a million sequences: worker startup and sequence
 serialization outweigh the parallel gain. Reserve \code{BPPARAM} for
 substantially larger jobs, or parallelize at a coarser level (e.g. one
 chromosome per worker, each a serial \code{tm_calculate} call).}

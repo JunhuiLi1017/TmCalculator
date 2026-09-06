@@ -5,7 +5,7 @@
 \alias{tm_wallace}
 \title{Calculate the melting temperature using the 'Wallace rule'}
 \usage{
-tm_wallace(gr_seq, ambiguous = FALSE, BPPARAM = BiocParallel::SerialParam())
+tm_wallace(gr_seq, ambiguous = FALSE, BPPARAM = NULL)
 }
 \arguments{
 \item{gr_seq}{Pre-processed sequence(s) in 5' to 3' direction. This should be the output from
@@ -17,7 +17,10 @@ to_genomic_ranges() function.}
 specifying the parallel backend, e.g.
 \code{BiocParallel::MulticoreParam(4)} (Unix/macOS) or
 \code{BiocParallel::SnowParam(4)} (all platforms). The default,
-\code{BiocParallel::SerialParam()}, runs serially.}
+\code{NULL}, runs serially in the calling process. Passing
+\code{BiocParallel::SerialParam()} is equivalent but constructs an S4
+object on every call, which is measurable when the function is called
+repeatedly on small inputs.}
 }
 \value{
 Returns a list of sequences with updated Tm attributes

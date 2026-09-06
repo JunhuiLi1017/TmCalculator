@@ -44,19 +44,42 @@
 # ===========================================================================
 
 ## -- Configuration ---------------------------------------------------------
-pkg        <- "BSgenome.Hsapiens.UCSC.hg38"
-chrs       <- paste0("chr", c(1:22, "X", "Y"))
-window     <- 200L
-slide      <- 200L
-nn_table   <- "DNA_NN_SantaLucia_2004"
-Na         <- 50
-seg_size   <- 50e6            # segment mode: bp per task
-worker_set <- c(3L, 4L, 5L, 6L)
-strategies <- c("static", "dynamic", "segment")
-n_rep      <- 2L              # repeat each configuration; run-to-run spread on
-                              # a laptop is large enough that a single
-                              # measurement should not be reported
-outfile    <- "bench_parallel_strategy.csv"
+# A full sweep is 3 strategies x 4 worker counts x 3 repetitions, each pass
+# covering all 24 chromosomes, and takes hours. Every setting is therefore
+# overridable from the command line so that a smoke test can be run first:
+#
+#   Rscript inst/scripts/bench_parallel_strategy.R \
+#     --chrs chr21,chr22 --workers 2,3 --reps 1 --outfile smoke.csv
+#
+# That exercises all three strategies end to end in a few minutes. Only when
+# it completes and the window counts agree is it worth starting the real run.
+args <- commandArgs(trailingOnly = TRUE)
+argval <- function(flag, default) {
+  i <- match(flag, args)
+  if (is.na(i) || i == length(args)) default else args[i + 1L]
+}
+
+pkg        <- argval("--pkg", "BSgenome.Hsapiens.UCSC.hg38")
+chrs       <- strsplit(argval("--chrs", paste0("chr", c(1:22, "X", "Y"),
+                                               collapse = ",")), ",")[[1]]
+window     <- as.integer(argval("--window", "200"))
+slide      <- as.integer(argval("--slide", as.character(window)))
+nn_table   <- argval("--nn-table", "DNA_NN_Breslauer_1986")  # matches Section 2.2
+Na         <- as.numeric(argval("--na", "50"))
+seg_size   <- as.numeric(argval("--segsize", "50e6"))        # bp per task
+worker_set <- as.integer(strsplit(argval("--workers", "3,4,5,6"), ",")[[1]])
+strategies <- strsplit(argval("--strategies", "static,dynamic,segment"), ",")[[1]]
+n_rep      <- as.integer(argval("--reps", "3"))
+                              # repeat each configuration: the same worker count
+                              # has been observed to differ by ~28% between
+                              # runs on this machine, so a single measurement
+                              # must not be reported as a point value
+outfile    <- argval("--outfile", "bench_parallel_strategy.csv")
+
+message("chromosomes: ", paste(chrs, collapse = ", "))
+message("workers    : ", paste(worker_set, collapse = ", "),
+        "   strategies: ", paste(strategies, collapse = ", "),
+        "   reps: ", n_rep)
 
 suppressPackageStartupMessages({
   library(TmCalculator)
@@ -170,7 +193,7 @@ run_config <- function(strategy, n_workers) {
     as.data.frame(attr(x, "bench"), stringsAsFactors = FALSE)))
 
   n_win_total <- sum(b$n_win)
-  rm(res); invisible(base::gc())          # base:: -- the package exports gc()
+  rm(res); invisible(gc())
 
   list(
     summary = data.frame(

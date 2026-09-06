@@ -51,7 +51,6 @@
 #' 
 #' @importFrom Biostrings getSeq readBStringSet
 #' @importFrom GenomicRanges GRanges
-#' @importFrom BSgenome available.genomes
 #' @importFrom IRanges IRanges
 #' @importFrom S4Vectors mcols
 #' @importFrom GenomeInfoDb genome

@@ -55,7 +55,7 @@ pkg        <- "BSgenome.Hsapiens.UCSC.hg38"
 chrs       <- paste0("chr", c(1:22, "X", "Y"))
 window     <- 200L
 slide      <- 200L
-nn_table   <- "DNA_NN_SantaLucia_2004"
+nn_table   <- "DNA_NN_Breslauer_1986"   # matches the case study (Section 2.2)
 Na         <- 50
 strategies <- c("static", "dynamic", "segment")
 
@@ -246,7 +246,7 @@ run_config <- function(strategy, n_workers) {
   b <- do.call(rbind, lapply(res, function(x)
     as.data.frame(attr(x, "bench"), stringsAsFactors = FALSE)))
   n_win_total <- sum(b$n_win)
-  rm(res); invisible(base::gc())        # base:: -- the package exports gc()
+  rm(res); invisible(gc())
 
   list(summary = data.frame(
          strategy = strategy, n_workers = n_workers, n_tasks = nrow(b),

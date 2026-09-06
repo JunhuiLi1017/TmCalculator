@@ -197,7 +197,6 @@
 #' @importFrom methods is
 #' @importFrom Biostrings getSeq letterFrequency
 #' @importFrom GenomeInfoDb seqlengths seqlevels genome
-#' @importFrom BSgenome provider organism
 #' @importFrom S4Vectors metadata
 #' @export
 make_genomiccoord <- function(
@@ -424,6 +423,18 @@ make_genomiccoord <- function(
   # Fallback: class name or provider + genome
   cls <- class(bsgenome)
   if (length(cls) > 0 && nchar(cls[1]) > 5) return(cls[1])
+  # Last resort, reached only when the object carries no Package metadata and
+  # has an unusually short class name. BSgenome is in Suggests rather than
+  # Imports because attaching it pulls in rtracklayer, Rsamtools and their
+  # dependencies, which costs several seconds at load for functionality most
+  # calls never touch. Any genuine BSgenome object comes from a package that
+  # depends on BSgenome, so the namespace is available whenever this branch
+  # can actually be reached; the guard covers the case where it is not.
+  if (!requireNamespace("BSgenome", quietly = TRUE)) {
+    warning("Cannot derive the genome package name: the 'BSgenome' package ",
+            "is not installed. Supply 'pkg_name' explicitly.", call. = FALSE)
+    return(if (length(cls)) cls[1] else NA_character_)
+  }
   paste0("BSgenome.", BSgenome::organism(bsgenome), ".",
          BSgenome::provider(bsgenome), ".", GenomeInfoDb::genome(bsgenome))
 }

@@ -3,7 +3,7 @@
 # bench_methods.R -- relative cost of the three Tm methods on identical input
 #
 # Motivation: the nearest-neighbor path runs in compiled code, whereas
-# tm_gc() and tm_wallace() loop over sequences in R and call gc(), which
+# tm_gc_content() and tm_wallace() loop over sequences in R and call gc(), which
 # splits each sequence into a character vector with s2c() and then makes
 # five %in% passes over it. It is therefore possible that the "simple"
 # composition-based methods are slower per window than the "expensive"

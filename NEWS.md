@@ -1,6 +1,47 @@
 # TmCalculator 1.10.0
 
+## Bug fix affecting all nearest-neighbor Tm values
+
+* **Four of the six reverse-complement rows added to every nearest-neighbor
+  table were transposed, so `tm_nn()` returned incorrect Tm values for any
+  sequence containing an AC, AG, TC or TG step.** A key `XY/WZ` denotes the
+  duplex 5'-XY-3' / 3'-WZ-5'; read from the other strand the same stack is
+  written as the character reversal of the key. `.complete_nn_rc()` instead
+  gave `AC/TG` and `TG/AC` each other's parameters, and likewise `AG/TC` and
+  `TC/AG`.
+
+  Every table built through that helper was affected, which is all of the
+  DNA and RNA sets including `DNA_NN_Breslauer_1986` and
+  `DNA_NN_SantaLucia_2004`. `RNA_DNA_NN_Sugimoto_1995` and the RNA/DNA hybrid
+  sets ship with all sixteen pairs and were never completed, so they are
+  unaffected.
+
+  The size of the error depends on how far apart the transposed rows are in a
+  given table and on how often the affected steps occur, so it is
+  sequence-dependent rather than a constant offset. It is small for
+  SantaLucia 2004 (the transposed pairs differ by 0.1 and 0.4 kcal/mol) and
+  considerably larger for Breslauer 1986 (0.7 and 2.2 kcal/mol). **Any Tm
+  computed with a previous release should be recomputed.**
+
+  Found by recovering dH and dS from `Tm_NN` in Biopython and from MELTING 5
+  and comparing them with this package: those two agree with each other on
+  the sequence-dependent part of the sum, and this package did not.
+  `tests/testthat/test_nn_rc_completion.R` now re-derives the mapping from
+  the reversal rule rather than restating it, and pins the four affected rows
+  to their published values.
+
 ## Breaking changes
+
+* **`gc()` has been renamed `gc_content()` and is no longer exported under its
+  old name.** The exported `gc()` masked `base::gc()` for every user of the
+  package, so attaching it printed a masking warning and any subsequent call
+  to the garbage collector needed a `base::` prefix, including inside this
+  package's own benchmark scripts.
+
+  No deprecated alias is kept, because keeping one would preserve exactly the
+  masking the rename is meant to remove. Existing calls fail loudly rather
+  than silently: `gc("ACGT")` now reaches `base::gc()`, whose first argument
+  is `verbose`, and errors instead of returning a plausible number.
 
 * **`GC` is now a percentage everywhere, computed as
   `100 * (G+C)/(A+C+G+T)`.** `coor_to_genomic_ranges()` previously wrote this
@@ -33,6 +74,41 @@
   implementation and one definition of GC; the internal `.GC_fast()`, which
   carried a second definition, has been removed.
 
+* **Fewer S4 operations per call.** Profiling a 100-sequence `tm_nn()` call
+  found `validObject()`, `updateObject()` and method dispatch accounting for
+  most of the run time, against about 2% in the compiled core. Three sources
+  were removed: the two `GRanges` subsets used to drop N-containing regions
+  are now taken only when something is actually dropped; the `GC` and `Tm`
+  metadata columns are written in a single `mcols<-` assignment instead of
+  two `$<-` calls, each of which replaced and revalidated the whole metadata
+  table; and the metadata table is extracted once and reused. `tm_gc()`
+  receives the same treatment for its two column writes.
+
+  This is a fixed saving per call rather than per sequence, so it does not
+  change genome-scale timings. It matters when the functions are called
+  repeatedly on short sequences. Results are unchanged.
+
+  Measured on a 100-sequence input of 25 bp oligonucleotides, the two changes
+  in this section together reduced the cost of one `tm_calculate()` call from
+  25.1 ms to 11.6 ms, a factor of 2.2 (`BPPARAM` default 25.1 -> 21.4 ms; the
+  S4 reductions 21.4 -> 11.6 ms). Profiling after the change shows no single
+  remaining hotspot: the residual cost is S4 method dispatch distributed
+  across the Biostrings, S4Vectors and GenomicRanges accessors, and removing
+  it would require keeping the hot path out of S4 entirely.
+
+* **`BPPARAM` now defaults to `NULL` rather than
+  `BiocParallel::SerialParam()`** in `tm_calculate()`, `tm_nn()`, `tm_gc()`
+  and `tm_wallace()`. The two are equivalent in behaviour: `.bp_map_chunks()`
+  has always called the worker directly whenever the backend has a single
+  worker, so `SerialParam()` was constructed, queried through the S4 generic
+  `bpnworkers()`, and then not used. Profiling showed that construction
+  accounted for roughly half the per-call cost of `tm_nn()` on a short input.
+
+  The saving is a fixed amount per call, not per sequence, so it is invisible
+  on a genome-scale run and worth having when the functions are called in a
+  loop over individual oligonucleotides. Passing an explicit
+  `SerialParam()` still works and still runs serially.
+
 ## Dependencies
 
 * **`seqinr` is no longer required.** It was used for `s2c()`/`c2s()` in
@@ -45,6 +121,26 @@
   reject the RNA input this package supports. FASTA parsing behaviour is
   unchanged: no alphabet restriction, case preserved, sequences named by the
   first word of the header.
+
+* **`BSgenome` moved from Imports to Suggests, cutting load time by about
+  two thirds.** Attaching it pulls in rtracklayer, Rsamtools,
+  GenomicAlignments and their dependencies: measured on its own it took 7.2 s
+  to load, against 6.5 s for all of TmCalculator and roughly 2 s for the rest
+  of the Bioconductor packages combined. Every user paid that whether or not
+  they touched a genome.
+
+  Almost nothing used it. `available.genomes` was imported and never called.
+  `organism()` and `provider()` are reached only in the second fallback of
+  `.resolve_pkg_name()`, when a `BSgenome` object carries no `Package`
+  metadata and has a class name shorter than six characters, and they are now
+  guarded by `requireNamespace()`. Sequence extraction goes through
+  `Biostrings::getSeq()`, whose method for `BSgenome` objects is registered
+  when the genome package itself is loaded, which
+  `coor_to_genomic_ranges()` already does on demand.
+
+  Genome-wide workflows are unaffected: a genome package such as
+  `BSgenome.Ecoli.NCBI.ASM584v2` depends on BSgenome, so it is present
+  whenever it is needed.
 
 * `rlang` removed from Suggests; it was referenced nowhere.
 

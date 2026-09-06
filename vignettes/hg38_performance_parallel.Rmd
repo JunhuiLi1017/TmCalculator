@@ -56,16 +56,16 @@ resident size of the current process — including C++ allocations that R's
 GC does not see — comes from `ps::ps_memory_info()`.
 
 ```{r measuring}
-base::gc(reset = TRUE)                # reset the "max used" high-water mark
+gc(reset = TRUE)                      # reset the "max used" high-water mark
 ## ... run the code to be measured ...
-base::gc()                            # read peak from the "max used" column
+gc()                                  # read peak from the "max used" column
 
 ps::ps_memory_info()[["rss"]] / 1e9   # current process resident set, GB
 ```
 
-Note the `base::` prefix: TmCalculator exports a `gc()` function of its
-own (GC *content* of a sequence), which masks R's garbage collector once
-the package is attached.
+(Earlier releases exported a `gc()` of their own, for the GC *content* of a
+sequence, which masked R's garbage collector once the package was attached.
+That function is now `gc_content()`, so no `base::` prefix is needed.)
 
 For `SnowParam()` workers the manager cannot see worker memory at all;
 record it inside the worker function and return it with the result (this

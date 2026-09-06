@@ -36,7 +36,7 @@
 #   benchmark_tools_agreement.csv    pairwise Tm differences
 #   plus a markdown summary printed to the console
 # ===========================================================================
-setwd("/Users/lij11/UMass Medical School Dropbox/Junhui Li/Project/UMMS/Github/JunhuiLi1017/TmCalculator")
+setwd("~/dropbox/Project/UMMS/Github/JunhuiLi1017/TmCalculator")
 ## -- Configuration ---------------------------------------------------------
 sizes         <- c(100L, 500L, 2000L, 5000L, 23208L)  # 23208 = full genome
 rmelting_max_n <- 2000L      # raise if you are willing to wait

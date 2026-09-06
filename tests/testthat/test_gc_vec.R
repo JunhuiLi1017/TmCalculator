@@ -4,7 +4,7 @@ test_that(".gc_vec reproduces gc() on unambiguous sequences", {
     paste0(sample(c("A", "C", "G", "T"), sample(8:300, 1), TRUE), collapse = ""),
     character(1))
   expect_equal(TmCalculator:::.gc_vec(seqs),
-               vapply(seqs, function(s) TmCalculator::gc(s), numeric(1),
+               vapply(seqs, function(s) TmCalculator::gc_content(s), numeric(1),
                       USE.NAMES = FALSE))
 })
 
@@ -17,7 +17,7 @@ test_that(".gc_vec reproduces gc() with ambiguous codes apportioned", {
   for (amb in c(FALSE, TRUE)) {
     expect_equal(
       TmCalculator:::.gc_vec(seqs, ambiguous = amb),
-      vapply(seqs, function(s) TmCalculator::gc(s, ambiguous = amb),
+      vapply(seqs, function(s) TmCalculator::gc_content(s, ambiguous = amb),
              numeric(1), USE.NAMES = FALSE),
       info = paste("ambiguous =", amb))
   }
@@ -27,7 +27,7 @@ test_that(".gc_vec handles the degenerate cases gc() special-cases", {
   # A sequence with no countable base gives NA in both implementations; an
   # all-N sequence is the case that reaches the ngc + nat == 0 branch.
   expect_true(is.na(TmCalculator:::.gc_vec("NNNNNNNN")))
-  expect_true(is.na(TmCalculator::gc("NNNNNNNN")))
+  expect_true(is.na(TmCalculator::gc_content("NNNNNNNN")))
 
   expect_true(is.na(TmCalculator:::.gc_vec(NA_character_)))
 
@@ -38,7 +38,7 @@ test_that(".gc_vec handles the degenerate cases gc() special-cases", {
   expect_true(is.na(out[2]))
   expect_equal(out[3], 0)
 
-  # Inosine is in gc()'s accepted alphabet but is rejected by DNAStringSet,
+  # Inosine is in gc_content()'s accepted alphabet but is rejected by DNAStringSet,
   # which is one reason the counting is done in cpp_base_counts() rather than
   # through Biostrings::letterFrequency().
   expect_silent(TmCalculator:::.gc_vec("AICGT"))
@@ -60,7 +60,7 @@ test_that("tm_gc is unchanged by the vectorised chunk worker", {
   sm  <- co$salt_correct
 
   ref <- vapply(seqs, function(s) {
-    tm <- A + B * TmCalculator::gc(s) - Cc / nchar(s)
+    tm <- A + B * TmCalculator::gc_content(s) - Cc / nchar(s)
     if (!is.na(sm)) {
       tm <- tm + TmCalculator::salt_correct(
         Na = 50, K = 0, Tris = 0, Mg = 0, dNTPs = 0,
@@ -75,13 +75,13 @@ test_that("tm_gc is unchanged by the vectorised chunk worker", {
 })
 
 test_that("every GC path in the package agrees on one definition", {
-  # gc(), tm_gc(), tm_wallace() and tm_nn() must return the same GC for the
+  # gc_content(), tm_gc(), tm_wallace() and tm_nn() must return the same GC for the
   # same sequence. Before unification tm_nn used (G+C)/length while the others
   # used (G+C)/(A+C+G+T), and coor_to_genomic_ranges() wrote a 0-1 fraction.
   seqs <- c("ACGTACGTAC", "GGGGCCCCAA", "ATATATATAT")
   gr   <- TmCalculator::to_genomic_ranges(seqs)
 
-  ref <- vapply(seqs, function(s) TmCalculator::gc(s), numeric(1),
+  ref <- vapply(seqs, function(s) TmCalculator::gc_content(s), numeric(1),
                 USE.NAMES = FALSE)
 
   for (m in c("tm_nn", "tm_gc", "tm_wallace")) {
@@ -93,21 +93,21 @@ test_that("every GC path in the package agrees on one definition", {
 test_that("inosine is excluded from the GC denominator", {
   # I is an accepted but undeterminable base, so it must enter neither the
   # numerator nor the denominator. This is the one case where the removed
-  # .GC_fast() definition ((G+C)/length) diverged from gc()
+  # .GC_fast() definition ((G+C)/length) diverged from gc_content()
   # ((G+C)/(A+C+G+T)): it would have returned 100 * 4/6 here.
-  expect_equal(TmCalculator::gc("GGCCII"), 100)
+  expect_equal(TmCalculator::gc_content("GGCCII"), 100)
 
   # Same four G/C bases, but with two determinable A's instead of the two I's,
   # which do enter the denominator.
-  expect_equal(TmCalculator::gc("GGCCAA"), 100 * 4 / 6)
+  expect_equal(TmCalculator::gc_content("GGCCAA"), 100 * 4 / 6)
 
   # N behaves the same way as I.
-  expect_equal(TmCalculator::gc("GGCCNN"), 100)
+  expect_equal(TmCalculator::gc_content("GGCCNN"), 100)
 })
 
-test_that("gc() accepts a split sequence and a whole sequence alike", {
-  expect_equal(TmCalculator::gc(c("a", "t", "c", "g")),
-               TmCalculator::gc("atcg"))
+test_that("gc_content() accepts a split sequence and a whole sequence alike", {
+  expect_equal(TmCalculator::gc_content(c("a", "t", "c", "g")),
+               TmCalculator::gc_content("atcg"))
 })
 
 test_that("cpp_base_counts exposes N and I so the denominator is inspectable", {

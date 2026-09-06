@@ -15,7 +15,6 @@ Depends:
     R (>= 3.5)
 VignetteBuilder: knitr
 Imports: 
-    BSgenome,
     BiocGenerics,
     BiocParallel,
     Biostrings,
@@ -30,6 +29,7 @@ Imports:
 LinkingTo:
     Rcpp
 Suggests: 
+    BSgenome,
     testthat (>= 3.0.0),
     knitr,
     utils,

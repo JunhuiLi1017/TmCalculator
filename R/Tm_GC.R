@@ -66,7 +66,10 @@
 #'   specifying the parallel backend, e.g.
 #'   \code{BiocParallel::MulticoreParam(4)} (Unix/macOS) or
 #'   \code{BiocParallel::SnowParam(4)} (all platforms). The default,
-#'   \code{BiocParallel::SerialParam()}, runs serially.
+#'   \code{NULL}, runs serially in the calling process. Passing
+#'   \code{BiocParallel::SerialParam()} is equivalent but constructs an S4
+#'   object on every call, which is measurable when the function is called
+#'   repeatedly on small inputs.
 #'
 #' @returns Returns a list with two components:
 #'   - Tm: A list of sequences with updated Tm attributes
@@ -123,7 +126,7 @@ tm_gc <- function(gr_seq,
                   formamide_unit = list(value = 0, unit = "percent"),
                   dmso_factor = 0.75,
                   formamide_factor = 0.65,
-                  BPPARAM = BiocParallel::SerialParam()) {
+                  BPPARAM = NULL) {
   variant <- match.arg(variant)
   salt_method <- match.arg(salt_method)
   
@@ -179,8 +182,13 @@ tm_gc <- function(gr_seq,
     dmso_factor = dmso_factor, formamide_factor = formamide_factor
   )
 
-  gr_seq$GC <- chunk_res$GC
-  gr_seq$Tm <- chunk_res$Tm
+  # One mcols<- assignment rather than two `$<-`: each `$<-` replaces the
+  # whole metadata DataFrame and revalidates the GRanges, which dominates the
+  # cost of a call on a short input.
+  mc_out    <- GenomicRanges::mcols(gr_seq)
+  mc_out$GC <- chunk_res$GC
+  mc_out$Tm <- chunk_res$Tm
+  GenomicRanges::mcols(gr_seq) <- mc_out
   gr_seq <- .normalize_tm_gc_metadata(gr_seq)
 
   # Create result list with proper structure
@@ -231,7 +239,7 @@ tm_gc <- function(gr_seq,
   m    <- length(seqs)
   if (m == 0L) return(list(Tm = numeric(0), GC = numeric(0)))
 
-  # Previously this was a per-sequence loop calling gc(), which split every
+  # Previously this was a per-sequence loop calling gc_content(), which split every
   # sequence with s2c() and scanned it five times, and salt_correct(), which
   # did the same again. On 23,208 E. coli windows that cost 51.7 s against
   # 0.67 s for the compiled nearest-neighbor path. Both are now computed for

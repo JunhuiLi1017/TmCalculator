@@ -87,7 +87,7 @@ salt_correct <- function(Na=0,
     if(is.null(input_seq)){
       stop("'input_seq' should not be NULL when method is one of 'SantaLucia1998-2','Owczarzy2004','Owczarzy2008'")
     }else{
-      # One counting implementation for the whole package; gc() itself now
+      # One counting implementation for the whole package; gc_content() itself now
       # delegates here, so this avoids splitting the sequence a second time.
       if (length(input_seq) > 1) input_seq <- paste0(input_seq, collapse = "")
       nSeq <- nchar(input_seq)
@@ -140,7 +140,7 @@ salt_correct <- function(Na=0,
 #' Vectorized salt correction over per-sequence GC percent and length
 #'
 #' Mirrors \code{salt_correct()} exactly, but takes precomputed per-sequence
-#' GC percent (gc() semantics: GC/(A+C+G+T)) and sequence lengths instead of
+#' GC percent (gc_content() semantics: GC/(A+C+G+T)) and sequence lengths instead of
 #' sequences, so one call covers a whole chunk. Used by the Rcpp-backed
 #' \code{tm_nn} path.
 #' @keywords internal

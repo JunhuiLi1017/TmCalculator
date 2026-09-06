@@ -8,7 +8,7 @@
 }
 \description{
 Mirrors \code{salt_correct()} exactly, but takes precomputed per-sequence
-GC percent (gc() semantics: GC/(A+C+G+T)) and sequence lengths instead of
+GC percent (gc_content() semantics: GC/(A+C+G+T)) and sequence lengths instead of
 sequences, so one call covers a whole chunk. Used by the Rcpp-backed
 \code{tm_nn} path.
 }

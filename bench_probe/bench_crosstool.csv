@@ -1,0 +1,7 @@
+"tool","engine","n","rep","wall_s","compute_s","startup_s","seqs_per_s","rss_gb","ok"
+"TmCalculator","R with a compiled C++ core",100,1,7.393,0.131,7.262,763.358778625954,0.791527424,TRUE
+"TmCalculator","R with a compiled C++ core",1000,1,7.134,0.129,7.005,7751.93798449612,0.797556736,TRUE
+"rmelting","R calling the MELTING 5 Java engine",100,1,4.191,NA,NA,NA,0.182902784,TRUE
+"rmelting","R calling the MELTING 5 Java engine",1000,1,55.827,NA,NA,NA,0.239271936,TRUE
+"Biopython","pure Python",100,1,0.165999999999997,0.0041,0.161899999999997,24390.243902439,0.010125312,TRUE
+"Biopython","pure Python",1000,1,0.129000000000005,0.0397,0.0893000000000049,25188.9168765743,0.010395648,TRUE

@@ -22,7 +22,7 @@ tm_gc(
   formamide_unit = list(value = 0, unit = "percent"),
   dmso_factor = 0.75,
   formamide_factor = 0.65,
-  BPPARAM = BiocParallel::SerialParam()
+  BPPARAM = NULL
 )
 }
 \arguments{
@@ -89,7 +89,10 @@ Several papers report factors between 0.6 and 0.72.}
 specifying the parallel backend, e.g.
 \code{BiocParallel::MulticoreParam(4)} (Unix/macOS) or
 \code{BiocParallel::SnowParam(4)} (all platforms). The default,
-\code{BiocParallel::SerialParam()}, runs serially.}
+\code{NULL}, runs serially in the calling process. Passing
+\code{BiocParallel::SerialParam()} is equivalent but constructs an S4
+object on every call, which is measurable when the function is called
+repeatedly on small inputs.}
 }
 \value{
 Returns a list with two components:

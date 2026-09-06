@@ -175,7 +175,9 @@
 #'   recommended; \code{BiocParallel::MulticoreParam} can be slower than
 #'   serial on large inputs because copy-on-write interacts badly with R's
 #'   garbage collector (see \code{\link{tm_calculate}}). The default,
-#'   \code{BiocParallel::SerialParam()}, runs serially. Sequences are split
+#'   \code{NULL}, runs serially in the calling process; passing
+#'   \code{BiocParallel::SerialParam()} is equivalent but constructs an S4
+#'   object on every call. Sequences are split
 #'   into one chunk per worker, so parallelization pays off for large inputs
 #'   (e.g. genome-wide windows) rather than a handful of primers.
 #'
@@ -385,7 +387,7 @@ tm_nn <- function(gr_seq,
                   formamide_unit = list(value = 0, unit = "percent"),
                   dmso_factor    = 0.75,
                   formamide_factor     = 0.65,
-                  BPPARAM        = BiocParallel::SerialParam()) {
+                  BPPARAM        = NULL) {
 
   # -- Validate args once ----------------------------------------------------
   nn_table <- match.arg(nn_table)
@@ -431,7 +433,14 @@ tm_nn <- function(gr_seq,
 
   # -- Pairwise N filtering (fast path; the per-base cleaning that used to
   # -- happen here now runs inside the C++ core, on the workers) -------------
-  has_n <- .col_has_n(gr_seq$sequence) | .col_has_n(gr_seq$complement)
+  # Subsetting a GRanges is an S4 operation that rebuilds and revalidates the
+  # object. Profiling a 100-sequence call found validObject/updateObject and
+  # method dispatch accounting for most of the run time, against about 2% in
+  # the compiled core, so both subsets are now taken only when something is
+  # actually dropped -- which is the uncommon case, since most inputs contain
+  # no N at all.
+  mc0 <- GenomicRanges::mcols(gr_seq)
+  has_n <- .col_has_n(mc0$sequence) | .col_has_n(mc0$complement)
   if (any(has_n)) {
     warning(
       sprintf(
@@ -440,9 +449,11 @@ tm_nn <- function(gr_seq,
       ),
       call. = FALSE
     )
+    gr_seq_dropoff <- gr_seq[has_n]
+    gr_seq         <- gr_seq[!has_n]
+  } else {
+    gr_seq_dropoff <- gr_seq[0L]
   }
-  gr_seq_dropoff <- gr_seq[has_n]
-  gr_seq <- gr_seq[!has_n]
   if (length(gr_seq) == 0) {
     stop("No valid regions left for tm_nn calculation after filtering sequences with 'N'.")
   }
@@ -453,8 +464,10 @@ tm_nn <- function(gr_seq,
   # Keep the raw columns (possibly DNAStringSet); slices are coerced to
   # character per chunk so PSOCK workers never receive an XVector whose
   # serialization would drag the whole shared pool along.
-  all_seqs  <- mcols(gr_seq)$sequence
-  all_cseqs <- mcols(gr_seq)$complement
+  # Reuse the mcols already extracted above when the object was not subset.
+  mc        <- if (any(has_n)) GenomicRanges::mcols(gr_seq) else mc0
+  all_seqs  <- mc$sequence
+  all_cseqs <- mc$complement
 
   chunk_res <- .bp_map_chunks(
     n = n,
@@ -472,10 +485,12 @@ tm_nn <- function(gr_seq,
   )
   tm <- chunk_res$Tm
   gc <- chunk_res$GC
-  if (!"GC" %in% names(GenomicRanges::mcols(gr_seq))) {
-    gr_seq$GC <- gc
-  }
-  gr_seq$Tm <- tm
+  # One mcols<- assignment rather than two `$<-`: each `$<-` replaces the
+  # whole metadata DataFrame and revalidates the GRanges.
+  mc_out <- GenomicRanges::mcols(gr_seq)
+  if (!"GC" %in% names(mc_out)) mc_out$GC <- gc
+  mc_out$Tm <- tm
+  GenomicRanges::mcols(gr_seq) <- mc_out
   
   nn_table_list <- list("DNA_NN_Breslauer_1986" = "Breslauer K J (1986) <doi:10.1073/pnas.83.11.3746>",
                         "DNA_NN_Sugimoto_1996" = "Sugimoto N (1996) <doi:10.1093/nar/24.22.4501>",
@@ -606,7 +621,7 @@ tm_nn <- function(gr_seq,
   len <- res[, "len"]
   ok  <- res[, "ok"] > 0
 
-  # One definition of GC throughout the package: (G+C)/(A+C+G+T), i.e. gc()
+  # One definition of GC throughout the package: (G+C)/(A+C+G+T), i.e. gc_content()
   # semantics. Previously this path reported (G+C)/length and salt-corrected
   # with (G+C)/(A+C+G+T); the two diverge whenever inosine is present, since
   # I counts in the length but is not a determinable base.

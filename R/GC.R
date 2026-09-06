@@ -21,15 +21,15 @@
 #' @examples 
 #' 
 #' # Calculate GC content of a DNA sequence
-#' gc(c("a","t","c","t","g","g","g","c","c","a","g","t","a"))  # 53.85%
+#' gc_content(c("a","t","c","t","g","g","g","c","c","a","g","t","a"))  # 53.85%
 #' 
 #' # Calculate GC content including ambiguous bases
-#' gc("GCATSWSYK", ambiguous = TRUE)  # 55.56%
+#' gc_content("GCATSWSYK", ambiguous = TRUE)  # 55.56%
 #' 
 #' @author Junhui Li
 #' 
-#' @export gc
-gc <- function(input_seq, ambiguous = FALSE) {
+#' @export gc_content
+gc_content <- function(input_seq, ambiguous = FALSE) {
   if (length(input_seq) == 0) return(NA)
   if (!inherits(input_seq, "character")) {
     stop("sequence must be a character string or vector")
@@ -37,9 +37,9 @@ gc <- function(input_seq, ambiguous = FALSE) {
   if (length(input_seq) == 1 && is.na(input_seq)) return(NA)
 
   # A vector of length > 1 is documented as one sequence supplied as separate
-  # characters, e.g. gc(c("a","t","c","g")); collapse it so that a single
-  # code path serves both forms. Everything below is .gc_vec(), so gc(),
-  # tm_gc(), tm_wallace() and salt_correct() now share one definition of GC
+  # characters, e.g. gc_content(c("a","t","c","g")); collapse it so that a
+  # single code path serves both forms. Everything below is .gc_vec(), so
+  # gc_content(), tm_gc(), tm_wallace() and salt_correct() share one GC
   # and one implementation of the counting.
   if (length(input_seq) > 1) {
     input_seq <- paste0(input_seq, collapse = "")
@@ -52,7 +52,7 @@ gc <- function(input_seq, ambiguous = FALSE) {
 
 #' Vectorized GC percent over a character vector of sequences
 #'
-#' Mirrors \code{gc()} exactly, including its ambiguity apportioning and its
+#' Mirrors \code{gc_content()} exactly, including its ambiguity apportioning and its
 #' \code{GC/(A+C+G+T)} denominator, but counts every base in a single compiled
 #' pass per sequence (\code{cpp_base_counts()}) instead of splitting each
 #' sequence into a character vector with \code{s2c()} and scanning it five
@@ -60,7 +60,7 @@ gc <- function(input_seq, ambiguous = FALSE) {
 #' matrix, so the published formula remains the readable one.
 #'
 #' @param input_seq Character vector of sequences.
-#' @param ambiguous Logical; apportion ambiguous IUPAC codes as \code{gc()} does.
+#' @param ambiguous Logical; apportion ambiguous IUPAC codes as \code{gc_content()} does.
 #' @return Numeric vector of GC percentages, \code{NA} where a sequence is
 #'   \code{NA} or contains no countable base.
 #' @keywords internal
@@ -68,7 +68,7 @@ gc <- function(input_seq, ambiguous = FALSE) {
   x <- as.character(input_seq)
   m <- cpp_base_counts(x)          # uppercasing happens in the compiled pass
 
-  # gc() warns once per call; warn once for the whole vector instead.
+  # gc_content() warns once per call; warn once for the whole vector instead.
   if (any(m[, "other"] > 0L, na.rm = TRUE)) {
     warning("Non-nucleic acid bases found in input sequence")
   }
@@ -81,7 +81,7 @@ gc <- function(input_seq, ambiguous = FALSE) {
   } else {
     ngc <- nG + nC + m[, "S"]
     nat <- nA + nT + m[, "W"]
-    # gc() skips a code entirely when its denominator is zero, which is the
+    # gc_content() skips a code entirely when its denominator is zero, which is the
     # same as adding zero; the mask reproduces that without dividing by 0.
     apportion <- function(ngc, nat, k, denom, gc_part, at_part) {
       ok <- !is.na(denom) & denom != 0

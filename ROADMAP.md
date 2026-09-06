@@ -161,9 +161,27 @@ assumed, not checked, and it is wrong; see item 4.)
    these conventions, and delete `.GC_fast()` (now reachable only from the R
    reference implementation at `R/tm_nn.R:882`).
 
+## API correctness
+
+8. **`tm_gc(salt_method =)` is documented but inert.** For any built-in
+   `variant` the argument is silently overwritten at `R/tm_gc.R:134` by the
+   variant's own `salt_correct` entry, so a user-supplied value has no effect
+   and produces no warning. It takes effect only when `userset` is given.
+   The documentation is also wrong in two further ways: it states the default
+   is `NULL` (the default is the six-element choice vector, collapsed by
+   `match.arg()` to `"Schildkraut2010"`, and passing `NULL` errors), and it
+   states that `NA` disables the correction (`match.arg(NA)` errors).
+
+   Decide which behaviour is intended. Tying the salt term to the variant is
+   defensible, since each published GC formula carries its own; if that is the
+   intent, either drop the argument for the built-in path or warn when a value
+   is supplied and ignored. Then correct the `@param` text. Note that the
+   manuscript describes `salt_method` as user-selectable, which is true of
+   `tm_nn` but not of `tm_gc`.
+
 ## Documentation and interoperability
 
-8. **Verify and document `BatchtoolsParam()` on an HPC scheduler.**
+9. **Verify and document `BatchtoolsParam()` on an HPC scheduler.**
    `.bp_map_chunks()` calls `BiocParallel::bplapply()` generically, so any
    `BiocParallelParam` is accepted by construction — including
    `DoparParam()` (bridging to any registered foreach backend, and through

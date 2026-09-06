@@ -28,13 +28,26 @@
 # 10 of these - the 6 missing ones are thermodynamically equivalent to an
 # existing row when read from the other strand direction.
 #
-# The complete mapping (verified by enumeration):
-#   TT/AA  <- same ΔH/ΔS as  AA/TT   (homodimer palindrome)
-#   AC/TG  <- same ΔH/ΔS as  CA/GT   (RC pair)
-#   AG/TC  <- same ΔH/ΔS as  GA/CT   (RC pair)
-#   TC/AG  <- same ΔH/ΔS as  CT/GA   (RC pair)
-#   TG/AC  <- same ΔH/ΔS as  GT/CA   (RC pair)
-#   CC/GG  <- same ΔH/ΔS as  GG/CC   (homodimer palindrome)
+# A key "XY/WZ" denotes the duplex 5'-XY-3' paired with 3'-WZ-5'. Reading the
+# same duplex from the other strand reverses the whole key: the bottom strand
+# 3'-WZ-5' read 5'->3' is "ZW", and the top strand read 3'->5' is "YX", so
+# "XY/WZ" and "ZW/YX" are the same physical stack. In other words the source
+# key is the CHARACTER REVERSAL of the new key, which is also the rule
+# Biopython applies at lookup time (`neighbors[::-1]`).
+#
+#   TT/AA  <- AA/TT   (reverse of AA/TT; homodimer palindrome)
+#   AC/TG  <- GT/CA   (reverse of GT/CA)
+#   AG/TC  <- CT/GA   (reverse of CT/GA)
+#   TC/AG  <- GA/CT   (reverse of GA/CT)
+#   TG/AC  <- CA/GT   (reverse of CA/GT)
+#   CC/GG  <- GG/CC   (reverse of GG/CC; homodimer palindrome)
+#
+# Four of these six were transposed in releases up to 1.10.0: AC/TG and TG/AC
+# carried each other's values, as did AG/TC and TC/AG. Every table built
+# through this helper was affected, and because the error is per-stack it
+# changed Tm by an amount that depends on sequence composition. It was found
+# by comparing recovered dH/dS against Biopython and MELTING 5, which agree
+# with each other on the sequence-dependent part of the sum.
 #
 # @param tbl       Matrix with dimnames - a standard NN table (17+ rows).
 # @param skip_rows Row names to exclude from completion (init/sym rows and any
@@ -45,19 +58,24 @@
                             skip_rows = c("init", "init_A/T", "init_G/C",
                                           "init_oneG/C", "init_allA/T",
                                           "init_5T/A", "sym")) {
-  # Fixed mapping: new key -> source key to copy values from
-  # This is the complete, verified set - do not derive algorithmically
-  # (TT/AA and CC/GG are self-palindromes under the RC formula and would
-  # be missed by a naive "RC != self" filter).
+  # new key -> source key. Each source is the character reversal of the new
+  # key; the table is written out rather than computed so that the mapping is
+  # readable, and the assertion below re-derives it so that the two can never
+  # drift apart again.
   missing_map <- c(
     "TT/AA" = "AA/TT",
-    "AC/TG" = "CA/GT",
-    "AG/TC" = "GA/CT",
-    "TC/AG" = "CT/GA",
-    "TG/AC" = "GT/CA",
+    "AC/TG" = "GT/CA",
+    "AG/TC" = "CT/GA",
+    "TC/AG" = "GA/CT",
+    "TG/AC" = "CA/GT",
     "CC/GG" = "GG/CC"
   )
-  
+  .rev_key <- function(k)
+    paste(rev(strsplit(k, "", fixed = TRUE)[[1]]), collapse = "")
+  stopifnot(identical(unname(missing_map),
+                      vapply(names(missing_map), .rev_key, character(1),
+                             USE.NAMES = FALSE)))
+
   # Only add rows not already present (handles RNA_DNA_NN_Sugimoto_1995
   # which was published with the full 16-pair set)
   to_add <- missing_map[!names(missing_map) %in% rownames(tbl)]

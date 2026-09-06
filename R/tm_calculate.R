@@ -239,9 +239,12 @@
 #'   session via copy-on-write, and R's garbage collector then forces the
 #'   kernel to duplicate inherited pages in every worker, which can consume
 #'   more time than the computation itself. \code{n} should not exceed the
-#'   number of physical cores. The default,
-#'   \code{BiocParallel::SerialParam()}, runs serially and reproduces
-#'   previous behavior exactly. Sequences are split into one contiguous chunk
+#'   number of physical cores. The default, \code{NULL}, runs serially in the
+#'   calling process. Passing \code{BiocParallel::SerialParam()} gives the
+#'   same result, but a \code{BiocParallelParam} is an S4 object that would
+#'   then be constructed and queried on every call; that cost is invisible on
+#'   a genome-scale call and noticeable when the function is invoked in a
+#'   loop over short sequences. Sequences are split into one contiguous chunk
 #'   per worker, so results are identical to the serial run. With the
 #'   compiled nearest-neighbor core, the serial default is typically fastest
 #'   up to around a million sequences: worker startup and sequence
@@ -289,7 +292,6 @@
 #' 
 #' @export
 #' 
-#' @importFrom BSgenome available.genomes
 #' @importFrom GenomeInfoDb genome
 #' 
 #' @examples
@@ -392,7 +394,7 @@ tm_calculate <- function(input_seq,
                         dmso_factor = 0.75,
                         formamide_factor = 0.65,
                         mismatch = TRUE,
-                        BPPARAM = BiocParallel::SerialParam()) {
+                        BPPARAM = NULL) {
   # Validate method argument
   method <- match.arg(method, several.ok = FALSE)
 

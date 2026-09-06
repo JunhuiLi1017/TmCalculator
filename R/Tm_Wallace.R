@@ -11,7 +11,10 @@
 #'   specifying the parallel backend, e.g.
 #'   \code{BiocParallel::MulticoreParam(4)} (Unix/macOS) or
 #'   \code{BiocParallel::SnowParam(4)} (all platforms). The default,
-#'   \code{BiocParallel::SerialParam()}, runs serially.
+#'   \code{NULL}, runs serially in the calling process. Passing
+#'   \code{BiocParallel::SerialParam()} is equivalent but constructs an S4
+#'   object on every call, which is measurable when the function is called
+#'   repeatedly on small inputs.
 #'
 #' @returns Returns a list of sequences with updated Tm attributes
 #' 
@@ -37,7 +40,7 @@
 #' @export tm_wallace
 
 tm_wallace <- function(gr_seq, ambiguous = FALSE,
-                       BPPARAM = BiocParallel::SerialParam()) {
+                       BPPARAM = NULL) {
   # Filter sequence
   gr_seq$sequence <- check_filter_seq(gr_seq$sequence, method = "tm_wallace")
   # Calculate Tm for each sequence (chunked, optionally in parallel)
@@ -81,7 +84,7 @@ tm_wallace <- function(gr_seq, ambiguous = FALSE,
   if (m == 0L) return(list(Tm = numeric(0), GC = numeric(0)))
 
   # Was a per-sequence loop calling s2c() twice (once for the length, once
-  # inside gc()) and scanning the character vector five times. Counting now
+  # inside gc_content()) and scanning the character vector five times. Counting now
   # happens once per sequence in compiled code via .gc_vec(); the arithmetic
   # below is unchanged, including the use of the full sequence length rather
   # than the A+C+G+T count when converting the GC percentage back to a base

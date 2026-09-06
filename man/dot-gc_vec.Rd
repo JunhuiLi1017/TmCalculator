@@ -9,14 +9,14 @@
 \arguments{
 \item{input_seq}{Character vector of sequences.}
 
-\item{ambiguous}{Logical; apportion ambiguous IUPAC codes as \code{gc()} does.}
+\item{ambiguous}{Logical; apportion ambiguous IUPAC codes as \code{gc_content()} does.}
 }
 \value{
 Numeric vector of GC percentages, \code{NA} where a sequence is
   \code{NA} or contains no countable base.
 }
 \description{
-Mirrors \code{gc()} exactly, including its ambiguity apportioning and its
+Mirrors \code{gc_content()} exactly, including its ambiguity apportioning and its
 \code{GC/(A+C+G+T)} denominator, but counts every base in a single compiled
 pass per sequence (\code{cpp_base_counts()}) instead of splitting each
 sequence into a character vector with \code{s2c()} and scanning it five

@@ -37,7 +37,7 @@ tm_nn(
   formamide_unit = list(value = 0, unit = "percent"),
   dmso_factor = 0.75,
   formamide_factor = 0.65,
-  BPPARAM = BiocParallel::SerialParam()
+  BPPARAM = NULL
 )
 }
 \arguments{
@@ -184,7 +184,9 @@ specifying the parallel backend. \code{BiocParallel::SnowParam(n)} is
 recommended; \code{BiocParallel::MulticoreParam} can be slower than
 serial on large inputs because copy-on-write interacts badly with R's
 garbage collector (see \code{\link{tm_calculate}}). The default,
-\code{BiocParallel::SerialParam()}, runs serially. Sequences are split
+\code{NULL}, runs serially in the calling process; passing
+\code{BiocParallel::SerialParam()} is equivalent but constructs an S4
+object on every call. Sequences are split
 into one chunk per worker, so parallelization pays off for large inputs
 (e.g. genome-wide windows) rather than a handful of primers.}
 }
