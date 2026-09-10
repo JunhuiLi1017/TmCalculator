@@ -107,6 +107,35 @@
 #'   - "RNA_DNA_NN_Banerjee_2020": improved hybrid parameters fitted at a
 #'     physiological condition (100 mM NaCl), Banerjee et al. (2020)
 #' 
+#'
+#'   Alternatively, supply a matrix or data.frame of parameters directly. This
+#'   is the route for parameter sets the package does not ship, in particular
+#'   sets covering modified bases such as 5-methylcytosine. Requirements:
+#'   \itemize{
+#'     \item numeric, with columns 1 and 2 read as delta H (kcal/mol) and
+#'       delta S (cal/mol/K); further columns are ignored;
+#'     \item row names giving the parameter keys, e.g. \code{"AA/TT"},
+#'       \code{"init"}, \code{"init_A/T"}, \code{"sym"};
+#'     \item every key of a built-in reference set must be present. The
+#'       reference is named by \code{attr(x, "reference")}, or defaults to
+#'       the first built-in listed for the argument, which is a DNA/DNA set;
+#'       RNA and hybrid tables should therefore set the attribute. Extra keys
+#'       beyond the reference are kept, which is how a modified-base set adds
+#'       stacks rather than replacing them.
+#'   }
+#'   The supplied table is reordered to the reference key order before use, so
+#'   that two tables differing only in row order give identical results. A
+#'   missing key would otherwise contribute zero to the calculation instead of
+#'   raising an error, which is why the full key set is required. Keys that
+#'   disagree with their reverse complement produce a warning: expected for
+#'   modified bases, a transposition error otherwise.
+#'
+#'   Two optional attributes are honoured. \code{attr(x, "salt_mM")} marks a
+#'   set as fitted at a stated sodium concentration, which suppresses the salt
+#'   correction at that concentration exactly as for the built-in sets fitted
+#'   this way; without it the table is treated as a reference-condition set and
+#'   \code{salt_method} is applied. \code{attr(x, "end_table")} supplies a
+#'   companion penultimate-pair end-effect table.
 #' @param tmm_table Thermodynamic parameters for terminal mismatches. Default: "DNA_TMM_Bommarito_2000"
 #'   These parameters account for mismatches at the ends of the duplex.
 #' 
@@ -390,23 +419,31 @@ tm_nn <- function(gr_seq,
                   BPPARAM        = NULL) {
 
   # -- Validate args once ----------------------------------------------------
-  nn_table <- match.arg(nn_table)
-  tmm_table <- match.arg(tmm_table)
-  imm_table <- match.arg(imm_table)
-  de_table <- match.arg(de_table)
+  # Each table argument is either a built-in name or a user-supplied matrix.
+  # .resolve_table() applies match.arg() on the first path and validates,
+  # canonicalises the row order of, and returns the second; see its definition
+  # for why the key set is enforced rather than trusted.
+  .nn  <- .resolve_table(nn_table,  "nn_table",  eval(formals(tm_nn)$nn_table))
+  .tmm <- .resolve_table(tmm_table, "tmm_table", eval(formals(tm_nn)$tmm_table))
+  .imm <- .resolve_table(imm_table, "imm_table", eval(formals(tm_nn)$imm_table))
+  .de  <- .resolve_table(de_table,  "de_table",  eval(formals(tm_nn)$de_table))
   salt_method <- match.arg(salt_method)
 
-  # -- Load tables once (from package sysdata or .TM_CONSTANTS) -------------
-  # In the final package, replace with: tbl <- .TM_CONSTANTS$NN[[nn_table]]
-  # For now, build once in this call (still 100x faster than per-sequence):
-  nn_tbl <- get_table(nn_table)   # internal helper (see below)
-  tmm_tbl <- get_table(tmm_table)
-  imm_tbl <- get_table(imm_table)
-  de_tbl <- get_table(de_table)
+  nn_tbl  <- .nn$tbl
+  tmm_tbl <- .tmm$tbl
+  imm_tbl <- .imm$tbl
+  de_tbl  <- .de$tbl
+
   # Companion end-effect table, if the selected parameter set ships one
   # (currently only Zuber 2022). Empty matrix otherwise, which leaves the
-  # calculation identical to previous releases.
-  end_tbl <- get_end_table(nn_table)
+  # calculation identical to previous releases. A user table has no name to
+  # look up, so it carries its own end table as an attribute if it needs one.
+  end_tbl <- if (.nn$user) {
+    e <- attr(nn_tbl, "end_table")
+    if (is.null(e)) matrix(numeric(0), nrow = 0, ncol = 2,
+                           dimnames = list(NULL, c("left", "right")))
+    else as.matrix(e)
+  } else get_end_table(.nn$name)
 
   # -- Salt-correction guard -------------------------------------------------
   # Some parameter sets (the Weber/VarGibbs series) are fitted AT a specific
@@ -422,7 +459,7 @@ tm_nn <- function(gr_seq,
       # Already fitted at this salt: skip correction silently.
       salt_fn_eff <- NULL
     } else {
-      warning("Parameter set '", nn_table, "' was fitted at ", tbl_salt,
+      warning("Parameter set '", .nn$name, "' was fitted at ", tbl_salt,
               " mM [Na+], but Na = ", Na, " mM was requested. The '",
               salt_method, "' correction is being applied on top of a ",
               "condition-specific parameter set, which is approximate. ",
@@ -536,10 +573,10 @@ tm_nn <- function(gr_seq,
     gr = gr_seq,
     options = list("Ambiguous" = ambiguous,
                    "Shift" = shift,
-                   "Thermodynamic NN values" = paste0(nn_table, ": ", nn_table_list[[nn_table]]), 
-                   "Thermodynamic values for terminal mismatches" = paste0(tmm_table,": ",nn_table_list[[tmm_table]]), 
-                   "Thermodynamic values for internal mismatches" = paste0(imm_table,": ",nn_table_list[[imm_table]]),
-                   "Thermodynamic values for dangling ends" = paste0(de_table,": ",nn_table_list[[de_table]]), 
+                   "Thermodynamic NN values" = .tbl_label(.nn, nn_table_list),
+                   "Thermodynamic values for terminal mismatches" = .tbl_label(.tmm, nn_table_list),
+                   "Thermodynamic values for internal mismatches" = .tbl_label(.imm, nn_table_list),
+                   "Thermodynamic values for dangling ends" = .tbl_label(.de, nn_table_list),
                    "Concentration of the higher concentrated strand" = dnac_high,
                    "Concentration of the lower concentrated strand" = dnac_low, 
                    "Sequence self-complementary" = self_comp, 
@@ -942,6 +979,132 @@ get_end_table <- function(table_name) {
 }
 
 # -- Helper: get table (package data or build) ------------------------------
+# -- Helper: provenance string for a resolved table --------------------------
+# A user-supplied table has no entry in the citation list, and indexing a list
+# with a name it does not contain returns NULL, which paste0() would silently
+# render as "". The recorded provenance is the only place a reader can see
+# which parameters produced a Tm, so it says "user-supplied" explicitly.
+.tbl_label <- function(res, citations) {
+  if (isTRUE(res$user)) return(res$name)
+  cit <- citations[[res$name]]
+  if (is.null(cit)) res$name else paste0(res$name, ": ", cit)
+}
+
+# -- Helper: resolve a table argument ----------------------------------------
+# A table argument is either the name of a built-in parameter set or a
+# user-supplied matrix / data.frame. The second form exists so that parameter
+# sets that the package does not ship, most obviously sets covering modified
+# bases such as 5-methylcytosine, can be used without a new release.
+#
+# A user table is validated and REORDERED against a built-in reference rather
+# than taken as given. Two reasons:
+#
+#   * The keys are the interface. The compiled core looks each dinucleotide
+#     stack up by name (.tbl_to_cpp passes rownames), so a table missing a key
+#     does not fail loudly: the lookup returns nothing and that stack silently
+#     contributes zero to dH and dS. Requiring the full reference key set turns
+#     a wrong number into an error.
+#
+#   * Row order is not used by the lookup, but two tables that differ only in
+#     row order produce byte-different objects, which makes cached results and
+#     regression tests disagree for no reason. Canonicalising the order removes
+#     that.
+#
+# Extra keys beyond the reference are kept, appended after the canonical block.
+# That is the whole point for modified bases: a 5mC set adds stacks rather than
+# replacing them.
+.resolve_table <- function(x, arg_name, choices) {
+  # `is.null(dim(x))` is load-bearing: a character MATRIX satisfies
+  # is.character(), so testing the type alone sends a table of the wrong
+  # storage mode down the parameter-set-name path, where match.arg() reports
+  # "'arg' must be of length 1" and says nothing about the actual problem.
+  if (is.character(x) && is.null(dim(x))) {
+    nm <- match.arg(x, choices)
+    return(list(tbl = get_table(nm), name = nm, user = FALSE))
+  }
+  if (!is.matrix(x) && !is.data.frame(x))
+    stop("`", arg_name, "` must be one of the built-in parameter set names, ",
+         "or a matrix / data.frame of thermodynamic parameters.",
+         call. = FALSE)
+
+  # Which built-in defines the required keys. A user table may name it with
+  # attr(x, "reference"); otherwise the argument's own default is used, which
+  # is right for DNA/DNA and wrong for anything else, so RNA or hybrid sets
+  # should set the attribute.
+  ref_name <- attr(x, "reference")
+  if (is.null(ref_name)) ref_name <- choices[1L]
+  ref_name <- match.arg(as.character(ref_name)[1L], choices)
+  ref      <- get_table(ref_name)
+
+  keep <- attributes(x)[intersect(c("salt_mM", "end_table"), names(attributes(x)))]
+
+  m <- if (is.data.frame(x)) as.matrix(x) else x
+  if (!is.numeric(m))
+    stop("`", arg_name, "` must be numeric; columns 1 and 2 are read as ",
+         "delta H (kcal/mol) and delta S (cal/mol/K).", call. = FALSE)
+  if (ncol(m) < 2L)
+    stop("`", arg_name, "` needs at least two columns (delta H, delta S).",
+         call. = FALSE)
+  m <- m[, 1:2, drop = FALSE]
+  colnames(m) <- colnames(ref)[1:2]
+
+  keys <- rownames(m)
+  if (is.null(keys) || anyNA(keys) || any(!nzchar(keys)))
+    stop("`", arg_name, "` must have row names giving the parameter keys, ",
+         "e.g. \"AA/TT\", \"init\", \"sym\".", call. = FALSE)
+  if (anyDuplicated(keys))
+    stop("`", arg_name, "` has duplicated row names: ",
+         paste(unique(keys[duplicated(keys)]), collapse = ", "), call. = FALSE)
+
+  req  <- rownames(ref)
+  miss <- setdiff(req, keys)
+  if (length(miss))
+    stop("`", arg_name, "` is missing ", length(miss), " key(s) required by ",
+         "the reference set '", ref_name, "': ",
+         paste(utils::head(miss, 10L), collapse = ", "),
+         if (length(miss) > 10L) ", ..." else "",
+         ". A missing key contributes zero to the calculation rather than ",
+         "raising an error, so it must be supplied explicitly.", call. = FALSE)
+
+  bad <- req[!is.finite(m[req, 1L]) | !is.finite(m[req, 2L])]
+  if (length(bad))
+    stop("`", arg_name, "` has non-finite values for: ",
+         paste(utils::head(bad, 10L), collapse = ", "), call. = FALSE)
+
+  extra <- setdiff(keys, req)
+  if (length(extra))
+    message("`", arg_name, "`: ", length(extra), " key(s) beyond the '",
+            ref_name, "' reference retained (",
+            paste(utils::head(extra, 6L), collapse = ", "),
+            if (length(extra) > 6L) ", ..." else "", ")")
+
+  m <- m[c(req, extra), , drop = FALSE]
+
+  # Reverse-complement symmetry. A key and its character reversal describe the
+  # same duplex read from opposite strands, so canonical stacks must agree;
+  # four rows of the shipped SantaLucia 2004 table were once transposed and
+  # this is the check that finds it. It is a warning rather than an error
+  # because a modified-base set legitimately breaks the symmetry: the
+  # complement of 5-methylcytosine is not 5-methylcytosine.
+  can <- grep("^[A-Za-z]{2}/[A-Za-z]{2}$", rownames(m), value = TRUE)
+  rc  <- vapply(can, .rev_str, character(1L), USE.NAMES = FALSE)
+  chk <- rc %in% rownames(m)
+  if (any(chk)) {
+    a <- m[can[chk], , drop = FALSE]; b <- m[rc[chk], , drop = FALSE]
+    off <- which(abs(a[, 1] - b[, 1]) > 1e-8 | abs(a[, 2] - b[, 2]) > 1e-8)
+    if (length(off))
+      warning("`", arg_name, "`: ", length(off), " key(s) disagree with their ",
+              "reverse complement (", paste(utils::head(can[chk][off], 6L),
+                                            collapse = ", "),
+              "). This is expected for modified bases and is a transposition ",
+              "error otherwise.", call. = FALSE)
+  }
+
+  for (a in names(keep)) attr(m, a) <- keep[[a]]
+  list(tbl = m, name = paste0("user-supplied (reference: ", ref_name, ")"),
+       user = TRUE)
+}
+
 get_table <- function(table_name) {
   if (!exists(table_name, envir = .TM_TABLE_CACHE, inherits = FALSE)) {
     assign(table_name, .TM_CONSTANTS[[table_name]], envir = .TM_TABLE_CACHE)

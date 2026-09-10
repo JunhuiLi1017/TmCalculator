@@ -221,27 +221,45 @@ the composition landscape itself does not depend on the tiling.
 
 ### Cross-scale agreement
 
-We aggregate each finer profile onto the 500 bp grid (mean Tm per bin)
-and correlate it with the directly computed 500 bp profile:
+Every profile is aggregated onto one common grid (mean Tm per bin) and the
+resulting series are correlated.
+
+The grid is 1 kb rather than 500 bp, and the choice matters. Correlating
+against the 500 bp profile directly makes 200 bp the odd one out: 50 and 100
+divide 500 exactly, into ten and five windows per bin, but 200 does not, so
+each bin receives two or three windows that straddle its boundaries and the
+aggregation is itself inexact. That alone drove the 200 bp correlation down
+to 0.976 while the two finer profiles reached 0.997 and 0.999, an ordering
+that would invite the reader to conclude that the closest resolution agrees
+worst. All four window sizes divide 1 kb (into 20, 10, 5 and 2), so on that
+grid every profile is aggregated exactly and the comparison is between
+profiles rather than between remainders. The 500 bp profile is aggregated
+too, and serves as the reference.
 
 ```{r sensitivity-correlation}
-gr500  <- sens[["w500"]]$gr
-bin500 <- (start(gr500) - 1L) %/% 500L
+grid_bp <- 1000L
+stopifnot(all(grid_bp %% window_sizes == 0L))   # exact aggregation for each
+
+gr_ref  <- sens[["w500"]]$gr
+ref_agg <- tapply(gr_ref$Tm, (start(gr_ref) - 1L) %/% grid_bp,
+                  mean, na.rm = TRUE)
 
 cor_tbl <- vapply(c("w50", "w100", "w200"), function(k) {
-  g   <- sens[[k]]$gr
-  agg <- tapply(g$Tm, (start(g) - 1L) %/% 500L, mean, na.rm = TRUE)
-  stats::cor(agg[match(bin500, as.integer(names(agg)))], gr500$Tm,
-             use = "complete.obs")
+  g      <- sens[[k]]$gr
+  agg    <- tapply(g$Tm, (start(g) - 1L) %/% grid_bp, mean, na.rm = TRUE)
+  common <- intersect(names(agg), names(ref_agg))
+  stats::cor(agg[common], ref_agg[common], use = "complete.obs")
 }, numeric(1))
 round(cor_tbl, 3)
 ```
 
-Aggregated onto a common 500 bp grid, the profiles are nearly
+Aggregated onto the common 1 kb grid, the profiles are nearly
 interchangeable (r =
 `r paste(sprintf("%.3f", cor_tbl), collapse = ", ")` for 50, 100 and
-200 bp respectively). Window size rescales and smooths the profile but
-preserves the spatial landscape.
+200 bp respectively). Agreement now rises monotonically as the window
+approaches the grid, which is what averaging fewer windows per bin should
+do, and is the behaviour the 500 bp grid obscured. Window size rescales and
+smooths the profile but preserves the spatial landscape.
 
 ### Robustness of the MutL-AR association
 
@@ -267,6 +285,56 @@ test_summary <- do.call(rbind, lapply(seq_along(window_sizes), function(i) {
 }))
 test_summary
 ```
+
+### One table for the whole analysis
+
+Both questions are answered by the same four rows, so they are assembled
+into a single table: the first four columns say what window size does to the
+landscape, and the last three say what it does to the conclusion drawn from
+it.
+
+```{r sensitivity-table}
+sens_tbl <- do.call(rbind, lapply(seq_along(window_sizes), function(i) {
+  g   <- sens[[i]]$gr
+  ann <- sens[[i]]$ann
+  med <- tapply(ann$Tm, ann$in_mutH, stats::median, na.rm = TRUE)
+  res <- sens[[i]]$test$results
+  w   <- window_sizes[i]
+  data.frame(
+    `Window (bp)`        = w,
+    Windows              = length(g),
+    `Tm mean (C)`        = mean(g$Tm, na.rm = TRUE),
+    `Tm SD`              = stats::sd(g$Tm, na.rm = TRUE),
+    `GC mean (%)`        = mean(g$GC, na.rm = TRUE),
+    ## The reference profile correlates with itself by construction.
+    `r vs 1 kb grid`     = if (w == max(window_sizes)) NA_real_
+                           else unname(cor_tbl[[paste0("w", w)]]),
+    `MutL-AR windows`    = sum(ann$in_mutH == "peak"),
+    `Tm peak - bg (C)`   = unname(med["peak"] - med["non_peak"]),
+    ## Formatted as character: these p values span sixty-five orders of
+    ## magnitude, and rounding them to a fixed number of decimals prints
+    ## every one of them as zero.
+    `p (Tm)`             = format(res$p.value[res$target == "Tm"],
+                                  digits = 2, scientific = TRUE),
+    check.names = FALSE, stringsAsFactors = FALSE)
+}))
+knitr::kable(sens_tbl, digits = c(0, 0, 2, 2, 2, 3, 0, 3, 0),
+             caption = paste("Window-size sensitivity. GC mean is invariant;",
+                             "the Tm distribution shifts and narrows; the",
+                             "MutL-AR effect size varies within a few tenths",
+                             "of a degree while the p value tracks the number",
+                             "of windows."))
+```
+
+The last two columns are the point of the section. The p value falls by
+sixty-five orders of magnitude between the coarsest and the finest tiling,
+which is a statement about how many windows were tested rather than about how
+far apart the two groups are. The difference in medians, which is that
+statement, stays between -1.7 and -2.0 degrees C. The finest tiling gives the
+largest separation, as expected: a 500 bp window overlapping a MutL-AR peak
+also contains flanking sequence that does not, and averaging over it dilutes
+the contrast, whereas a 50 bp window resolves the peak more sharply. The
+three coarser tilings agree within 0.1 degrees C.
 
 ### Multi-scale tracks alongside the multi-omics layers
 
@@ -308,15 +376,42 @@ plot_genome_track(
 ```
 
 At whole-genome scale the four bandwidths look nearly identical -- the
-landscape is invariant. The difference window size makes is local
-smoothing, best seen in a zoomed view:
+landscape is invariant. The difference window size makes is local smoothing,
+best seen in a zoomed view of the same interval used by the main case study:
 
-```{r sensitivity-zoom, fig.width=10, fig.height=7, fig.cap="Zoomed 1.5-1.7 Mb region. The 50 bp profile resolves single-window fluctuations that the 500 bp profile averages away; all four trace the same underlying landscape."}
+```{r sensitivity-zoom, fig.width=10, fig.height=7.5, fig.cap="The 0.1-0.3 Mb region, within the interval shown in the genome-wide figure of the main case study, with Tm computed at 50, 100, 200 and 500 bp (dark to light). The 50 bp profile resolves single-window fluctuations that the 500 bp profile averages away, but all four trace the same underlying landscape. Yellow bands mark MutL-AR peaks."}
+## Only the four Tm profiles are drawn. Ten line tracks in one linear panel
+## leave each too little vertical space for its own axis labels, which then
+## collide, and everything except Tm is answering a different question: the
+## GC layers duplicate what the summary table already gives numerically, and
+## the microsatellite density is the subject of the main case study's figure,
+## not of this one. Removing both leaves five tracks with room to be read.
+## The full ten-track version is the circular figure above.
+##
+## The interval is the one used in the main case study's zoomed panel, so the
+## two figures can be read against each other rather than against different
+## parts of the chromosome.
+tracks_zoom <- c(
+  list(list(type = "rect", data = ecoli_rep_hotspots$all_peaks_IP_mutH,
+            col = "#2C3E50", bg.col = "grey", name = "MutL-AR",
+            legend_font_col = "#2C3E50", ideogram = TRUE, height = 0.6)),
+  lapply(seq_along(window_sizes), function(i)
+    list(type = "line", data = sens_dfs[[i]], value_col = "Tm",
+         name = paste0("Tm ", window_sizes[i], " bp"),
+         col = scale_cols_tm[i], legend_font_col = scale_cols_tm[i],
+         height = 1.2)),
+  list(list(type = "highlight",
+            data = ecoli_rep_hotspots$all_peaks_IP_mutH,
+            col = "#F1C40F", alpha = 0.18))
+)
+
 plot_genome_track(
   genome_name = genome_name,
   genome_size = chr_length,
-  track_list  = tracks_scale,
-  zoom        = "U00096.3:1500000-1700000"
+  track_list  = tracks_zoom,
+  zoom        = "U00096.3:100000-300000",
+  track.gap   = 0.03,
+  axis.cex    = 0.55
 )
 ```
 

@@ -91,9 +91,19 @@ phys_cores <- local({
 usable <- if (!is.na(phys_cores)) min(alloc_cores$n, phys_cores) else alloc_cores$n
 # Leave one core for the manager process, which is not idle: it receives and
 # binds the per-task results.
-worker_set <- unique(pmax(2L, seq.int(2L, max(2L, usable - 1L),
-                                      length.out = min(6L, max(2L, usable - 1L)))))
-worker_set <- sort(unique(as.integer(round(worker_set))))
+# The sweep must include one worker: it is the serial baseline every speedup
+# is divided by, and without it the ratios can only be formed against each
+# strategy's own summed task times, which are not comparable across
+# strategies because segmenting changes how much total work there is.
+# BiocParallel runs a single worker inside the manager rather than spawning
+# one, so that point measures the serial cost with nothing to serialise.
+worker_set <- local({
+  v <- argval("--workers", "")
+  if (nzchar(v)) return(sort(unique(as.integer(strsplit(v, ",")[[1]]))))
+  hi <- max(2L, usable - 1L)          # one core left for the manager
+  sort(unique(c(1L, as.integer(round(
+    seq.int(2L, hi, length.out = min(6L, hi - 1L)))))))
+})
 
 cpu_model <- local({
   x <- grep("^Model name:", system2("lscpu", stdout = TRUE, stderr = FALSE),
@@ -189,10 +199,16 @@ run_task <- function(task, pkg, window, slide, nn_table, Na, mode, lib) {
   if (nzchar(lib)) .libPaths(c(lib, .libPaths()))
   t0 <- proc.time()[["elapsed"]]                # per TASK, not per process
 
+  # A worker attaches the packages on its FIRST task only, and the BSgenome
+  # package is several seconds to load. Timed inside the task, that cost lands
+  # on whichever task happens to reach a cold worker, where it can exceed the
+  # calculation by an order of magnitude, and it inflates sum(task times) and
+  # therefore the balancing floor and the efficiency. Measured separately.
   suppressPackageStartupMessages({
     library(TmCalculator)
     library(pkg, character.only = TRUE)
   })
+  t_load <- proc.time()[["elapsed"]]
 
   # On a whole chromosome, trim the leading/trailing assembly gaps. On a
   # segment, do not: trimming would shift the window grid relative to a
@@ -217,7 +233,9 @@ run_task <- function(task, pkg, window, slide, nn_table, Na, mode, lib) {
   attr(out, "bench") <- list(
     chr = task$chr, start = task$start, end = task$end,
     bp = task$end - task$start + 1, n_win = length(out),
-    secs = proc.time()[["elapsed"]] - t0,
+    secs      = proc.time()[["elapsed"]] - t_load,  # calculation only
+    load_s    = t_load - t0,                       # 0 on a warm worker
+    secs_wall = proc.time()[["elapsed"]] - t0,
     rss_gb = ps::ps_memory_info()[["rss"]] / 1e9,
     pid = Sys.getpid())
   out
@@ -251,10 +269,20 @@ run_config <- function(strategy, n_workers) {
   list(summary = data.frame(
          strategy = strategy, n_workers = n_workers, n_tasks = nrow(b),
          wall_s = wall,
+         startup_s = if ("load_s" %in% names(b)) max(b$load_s, na.rm = TRUE) else 0,
+         wall_compute_s = max(wall - (if ("load_s" %in% names(b))
+                                        max(b$load_s, na.rm = TRUE) else 0),
+                              .Machine$double.eps),
          work_s = sum(b$secs),                    # serial-equivalent total
          balance_floor = sum(b$secs) / n_workers, # floor if perfectly balanced
          hard_floor = max(b$secs),                # longest indivisible task
-         efficiency = sum(b$secs) / (n_workers * wall),
+         speedup = sum(b$secs) / max(wall - (if ("load_s" %in% names(b))
+                                               max(b$load_s, na.rm = TRUE) else 0),
+                                     .Machine$double.eps),
+         efficiency = sum(b$secs) /
+           (n_workers * max(wall - (if ("load_s" %in% names(b))
+                                      max(b$load_s, na.rm = TRUE) else 0),
+                            .Machine$double.eps)),
          idle_s = n_workers * wall - sum(b$secs),
          max_rss_gb = max(b$rss_gb), n_windows = n_win_total,
          stringsAsFactors = FALSE),
@@ -289,7 +317,11 @@ agg <- do.call(rbind, lapply(split(S, list(S$strategy, S$n_workers), drop = TRUE
     strategy = g$strategy[1], n_workers = g$n_workers[1], n_rep = nrow(g),
     wall_med = median(g$wall_s), wall_min = min(g$wall_s), wall_max = max(g$wall_s),
     spread_pct = 100 * (max(g$wall_s) - min(g$wall_s)) / median(g$wall_s),
-    speedup = median(g$work_s) / median(g$wall_s),
+    startup_med = median(g$startup_s),
+    # Divided by the wall clock with worker start-up removed. The per-task
+    # times no longer contain package loading, so dividing by a wall clock
+    # that still does would understate every speedup by that amount.
+    speedup = median(g$speedup),
     efficiency = median(g$efficiency), max_rss_gb = max(g$max_rss_gb),
     stringsAsFactors = FALSE)))
 agg <- agg[order(agg$strategy, agg$n_workers), ]

@@ -51,7 +51,19 @@
 #'   In circular mode the regions are concatenated around the circle with
 #'   small gaps between them.
 #'   \code{NULL} (default) shows the full genome.
+#' @param main Panel title. \code{NULL} (default) uses the genome name, with
+#'   the interval appended when several zoom regions are drawn. Supply a
+#'   character string to replace it, or \code{NA} / \code{""} to omit it: a
+#'   manuscript figure normally carries the genome and interval in its caption
+#'   instead, and the title otherwise takes vertical space from the tracks.
+#'   A vector of the same length as \code{zoom} titles each panel separately.
 #' @param plot.type karyoploteR plot.type (linear only).
+#' @param plot.params Optional named list overriding entries of
+#'   \code{karyoploteR::getDefaultPlotParams()} (linear only). The defaults
+#'   size the margins for a single track, so several tracks in one panel leave
+#'   conspicuous white space above and below; e.g.
+#'   \code{plot.params = list(topmargin = 15, bottommargin = 15,
+#'   data1outmargin = 8)}. Unknown names are ignored with a warning.
 #' @param track.gap Relative gap between tracks (linear only, 0 to ~0.05).
 #' @param legend.show Logical.
 #' @param legend.position Legend position. Character for linear (e.g. "topright"),
@@ -63,6 +75,10 @@
 #' @param title.cex Title size.
 #' @param axis.cex Axis label size.
 #' @param base.tick.dist Numeric or NULL (linear only).
+#' @param base.tick.units Logical (linear only). Append the unit to the base
+#'   position labels, so that an axis reads \code{100 kb} rather than
+#'   \code{100}, which on its own could be bases, kb or Mb. Default
+#'   \code{TRUE}.
 #' @param start.degree Numeric. Starting angle in degrees for the circular
 #'   layout (default 34.47, matching the circlize convention).
 #' @param track.height,gap.after,cell.padding,track.margin
@@ -185,6 +201,8 @@ plot_genome_track <- function(
     chromosomes  = NULL,
     zoom         = NULL,
     plot.type    = 1,
+    plot.params  = NULL,
+    main         = NULL,
     track.gap    = 0.01,
 
     # legend
@@ -204,6 +222,7 @@ plot_genome_track <- function(
     axis.cex       = NULL,
     title.cex      = NULL,
     base.tick.dist = NULL,
+    base.tick.units = TRUE,
 
     # ---- circular-only params ----
     start.degree   = 34.47,
@@ -795,17 +814,38 @@ plot_genome_track <- function(
 
     # ---- init karyoplot ----
     pp <- karyoploteR::getDefaultPlotParams(plot.type)
+    # karyoploteR reserves 50 plot units above and below the data by default,
+    # which is generous for a single track and becomes conspicuous white space
+    # once several tracks share the panel. Named entries given here replace
+    # the corresponding defaults; everything else is left alone.
+    if (!is.null(plot.params)) {
+      unknown <- setdiff(names(plot.params), names(pp))
+      if (length(unknown))
+        warning("ignoring unknown plot.params: ",
+                paste(unknown, collapse = ", "), call. = FALSE)
+      keep <- intersect(names(plot.params), names(pp))
+      pp[keep] <- plot.params[keep]
+    }
     if (length(ideogram_list) > 0) {
       ideo_h <- ideogram_list[[1]]$height
       if (!is.null(ideo_h)) pp$ideogramheight <- pp$ideogramheight * ideo_h
     }
 
-    panel_title <- if (n_zoom == 1L) genome_name else {
+    # `main` overrides the automatic panel title. NA or "" suppresses it
+    # altogether, which is what a manuscript figure usually wants: the
+    # genome and the interval belong in the caption, not stamped on the
+    # plot, and the title otherwise reserves vertical space that the tracks
+    # could use.
+    panel_title <- if (!is.null(main)) {
+      if (length(main) > 1L) main[[zi]] else main
+    } else if (n_zoom == 1L) genome_name else {
       zr <- zoom_regions[zi, ]
       paste0(genome_name, "  [",
              format(zr$start, big.mark = ","), " - ",
              format(zr$end,   big.mark = ","), "]")
     }
+    if (length(panel_title) == 1L &&
+        (is.na(panel_title) || !nzchar(panel_title))) panel_title <- NULL
 
     kp_args <- list(
       genome      = genome,
@@ -833,7 +873,11 @@ plot_genome_track <- function(
     } else {
       btd <- base.tick.dist
     }
-    karyoploteR::kpAddBaseNumbers(kp, tick.dist = btd, cex = axis.cex)
+    # Bare tick numbers are ambiguous: an axis reading 100 to 300 could be
+    # bases, kb or Mb. karyoploteR can append the unit, and does not by
+    # default, so it is switched on here.
+    karyoploteR::kpAddBaseNumbers(kp, tick.dist = btd, cex = axis.cex,
+                                  add.units = base.tick.units)
 
     # ---- layout ----
     n_tracks <- length(track_list)

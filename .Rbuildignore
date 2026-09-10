@@ -15,3 +15,4 @@
 ^bench_.*\.csv$
 ^Figure2\.(png|tif)$
 ^\.github$
+^figures$

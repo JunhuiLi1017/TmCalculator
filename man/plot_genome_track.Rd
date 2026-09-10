@@ -14,6 +14,8 @@ plot_genome_track(
   chromosomes = NULL,
   zoom = NULL,
   plot.type = 1,
+  plot.params = NULL,
+  main = NULL,
   track.gap = 0.01,
   legend.show = TRUE,
   legend.position = NULL,
@@ -29,6 +31,7 @@ plot_genome_track(
   axis.cex = NULL,
   title.cex = NULL,
   base.tick.dist = NULL,
+  base.tick.units = TRUE,
   start.degree = 34.47,
   track.height = 0.05,
   gap.after = 0,
@@ -77,6 +80,20 @@ small gaps between them.
 
 \item{plot.type}{karyoploteR plot.type (linear only).}
 
+\item{plot.params}{Optional named list overriding entries of
+\code{karyoploteR::getDefaultPlotParams()} (linear only). The defaults
+size the margins for a single track, so several tracks in one panel leave
+conspicuous white space above and below; e.g.
+\code{plot.params = list(topmargin = 15, bottommargin = 15,
+data1outmargin = 8)}. Unknown names are ignored with a warning.}
+
+\item{main}{Panel title. \code{NULL} (default) uses the genome name, with
+the interval appended when several zoom regions are drawn. Supply a
+character string to replace it, or \code{NA} / \code{""} to omit it: a
+manuscript figure normally carries the genome and interval in its caption
+instead, and the title otherwise takes vertical space from the tracks.
+A vector of the same length as \code{zoom} titles each panel separately.}
+
 \item{track.gap}{Relative gap between tracks (linear only, 0 to ~0.05).}
 
 \item{legend.show}{Logical.}
@@ -95,6 +112,11 @@ numeric vector of length 2 for circular (e.g. c(0.75, 1)).}
 \item{title.cex}{Title size.}
 
 \item{base.tick.dist}{Numeric or NULL (linear only).}
+
+\item{base.tick.units}{Logical (linear only). Append the unit to the base
+position labels, so that an axis reads \code{100 kb} rather than
+\code{100}, which on its own could be bases, kb or Mb. Default
+\code{TRUE}.}
 
 \item{start.degree}{Numeric. Starting angle in degrees for the circular
 layout (default 34.47, matching the circlize convention).}

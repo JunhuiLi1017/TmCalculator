@@ -146,6 +146,20 @@ cat("> **The benchmark results are not present in this build.**\n>\n",
 S <- utils::read.csv(f, stringsAsFactors = FALSE)
 S <- S[S$ok & !is.na(S$compute_s), , drop = FALSE]
 
+## The benchmark file accumulates across invocations, so it can hold rows
+## taken before and after a change to the package. Averaging those together
+## gives a table that describes no build at all, so refuse instead.
+if ("pkg_version" %in% names(S)) {
+  vs <- sort(unique(stats::na.omit(S$pkg_version)))
+  if (length(vs) > 1L)
+    stop("crosstool_bench.csv mixes TmCalculator versions (",
+         paste(vs, collapse = ", "), "); re-run the benchmark with --fresh.")
+} else {
+  stop("crosstool_bench.csv predates the split of start-up from file I/O. ",
+       "Re-run inst/scripts/bench_crosstool.R and copy the result into ",
+       "inst/extdata/, then reinstall.")
+}
+
 ## Median and range over repetitions. With three repetitions a standard
 ## deviation is not a meaningful estimate, and repeated runs of the same
 ## configuration on a laptop have differed by nearly 30%, so the spread is
@@ -159,9 +173,24 @@ agg <- do.call(rbind, lapply(split(S, list(S$tool, S$n), drop = TRUE), function(
              rss_med     = stats::median(d$rss_gb),
              rss_lo      = min(d$rss_gb), rss_hi = max(d$rss_gb),
              startup_med = stats::median(d$startup_s),
+             ## Reading the input and writing the results exist only because
+             ## each tool runs as a separate process, so that peak memory can
+             ## be attributed to it. Reported, never added to start-up, never
+             ## drawn: a user passes data in memory.
+             io_med      = stats::median(d$io_s),
              stringsAsFactors = FALSE)
 }))
 agg <- agg[order(agg$tool, agg$n), ]
+
+## Start-up cannot depend on the input. If it does, something that scales
+## with n is being counted as start-up.
+for (t in unique(agg$tool)) {
+  d <- agg[agg$tool == t, ]
+  if (nrow(d) > 1L && max(d$startup_med) / min(d$startup_med) > 1.5)
+    warning(t, " start-up varies ",
+            sprintf("%.1fx", max(d$startup_med) / min(d$startup_med)),
+            " across input sizes; it should be constant.", call. = FALSE)
+}
 knitr::kable(agg, digits = 4, row.names = FALSE,
              caption = "Median and range over repetitions at each input size.")
 ```

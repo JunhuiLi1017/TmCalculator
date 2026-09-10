@@ -339,12 +339,16 @@ The `zoom` parameter accepts a character string (e.g. `"chr:start-end"`) or a
 GRanges object. In linear mode, the karyoploteR view is restricted to that
 region; in circular mode, only data overlapping the region is drawn.
 
-```{r zoom-single, fig.width=10, fig.height=5, fig.cap="Zoomed linear view of the 1.0-2.0 Mb region."}
+```{r zoom-single, fig.width=10, fig.height=8, fig.cap="Zoomed linear view of the 0.1-0.5 Mb region. Seven tracks share one panel, so `track.gap` separates them and `axis.cex` shrinks the tick labels; without both the y-axis labels of adjacent tracks overlap."}
 plot_genome_track(
   genome_name = genome_name,
   genome_size = chr_length,
   track_list  = tracks,
-  zoom        = c("U00096.3:100000-500000")
+  zoom        = "U00096.3:100000-500000",
+  ## Seven tracks in a linear panel leave each one little vertical room. The
+  ## gap is relative to the panel, so it has to grow with the track count.
+  track.gap   = 0.03,
+  axis.cex    = 0.55
 )
 ```
 
@@ -355,7 +359,7 @@ In linear mode each region is drawn as a separate stacked panel; in circular
 mode the regions are concatenated around the circle with small gaps between
 them.
 
-```{r zoom-multi-linear, fig.width=10, fig.height=8, fig.cap="Two zoomed regions displayed as stacked linear panels."}
+```{r zoom-multi-linear, fig.width=10, fig.height=9, fig.cap="Two zoomed regions, 0.1-0.5 Mb and 3.6-4.5 Mb, concatenated around the circle with a gap between them."}
 plot_genome_track(
   genome_name = genome_name,
   genome_size = chr_length,
@@ -405,6 +409,166 @@ plot_genome_track(
   circular    = TRUE
 )
 ```
+
+## Same GC content, different Tm
+
+The tracks above show GC content and Tm as two separate rings, which raises
+the obvious question of whether the second adds anything to the first. It
+does, and the genome-wide profile is enough to measure how much.
+
+Group the windows by GC content. Within a group every window has the same
+length, the same salt, and the same GC percentage, so an empirical formula
+whose only sequence input is GC percentage assigns all of them a single
+temperature. A nearest-neighbour model reads the dinucleotide stacks and
+does not.
+
+```{r gc-vs-tm-data}
+## The GC-content prediction for the same windows, for comparison.
+tm_gc_ecoli <- tm_calculate(gr_batch, method = "tm_gc",
+                            variant = "Schildkraut1965", Na = 50)
+GCmod <- as.data.frame(tm_gc_ecoli$gr[, c("Tm", "GC")])
+
+## Keep only windows whose GC percentage is an exact integer. A 200 bp
+## window can only take GC values in steps of 0.5%, so binning 49.5% with
+## 50.0% would put a real GC difference inside a group and some of the
+## spread below could be attributed to GC rather than to composition.
+## The same test also removes windows that contained an ambiguous base,
+## whose GC denominator is smaller than the window.
+prep <- function(d) {
+  d <- d[!is.na(d$Tm) & !is.na(d$GC) & d$width == 200L, ]
+  d <- d[d$GC == round(d$GC), ]
+  d$GCi <- as.integer(d$GC)
+  d
+}
+Cnn <- prep(as.data.frame(tm_ASM584v2$gr[, c("Tm", "GC")]))
+Cgc <- prep(GCmod)
+
+cnt <- table(Cnn$GCi)
+lv  <- sort(as.integer(names(cnt[cnt >= 30])))   # enough windows to be stable
+Cnn <- Cnn[Cnn$GCi %in% lv, ]
+Cgc <- Cgc[Cgc$GCi %in% lv, ]
+
+modal   <- lv[which.max(cnt[as.character(lv)])]
+at_mode <- Cnn$Tm[Cnn$GCi == modal]
+
+cat(sprintf("At %d%% GC: %s windows, Tm from %.2f to %.2f (spread %.2f C)\n",
+            modal, format(length(at_mode), big.mark = ","),
+            min(at_mode), max(at_mode), diff(range(at_mode))))
+cat(sprintf("GC-content formula predicts a single value: %.2f C\n",
+            median(Cgc$Tm[Cgc$GCi == modal])))
+cat(sprintf("Largest spread at any GC value: %.2f C\n",
+            max(tapply(Cnn$Tm, Cnn$GCi, function(v) diff(range(v))))))
+```
+
+```{r gc-vs-tm-plot, fig.width=7, fig.height=5, fig.cap="Melting temperature against GC content for 200 bp windows of the E. coli chromosome. Each box holds windows of identical length, salt and GC content. The red line is the GC-content formula, which by construction has no width within a group; the boxes do, and that width is the composition effect the formula cannot represent."}
+gc_line <- tapply(Cgc$Tm, Cgc$GCi, median)[as.character(lv)]
+
+op <- par(mar = c(4.6, 4.6, 1.2, 1.2), las = 1, mgp = c(2.9, 0.7, 0))
+boxplot(Tm ~ factor(GCi, levels = lv), data = Cnn, at = seq_along(lv),
+        outline = FALSE, border = "#34495E", col = "#D6E4F0", lwd = 0.7,
+        xaxt = "n", bty = "n", xlab = "GC content (%)",
+        ylab = expression(paste("Melting temperature (", degree, "C)")))
+sel <- seq(1, length(lv), by = 5)          # one label per box is unreadable
+axis(1, at = seq_along(lv)[sel], labels = lv[sel])
+lines(seq_along(lv), gc_line, col = "#C0392B", lwd = 2.2)
+legend("topleft", bty = "n", cex = 0.85,
+       legend = c("Nearest-neighbour (Breslauer 1986)",
+                  "GC-content formula (Schildkraut 1965)"),
+       col = c("#34495E", "#C0392B"), lwd = c(0.7, 2.2), seg.len = 1.4)
+par(op)
+```
+
+Two things to read off this, and one not to.
+
+The boxes have real width. Windows that agree on GC content to the base
+still differ in Tm, because AA/TT, AT/TA and TA/AT stacks are not
+interchangeable and neither are the ten GC-containing ones. That difference
+is the whole content of a nearest-neighbour model, and it is invisible to
+any formula parameterised on GC percentage alone.
+
+The width is not uniform. It is largest in the middle of the GC range,
+where the number of distinct sequences compatible with a given GC content
+is largest, and narrows at both extremes, where composition is increasingly
+constrained. A GC-content formula is therefore least reliable exactly where
+most of the genome sits.
+
+What should *not* be read off it is the vertical offset between the line and
+the boxes. The two are different parameterisations calibrated against
+different reference conditions, and comparing their absolute values is a
+separate question from the one this panel asks. The claim here concerns the
+spread at fixed GC, which is a property of the sequences and does not depend
+on where either scale is anchored.
+
+## Finding a locus that shows it
+
+The distribution above says the effect exists across the genome. To see it
+in one place, scan for the locus in which two windows of exactly equal GC
+content are furthest apart in Tm, then zoom to it.
+
+```{r find-locus}
+W <- as.data.frame(tm_ASM584v2$gr[, c("Tm", "GC")])
+W <- W[!is.na(W$Tm) & !is.na(W$GC) & W$width == 200L, ]
+W <- W[order(W$start), ]
+
+## Largest Tm difference between two windows of identical GC inside a locus.
+best_pair <- function(d) {
+  g <- split(seq_len(nrow(d)), d$GC)
+  g <- g[lengths(g) >= 2L]
+  if (!length(g)) return(NULL)
+  sp <- vapply(g, function(ix) diff(range(d$Tm[ix])), numeric(1))
+  ix <- g[[which.max(sp)]]
+  list(spread = max(sp),
+       rows   = ix[c(which.min(d$Tm[ix]), which.max(d$Tm[ix]))])
+}
+
+n_loc  <- 100L                       # 100 x 200 bp = 20 kb
+starts <- seq_len(nrow(W) - n_loc + 1L)
+sc <- vapply(starts, function(i) {
+  b <- best_pair(W[i:(i + n_loc - 1L), ]); if (is.null(b)) 0 else b$spread
+}, numeric(1))
+
+i0   <- starts[which.max(sc)]
+d    <- W[i0:(i0 + n_loc - 1L), ]
+pair <- d[best_pair(d)$rows, ]
+pair[, c("seqnames", "start", "end", "GC", "Tm")]
+```
+
+```{r zoom-locus, fig.width=8, fig.height=4, fig.cap="High-magnification view of the locus containing the largest melting-temperature difference between two windows of identical GC content. The two windows are shaded. Only the GC and Tm tracks are drawn: seven tracks in one linear panel leave each of them too little height to read at this scale."}
+tracks_zoom <- list(
+  list(type = "line", data = Tm, value_col = "GC", name = "GC content",
+       col = "#4A90E2", legend_font_col = "#4A90E2", height = 1),
+  list(type = "line", data = Tm, value_col = "Tm", name = "Melting temp",
+       col = "#E06666", legend_font_col = "#E06666", height = 1.4),
+  list(type = "highlight", data = pair[, c("seqnames", "start", "end")],
+       col = "#B7791F", alpha = 0.28)
+)
+
+plot_genome_track(
+  ## The chromosome bar is labelled with `genome_name`, and the BSgenome
+  ## package name is too long for a 20 kb panel; the accession is short and
+  ## says the same thing.
+  genome_name = chr_name,
+  genome_size = chr_length,
+  track_list  = tracks_zoom,
+  zoom        = sprintf("%s:%d-%d", chr_name, min(d$start), max(d$end)),
+  track.gap   = 0.06,
+  axis.cex    = 0.6,
+  ## Without this the panel carries no base positions at all: the default
+  ## tick spacing is 500 kb for any view under 10 Mb, which places no tick
+  ## inside a 20 kb window.
+  base.tick.dist  = 2000,
+  base.tick.units = TRUE
+)
+```
+
+The GC track is flat across the two shaded windows and the Tm track is not.
+That is the whole argument for a nearest-neighbour model in one picture, and
+it is the panel used as Figure 2C in the manuscript; the combined figure is
+produced by `inst/scripts/make_figure2.R`.
+
+One caveat worth stating plainly: this locus was selected *because* it is
+extreme, so it shows the largest effect rather than a typical one. The
+box plot above is the honest summary, and the two belong together.
 
 ---
 
@@ -485,18 +649,6 @@ On a standard desktop computer (single core, R 4.4, compiled Rcpp nearest-neighb
 | Sequence extraction | `to_genomic_ranges_fast()` | ~`r sprintf("%.2f", runtime1["elapsed"])` s |
 | Tm calculation (23,208 windows) | `tm_calculate()` | ~`r sprintf("%.2f", runtime2["elapsed"])` s |
 | **Total** | | **~`r sprintf("%.2f", runtime0["elapsed"] + runtime1["elapsed"] + runtime2["elapsed"])` s** |
-
-For human-scale analyses (non-overlapping 200 bp windows across the ~3.1 Gb
-haploid genome; 14.7 M windows after excluding assembly gaps), run the
-*entire pipeline* -- window building, sequence extraction and
-`tm_calculate()` -- inside one `BiocParallel::SnowParam()` worker per
-chromosome, keeping `tm_calculate()` itself at its serial default. On a
-6-core/16 GB laptop this completes all of hg38 in just under 5 minutes
-with 5 workers. Peak memory per worker is governed by its largest
-chromosome (~4 GB for chr1), not by the total window count. Measured
-timings, worker-count guidance and ready-to-run code are in the companion
-vignette *Runtime and Memory for Genome-Scale Tm Profiling: an hg38
-Benchmark Guide*.
 
 ---
 

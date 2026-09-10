@@ -78,10 +78,40 @@ nucleotide compositions. Default: FALSE}
 Only applicable for the NN method. Default: 0}
 
 \item{nn_table}{Thermodynamic nearest-neighbor parameters for different nucleic acid hybridizations.
-Only applicable for the NN method. Sets whose name encodes a sodium
-concentration were fitted at that condition and are not salt-corrected
-again. See \code{\link{tm_nn}} for the full list and guidance on choosing
-between them. Default: "DNA_NN_SantaLucia_2004"}
+  Only applicable for the NN method. Sets whose name encodes a sodium
+  concentration were fitted at that condition and are not salt-corrected
+  again. See \code{\link{tm_nn}} for the full list and guidance on choosing
+  between them. Default: "DNA_NN_SantaLucia_2004"
+
+
+  Alternatively, supply a matrix or data.frame of parameters directly. This
+  is the route for parameter sets the package does not ship, in particular
+  sets covering modified bases such as 5-methylcytosine. Requirements:
+  \itemize{
+    \item numeric, with columns 1 and 2 read as delta H (kcal/mol) and
+      delta S (cal/mol/K); further columns are ignored;
+    \item row names giving the parameter keys, e.g. \code{"AA/TT"},
+      \code{"init"}, \code{"init_A/T"}, \code{"sym"};
+    \item every key of a built-in reference set must be present. The
+      reference is named by \code{attr(x, "reference")}, or defaults to
+      the first built-in listed for the argument, which is a DNA/DNA set;
+      RNA and hybrid tables should therefore set the attribute. Extra keys
+      beyond the reference are kept, which is how a modified-base set adds
+      stacks rather than replacing them.
+  }
+  The supplied table is reordered to the reference key order before use, so
+  that two tables differing only in row order give identical results. A
+  missing key would otherwise contribute zero to the calculation instead of
+  raising an error, which is why the full key set is required. Keys that
+  disagree with their reverse complement produce a warning: expected for
+  modified bases, a transposition error otherwise.
+
+  Two optional attributes are honoured. \code{attr(x, "salt_mM")} marks a
+  set as fitted at a stated sodium concentration, which suppresses the salt
+  correction at that concentration exactly as for the built-in sets fitted
+  this way; without it the table is treated as a reference-condition set and
+  \code{salt_method} is applied. \code{attr(x, "end_table")} supplies a
+  companion penultimate-pair end-effect table.}
 
 \item{tmm_table}{Thermodynamic parameters for terminal mismatches. Only applicable for the NN method.
 Default: "DNA_TMM_Bommarito_2000"}
