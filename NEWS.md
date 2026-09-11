@@ -1,4 +1,4 @@
-# TmCalculator 1.10.0
+# TmCalculator 1.1.0
 
 ## Bug fix affecting all nearest-neighbor Tm values
 

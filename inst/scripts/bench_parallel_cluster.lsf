@@ -4,31 +4,73 @@
 #
 #   bsub < inst/scripts/bench_parallel_cluster.lsf
 #
-# The two options that matter for the validity of the measurement are -x and
-# span[hosts=1]. Without exclusive use, other jobs compete for cores and
-# memory bandwidth on the same node and the scaling curve measures the
-# cluster's load rather than the software. Without span[hosts=1], LSF may
-# scatter the slots across machines, which SnowParam's PSOCK workers cannot
-# use anyway since they are started locally.
+# PURPOSE. This run is not a search for the saturation point. It repeats the
+# laptop sweep (1-6 workers, ~16 GB) on cluster hardware so that the only
+# variable between the two tables is the CPU. Worker counts, memory and the
+# number of repetitions are therefore matched to the laptop deliberately,
+# not chosen to make use of the node.
+#
+# WHAT REPLACED EXCLUSIVE USE. The earlier version of this file carried -x.
+# The long queue rejects exclusive jobs, and taking a whole 40-core node to
+# run six workers would idle 34 cores for the length of the job. Instead the
+# job asks for six slots and the contention it suffers is *measured* rather
+# than prevented: three repetitions give an observed range, and the node
+# state is recorded before and after. A narrow range means neighbours did
+# not matter; a wide one is a result in itself and tells you to re-run or to
+# report the range. The effect under test is large (roughly 45% between
+# strategies on the laptop) relative to typical neighbour jitter.
+#
+# WHAT STILL HAS TO BE PINNED. The cluster is heterogeneous: Xeon Gold 6230,
+# EPYC 7702, EPYC 9334 and E5-2699 v4 all accept jobs. Three repetitions
+# landing on three CPU families would produce a range that measures the
+# scheduler, not the software. The model is therefore fixed below. Gold 6230
+# is chosen because there are ~72 such nodes (shortest queue) and because it
+# is the closest architectural match to the laptop's Intel Core i7, which is
+# what makes "the difference is the CPU" an interpretable statement.
 # ===========================================================================
 #BSUB -J tmcalc_parbench
 #BSUB -q long                 # adjust to a queue whose limit exceeds -W
-#BSUB -W 8:00                 # 3 strategies x ~6 worker counts x 3 reps
-#BSUB -n 16                   # slots; the script sweeps up to n-1 workers
+#BSUB -W 12:00                # 6 worker counts x 3 strategies x 3 reps
+#BSUB -n 6                    # matches the laptop's 6 physical cores
 #BSUB -R "span[hosts=1]"      # all slots on one machine (PSOCK is node-local)
-#BSUB -R "rusage[mem=8000]"   # MB per slot; segment mode needs ~1-2 GB per
-                              # worker, chromosome mode up to ~4.5 GB
-#BSUB -x                      # EXCLUSIVE node -- do not remove
+#BSUB -R "select[model=='x6_420X_IntelRXeonRGold6230CPU210GHz']"
+#BSUB -R "rusage[mem=2700]"   # MB per slot; 6 x 2700 = 16.2 GB ~ the laptop
 #BSUB -o logs/parbench.%J.out
 #BSUB -e logs/parbench.%J.err
 
 set -euo pipefail
 mkdir -p logs results
 
-# --- modules -------------------------------------------------------------
-# Adjust these two lines to your site. The R build must be the one where
-# TmCalculator and BSgenome.Hsapiens.UCSC.hg38 are installed.
-module load R/4.4.0 || true
+# --- conda environment ---------------------------------------------------
+# A batch job starts a fresh non-interactive shell and inherits nothing from
+# the interactive session, so the environment has to be activated here.
+# `conda activate` alone fails in a non-interactive shell ("run 'conda init'
+# first"); sourcing conda.sh is what defines the shell function.
+#
+# `set +u` is load-bearing: conda's activate reads unset variables, and with
+# `set -u` in force the job dies on this line with a message that does not
+# mention conda.
+#
+# There is deliberately no `module load R`. A site R module would take
+# precedence on PATH over the conda R that has TmCalculator and the hg38
+# BSgenome installed, and the failure mode is not an error but a missing
+# package much later in the run.
+CONDA_BASE="$(conda info --base 2>/dev/null || echo "$HOME/anaconda3")"
+# shellcheck disable=SC1091
+source "${CONDA_BASE}/etc/profile.d/conda.sh"
+set +u
+conda activate r441_hg38
+set -u
+
+# --- fail now, not in four hours -----------------------------------------
+echo "R         : $(command -v R)"
+R --version | head -1
+Rscript -e 'cat("libPaths:\n"); cat(.libPaths(), sep = "\n")'
+Rscript -e 'for (p in c("TmCalculator", "BSgenome.Hsapiens.UCSC.hg38",
+                        "BiocParallel", "ps"))
+              if (!requireNamespace(p, quietly = TRUE)) stop("missing: ", p)
+            cat("deps OK; TmCalculator ",
+                as.character(packageVersion("TmCalculator")), "\n")'
 
 # --- node-local scratch --------------------------------------------------
 # LSF sets LSB_JOBTMPDIR on many sites; fall back to /tmp under the job id.
@@ -39,17 +81,34 @@ SCRATCH="${LSB_JOBTMPDIR:-/tmp/$LSB_JOBID}"
 mkdir -p "$SCRATCH"
 trap 'rm -rf "$SCRATCH"' EXIT
 
-echo "host      : $(hostname)"
-echo "slots     : ${LSB_DJOB_NUMPROC:-unset}"
-echo "scratch   : $SCRATCH"
-df -T "$SCRATCH" || true      # confirm it is local, not nfs/gpfs/lustre
-lscpu | grep -E "^(Model name|Socket|Core|Thread)" || true
+# --- node state, recorded rather than assumed ----------------------------
+# Printed before and after the sweep. Without exclusive use these two blocks
+# are the evidence for how much company the job had, and they belong in the
+# table footnote if the observed range turns out to be wide.
+node_state() {
+  echo "=== node state ($1) $(date -Is) ==="
+  hostname
+  uptime                                            # load average
+  bhosts -w "$(hostname -s)" 2>/dev/null || true    # slots used on this host
+  echo "slots granted : ${LSB_DJOB_NUMPROC:-unset}"
+  echo "scratch       : $SCRATCH"
+  df -T "$SCRATCH" || true       # confirm local, not nfs/gpfs/lustre
+  free -g 2>/dev/null | head -2 || true
+  lscpu | grep -E "^(Model name|Socket|Core|Thread)" || true
+  echo
+}
+node_state "before"
 
 # --- run -----------------------------------------------------------------
+# --workers is given explicitly. The script's automatic sweep leaves one core
+# for the manager, so -n 6 would produce 1-5 and the table would silently be
+# missing the 6-worker row that the laptop has.
 Rscript inst/scripts/bench_parallel_cluster.R \
   --outdir results \
   --reps 3 \
   --segsize 50e6 \
+  --workers 1,2,3,4,5,6 \
   --scratch "$SCRATCH"
 
+node_state "after"
 echo "done: $(date)"

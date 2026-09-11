@@ -51,7 +51,7 @@ test_that("all 16 Watson-Crick stacks are present after completion", {
 })
 
 test_that("the four transposed rows carry their published values", {
-  # Regression test for the transposition present up to 1.10.0, pinned to
+  # Regression test for the transposition present up to 1.0.9, pinned to
   # literal values from SantaLucia & Hicks (2004) so that it fails loudly if
   # the mapping is ever reverted.
   tbl <- TmCalculator:::get_table("DNA_NN_SantaLucia_2004")

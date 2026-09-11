@@ -1,4 +1,4 @@
-# Nearest-neighbor parameters added in v1.10.0: provenance
+# Nearest-neighbor parameters added in v1.1.0: provenance
 
 Provenance record for the parameter sets added in this release: the two
 raised in review (Banerjee 2020, Zuber 2022) and the two molecular-crowding
@@ -20,7 +20,7 @@ Sugimoto N. *Improved nearest-neighbor parameters for the stability of
 RNA/DNA hybrids under a physiological condition.* Nucleic Acids Research
 2020;48(21):12042–12054. doi:10.1093/nar/gkaa572 — Table 2.
 
-**Status: implemented** as `RNA_DNA_NN_Banerjee_2020` (v1.10.0), with
+**Status: implemented** as `RNA_DNA_NN_Banerjee_2020` (v1.1.0), with
 `attr(, "salt_mM") = 100` so salt correction is skipped automatically at
 the fitted condition.
 

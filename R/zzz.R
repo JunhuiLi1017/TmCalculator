@@ -42,7 +42,7 @@
 #   TG/AC  <- CA/GT   (reverse of CA/GT)
 #   CC/GG  <- GG/CC   (reverse of GG/CC; homodimer palindrome)
 #
-# Four of these six were transposed in releases up to 1.10.0: AC/TG and TG/AC
+# Four of these six were transposed in releases up to 1.0.9: AC/TG and TG/AC
 # carried each other's values, as did AG/TC and TC/AG. Every table built
 # through this helper was affected, and because the error is per-stack it
 # changed Tm by an amount that depends on sequence composition. It was found

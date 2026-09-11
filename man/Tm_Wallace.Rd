@@ -28,6 +28,23 @@ Returns a list of sequences with updated Tm attributes
 \description{
 The Wallace rule is often used as rule of thumb for approximate melting temperature calculations for primers with 14 to 20 nt length.
 }
+\section{Length of validity}{
+
+
+The 2 + 4 rule was calibrated on 14 to 20 nt hybridisation probes and
+carries no length-dependent, salt-dependent or concentration-dependent
+term. Its error therefore grows without bound as sequences lengthen, and
+on genome-scale windows it returns a number that is not a melting
+temperature in any useful sense: a 200 bp window is reported at several
+hundred degrees Celsius.
+
+Sequences longer than 30 nt raise a warning that names
+\code{\link{tm_nn}} as the appropriate alternative. A warning rather than
+an error, because the rule stays a legitimate rule of thumb and users who
+knowingly apply it outside its calibrated range should not be blocked;
+wrap the call in \code{suppressWarnings()} in that case.
+}
+
 \examples{
 
 input_seq = c('acgtTGCAATGCCGTAWSDBSY','acgtTGCCCCGGCCGCGCCGTAWSDBSY') #for wallace rule

@@ -1,7 +1,22 @@
 #' Calculate the melting temperature using the 'Wallace rule'
 #' 
 #' The Wallace rule is often used as rule of thumb for approximate melting temperature calculations for primers with 14 to 20 nt length.
-#'  
+#'
+#' @section Length of validity:
+#'
+#' The 2 + 4 rule was calibrated on 14 to 20 nt hybridisation probes and
+#' carries no length-dependent, salt-dependent or concentration-dependent
+#' term. Its error therefore grows without bound as sequences lengthen, and
+#' on genome-scale windows it returns a number that is not a melting
+#' temperature in any useful sense: a 200 bp window is reported at several
+#' hundred degrees Celsius.
+#'
+#' Sequences longer than 30 nt raise a warning that names
+#' \code{\link{tm_nn}} as the appropriate alternative. A warning rather than
+#' an error, because the rule stays a legitimate rule of thumb and users who
+#' knowingly apply it outside its calibrated range should not be blocked;
+#' wrap the call in \code{suppressWarnings()} in that case.
+#'
 #' @param gr_seq Pre-processed sequence(s) in 5' to 3' direction. This should be the output from
 #'   to_genomic_ranges() function.
 #'    
@@ -43,6 +58,13 @@ tm_wallace <- function(gr_seq, ambiguous = FALSE,
                        BPPARAM = NULL) {
   # Filter sequence
   gr_seq$sequence <- check_filter_seq(gr_seq$sequence, method = "tm_wallace")
+
+  # Checked here rather than in .tm_wallace_chunk(): a warning raised on a
+  # BiocParallel worker is collected and re-emitted out of order, or lost
+  # entirely on some backends, and it would fire once per chunk instead of
+  # once per call.
+  .warn_wallace_length(gr_seq$sequence)
+
   # Calculate Tm for each sequence (chunked, optionally in parallel)
   all_seqs <- as.character(gr_seq$sequence)
   chunk_res <- .bp_map_chunks(
@@ -72,6 +94,31 @@ tm_wallace <- function(gr_seq, ambiguous = FALSE,
   attr(result_list, "nonhidden") <- "gr"
 
   return(result_list)
+}
+
+# -- Length guard -------------------------------------------------------------
+# The Wallace rule has no length term, so there is no length at which it
+# degrades gracefully; 30 nt is the point past which the rule is no longer
+# defensible even as an approximation, being 50% beyond the upper end of the
+# range it was calibrated on.
+#
+# The message reports the count and the longest sequence rather than listing
+# offenders: the genome-wide case has millions of windows and enumerating
+# them would be unusable.
+#' @keywords internal
+.warn_wallace_length <- function(seqs, limit = 30L) {
+  n <- nchar(as.character(seqs))
+  n <- n[!is.na(n)]
+  bad <- sum(n > limit)
+  if (bad == 0L) return(invisible(FALSE))
+
+  warning(sprintf(
+    paste0("tm_wallace(): %d of %d sequences exceed %d nt (longest %d nt). ",
+           "The Wallace rule was calibrated on 14-20 nt oligonucleotides and ",
+           "has no length-dependent term, so these values are not meaningful ",
+           "melting temperatures. Use tm_nn() for sequences of this length."),
+    bad, length(n), limit, max(n)), call. = FALSE)
+  invisible(TRUE)
 }
 
 # -- Chunk worker: Wallace-rule Tm over a block of sequences ------------------
