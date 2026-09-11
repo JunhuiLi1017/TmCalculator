@@ -14,6 +14,8 @@ integrate_granges(
   window_size = 1000L,
   bin_size = 1e+06,
   agg_fun = mean,
+  weight = c("none", "overlap"),
+  report_coverage = FALSE,
   min_overlap = 1L,
   ignore_strand = TRUE,
   keep_unmatched = TRUE,
@@ -48,12 +50,45 @@ Default: \code{1e6} (1 Mb). Smaller values give finer resolution but
 sparser coverage.}
 
 \item{agg_fun}{Function. Applied to numeric feature values when multiple
-features map to the same Tm range / bin. Must accept a numeric vector and
-an \code{na.rm} argument (e.g. \code{mean}, \code{median}, \code{sum},
-\code{max}). Default: \code{mean}.}
+features map to the same Tm range / bin. It is called as
+\code{agg_fun(values, na.rm = TRUE)}, so it must accept an
+\code{na.rm} argument; \code{mean}, \code{median}, \code{sum} and
+\code{max} all qualify, whereas \code{function(x) x[1]} does not.
+Ignored for character columns, which are always joined as a
+comma-separated list of their unique values. Default: \code{mean}.}
+
+\item{weight}{Character. How features are combined within a range.
+  \code{"none"} (default) gives every feature that passes the overlap test
+  the same weight, whatever the length of its overlap. \code{"overlap"}
+  computes a mean weighted by the number of overlapping base pairs,
+  \eqn{\sum_j w_{ij} v_j / \sum_j w_{ij}} with \eqn{w_{ij}} the width of
+  the intersection of range \eqn{i} and feature \eqn{j}.
+
+  The distinction matters wherever a signal changes sharply. A 200 bp
+  window whose first 190 bp are covered at depth 5 and whose last 10 bp are
+  covered at depth 200 has a true mean depth of 14.75; unweighted
+  aggregation returns 102.5, because the 10 bp feature counts as much as
+  the 190 bp one. Raising \code{min_overlap} does not fix this, it only
+  reverses the sign of the bias by discarding the short feature entirely.
+
+  \code{"overlap"} requires \code{agg_fun = mean}: an overlap-weighted
+  maximum has no accepted definition, and quietly ignoring \code{agg_fun}
+  would return an unweighted value that looks weighted. It does not apply
+  to \code{strategy = "nearest"}, which performs no aggregation.}
+
+\item{report_coverage}{Logical. Add a \code{covered_frac} column giving the
+fraction of each range covered by at least one feature, computed after
+reducing the features so that overlapping ones are not counted twice.
+A weighted mean normalises by the covered bases, so a value derived from
+a quarter of a window is indistinguishable from one derived from all of
+it; this column is what makes the difference visible. Produced by the
+\code{"overlap"} and \code{"window"} strategies. Default: \code{FALSE}.}
 
 \item{min_overlap}{Integer. Minimum overlap in base pairs required between
-a Tm range and a feature range in \code{"overlap"} mode. Default:
+a Tm range and a feature range. It is a filter and not a weight: a
+feature either qualifies or does not, and a qualifying feature counts in
+full. Applies to the \code{"overlap"} strategy only; \code{"window"} and
+\code{"bin"} require a single overlapping base pair. Default:
 \code{1}.}
 
 \item{ignore_strand}{Logical. If \code{TRUE} (default), strand is ignored
@@ -105,7 +140,88 @@ numeric columns are aggregated via \code{agg_fun} (default \code{mean}),
 and categorical columns are collapsed to a comma-separated string of unique
 values.
 }
+\section{Aggregating continuous signals}{
+
+When several features map to the same range, numeric columns are summarised
+by \code{agg_fun} and character columns are joined as their unique values.
+Which features take part is decided by \code{min_overlap}, and how much each
+one counts is decided by \code{weight}. The two are easy to confuse, and the
+distinction is what determines whether a coverage-like signal is summarised
+correctly at a boundary.
+
+Let \eqn{R_i} be the \eqn{i}-th range of \code{gr_tm}, \eqn{F_j} the
+\eqn{j}-th feature, \eqn{x_j} its value, and
+\eqn{w_{ij} = |R_i \cap F_j|} the number of base pairs they share. The set
+of features entering the summary of \eqn{R_i} is
+\eqn{S_i = \{ j : w_{ij} \ge \code{min_overlap} \}}, and
+
+\deqn{v_i = \mathrm{agg\_fun}(\{x_j : j \in S_i\})}{
+      v_i = agg_fun({x_j : j in S_i})}
+
+with \code{weight = "none"}, or
+
+\deqn{v_i = \frac{\sum_{j \in S_i} w_{ij} x_j}{\sum_{j \in S_i} w_{ij}}}{
+      v_i = sum_j w_ij x_j / sum_j w_ij}
+
+with \code{weight = "overlap"}.
+
+The unweighted form gives a feature that overlaps by one base pair the same
+influence as one that spans the whole range. This is harmless where a signal
+is flat and wrong where it steps, which is to say at exon boundaries, peak
+edges and promoters. Raising \code{min_overlap} does not repair it: the
+threshold is a filter, so a short feature is either counted in full or
+discarded in full, and the bias changes sign rather than disappearing. The
+example below shows both failures against a case with a known answer.
+
+The weighted mean normalises by the covered base pairs, not by the width of
+the range, so a value derived from a quarter of a window is
+indistinguishable from one derived from all of it.
+\code{report_coverage = TRUE} adds a \code{covered_frac} column giving the
+fraction of each range covered by at least one feature, computed after
+\code{\link[GenomicRanges]{reduce}}-ing the features so that overlapping
+ones are not double counted. Multiply by it to convert a mean over covered
+bases into a mean over the range.
+
+Weighting is not the default. Enabling it changes numeric output, and
+existing analyses should stay reproducible unless their author decides
+otherwise.
+}
+
 \examples{
+## Aggregation: a coverage track with a known answer -----------------------
+## Two 200 bp windows over a signal that steps sharply inside the first.
+##
+##   window 1  [  1 .. 200]        window 2  [401 .. 600]
+##   depth     [  1 .. 190] = 5
+##             [191 .. 400] = 200
+##                                           [401 .. 450] = 60
+library(GenomicRanges)
+
+win <- GRanges("chr1", IRanges(start = c(1, 401), width = 200),
+               Tm = c(70, 72))
+cov <- GRanges("chr1", IRanges(start = c(1, 191, 401),
+                               end   = c(190, 400, 450)),
+               cov = c(5, 200, 60))
+
+## Window 1 truly averages (5 * 190 + 200 * 10) / 200 = 14.75.
+integrate_granges(win, cov, strategy = "overlap")$cov
+## 102.5  60   the 10 bp feature counts as much as the 190 bp one
+
+integrate_granges(win, cov, strategy = "overlap",
+                  weight = "overlap")$cov
+## 14.75  60   overlap-weighted mean recovers the true depth
+
+integrate_granges(win, cov, strategy = "overlap", min_overlap = 20L)$cov
+## 5      60   the threshold discards the short feature; bias reverses
+
+## Window 2 is only a quarter covered. Weighting cannot show that, because
+## it normalises by the covered bases; the coverage column can.
+res <- integrate_granges(win, cov, strategy = "overlap",
+                         weight = "overlap", report_coverage = TRUE)
+res$cov                      # 14.75  60
+res$covered_frac             # 1.00   0.25
+res$cov * res$covered_frac   # 14.75  15    mean over the whole window
+
 \dontrun{
 library(GenomicRanges)
 

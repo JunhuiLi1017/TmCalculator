@@ -46,11 +46,42 @@
 #'   Default: \code{1e6} (1 Mb). Smaller values give finer resolution but
 #'   sparser coverage.
 #' @param agg_fun Function. Applied to numeric feature values when multiple
-#'   features map to the same Tm range / bin. Must accept a numeric vector and
-#'   an \code{na.rm} argument (e.g. \code{mean}, \code{median}, \code{sum},
-#'   \code{max}). Default: \code{mean}.
+#'   features map to the same Tm range / bin. It is called as
+#'   \code{agg_fun(values, na.rm = TRUE)}, so it must accept an
+#'   \code{na.rm} argument; \code{mean}, \code{median}, \code{sum} and
+#'   \code{max} all qualify, whereas \code{function(x) x[1]} does not.
+#'   Ignored for character columns, which are always joined as a
+#'   comma-separated list of their unique values. Default: \code{mean}.
+#' @param weight Character. How features are combined within a range.
+#'   \code{"none"} (default) gives every feature that passes the overlap test
+#'   the same weight, whatever the length of its overlap. \code{"overlap"}
+#'   computes a mean weighted by the number of overlapping base pairs,
+#'   \eqn{\sum_j w_{ij} v_j / \sum_j w_{ij}} with \eqn{w_{ij}} the width of
+#'   the intersection of range \eqn{i} and feature \eqn{j}.
+#'
+#'   The distinction matters wherever a signal changes sharply. A 200 bp
+#'   window whose first 190 bp are covered at depth 5 and whose last 10 bp are
+#'   covered at depth 200 has a true mean depth of 14.75; unweighted
+#'   aggregation returns 102.5, because the 10 bp feature counts as much as
+#'   the 190 bp one. Raising \code{min_overlap} does not fix this, it only
+#'   reverses the sign of the bias by discarding the short feature entirely.
+#'
+#'   \code{"overlap"} requires \code{agg_fun = mean}: an overlap-weighted
+#'   maximum has no accepted definition, and quietly ignoring \code{agg_fun}
+#'   would return an unweighted value that looks weighted. It does not apply
+#'   to \code{strategy = "nearest"}, which performs no aggregation.
+#' @param report_coverage Logical. Add a \code{covered_frac} column giving the
+#'   fraction of each range covered by at least one feature, computed after
+#'   reducing the features so that overlapping ones are not counted twice.
+#'   A weighted mean normalises by the covered bases, so a value derived from
+#'   a quarter of a window is indistinguishable from one derived from all of
+#'   it; this column is what makes the difference visible. Produced by the
+#'   \code{"overlap"} and \code{"window"} strategies. Default: \code{FALSE}.
 #' @param min_overlap Integer. Minimum overlap in base pairs required between
-#'   a Tm range and a feature range in \code{"overlap"} mode. Default:
+#'   a Tm range and a feature range. It is a filter and not a weight: a
+#'   feature either qualifies or does not, and a qualifying feature counts in
+#'   full. Applies to the \code{"overlap"} strategy only; \code{"window"} and
+#'   \code{"bin"} require a single overlapping base pair. Default:
 #'   \code{1}.
 #' @param ignore_strand Logical. If \code{TRUE} (default), strand is ignored
 #'   when finding overlaps / nearest neighbours.
@@ -60,6 +91,51 @@
 #'   ranges are dropped.
 #' @param distance_col Character. Name of the distance column added in
 #'   \code{"nearest"} mode. Default: \code{"distance_to_feature"}.
+#'
+#' @section Aggregating continuous signals:
+#' When several features map to the same range, numeric columns are summarised
+#' by \code{agg_fun} and character columns are joined as their unique values.
+#' Which features take part is decided by \code{min_overlap}, and how much each
+#' one counts is decided by \code{weight}. The two are easy to confuse, and the
+#' distinction is what determines whether a coverage-like signal is summarised
+#' correctly at a boundary.
+#'
+#' Let \eqn{R_i} be the \eqn{i}-th range of \code{gr_tm}, \eqn{F_j} the
+#' \eqn{j}-th feature, \eqn{x_j} its value, and
+#' \eqn{w_{ij} = |R_i \cap F_j|} the number of base pairs they share. The set
+#' of features entering the summary of \eqn{R_i} is
+#' \eqn{S_i = \{ j : w_{ij} \ge \code{min_overlap} \}}, and
+#'
+#' \deqn{v_i = \mathrm{agg\_fun}(\{x_j : j \in S_i\})}{
+#'       v_i = agg_fun({x_j : j in S_i})}
+#'
+#' with \code{weight = "none"}, or
+#'
+#' \deqn{v_i = \frac{\sum_{j \in S_i} w_{ij} x_j}{\sum_{j \in S_i} w_{ij}}}{
+#'       v_i = sum_j w_ij x_j / sum_j w_ij}
+#'
+#' with \code{weight = "overlap"}.
+#'
+#' The unweighted form gives a feature that overlaps by one base pair the same
+#' influence as one that spans the whole range. This is harmless where a signal
+#' is flat and wrong where it steps, which is to say at exon boundaries, peak
+#' edges and promoters. Raising \code{min_overlap} does not repair it: the
+#' threshold is a filter, so a short feature is either counted in full or
+#' discarded in full, and the bias changes sign rather than disappearing. The
+#' example below shows both failures against a case with a known answer.
+#'
+#' The weighted mean normalises by the covered base pairs, not by the width of
+#' the range, so a value derived from a quarter of a window is
+#' indistinguishable from one derived from all of it.
+#' \code{report_coverage = TRUE} adds a \code{covered_frac} column giving the
+#' fraction of each range covered by at least one feature, computed after
+#' \code{\link[GenomicRanges]{reduce}}-ing the features so that overlapping
+#' ones are not double counted. Multiply by it to convert a mean over covered
+#' bases into a mean over the range.
+#'
+#' Weighting is not the default. Enabling it changes numeric output, and
+#' existing analyses should stay reproducible unless their author decides
+#' otherwise.
 #'
 #' @return
 #' \itemize{
@@ -74,6 +150,40 @@
 #' }
 #'
 #' @examples
+#' ## Aggregation: a coverage track with a known answer -----------------------
+#' ## Two 200 bp windows over a signal that steps sharply inside the first.
+#' ##
+#' ##   window 1  [  1 .. 200]        window 2  [401 .. 600]
+#' ##   depth     [  1 .. 190] = 5
+#' ##             [191 .. 400] = 200
+#' ##                                           [401 .. 450] = 60
+#' library(GenomicRanges)
+#'
+#' win <- GRanges("chr1", IRanges(start = c(1, 401), width = 200),
+#'                Tm = c(70, 72))
+#' cov <- GRanges("chr1", IRanges(start = c(1, 191, 401),
+#'                                end   = c(190, 400, 450)),
+#'                cov = c(5, 200, 60))
+#'
+#' ## Window 1 truly averages (5 * 190 + 200 * 10) / 200 = 14.75.
+#' integrate_granges(win, cov, strategy = "overlap")$cov
+#' ## 102.5  60   the 10 bp feature counts as much as the 190 bp one
+#'
+#' integrate_granges(win, cov, strategy = "overlap",
+#'                   weight = "overlap")$cov
+#' ## 14.75  60   overlap-weighted mean recovers the true depth
+#'
+#' integrate_granges(win, cov, strategy = "overlap", min_overlap = 20L)$cov
+#' ## 5      60   the threshold discards the short feature; bias reverses
+#'
+#' ## Window 2 is only a quarter covered. Weighting cannot show that, because
+#' ## it normalises by the covered bases; the coverage column can.
+#' res <- integrate_granges(win, cov, strategy = "overlap",
+#'                          weight = "overlap", report_coverage = TRUE)
+#' res$cov                      # 14.75  60
+#' res$covered_frac             # 1.00   0.25
+#' res$cov * res$covered_frac   # 14.75  15    mean over the whole window
+#'
 #' \dontrun{
 #' library(GenomicRanges)
 #'
@@ -145,6 +255,8 @@ integrate_granges <- function(
     window_size    = 1000L,
     bin_size       = 1e6,
     agg_fun        = mean,
+    weight         = c("none", "overlap"),
+    report_coverage = FALSE,
     min_overlap    = 1L,
     ignore_strand  = TRUE,
     keep_unmatched = TRUE,
@@ -152,6 +264,21 @@ integrate_granges <- function(
 ) {
 
   strategy <- match.arg(strategy)
+  weight   <- match.arg(weight)
+  weighted <- identical(weight, "overlap")
+
+  # Weighting is defined for a mean and for nothing else: there is no
+  # canonical weighted maximum, and a weighted median needs a definition
+  # chosen rather than assumed. Silently ignoring agg_fun would be the worst
+  # outcome, since the result would look weighted and would not be.
+  if (weighted && !identical(agg_fun, mean))
+    stop("weight = \"overlap\" computes an overlap-length-weighted mean and ",
+         "cannot honour a different `agg_fun`. Use agg_fun = mean, or ",
+         "weight = \"none\".", call. = FALSE)
+  if (weighted && strategy == "nearest")
+    stop("weight = \"overlap\" does not apply to strategy = \"nearest\", ",
+         "which transfers one feature per range and performs no aggregation.",
+         call. = FALSE)
 
   # -- Input validation -------------------------------------------------------
   if (!inherits(gr_tm, "GRanges"))
@@ -176,20 +303,59 @@ integrate_granges <- function(
   # Prefixed output column names
   out_names <- paste0(prefix, feature_cols)
 
-  # -- Aggregation helper -----------------------------------------------------
-  # Summarises a vector: mean (numeric) or comma-joined unique values (character)
-  .agg <- function(vals) {
-    vals <- vals[!is.na(vals)]
-    if (length(vals) == 0) return(NA)
-    if (is.numeric(vals)) agg_fun(vals, na.rm = TRUE)
-    else paste(sort(unique(as.character(vals))), collapse = ",")
+  # -- Aggregation helpers ----------------------------------------------------
+  # Overlap width for each (query, subject) pair of a Hits object. Computed
+  # arithmetically rather than with pintersect(): findOverlaps() already
+  # returns parallel indices, so the widths are one vectorised subtraction and
+  # no intermediate GRanges of the same length has to be allocated, which
+  # matters at genome scale.
+  .ov_width <- function(gq, gs, qi, si)
+    pmin(GenomicRanges::end(gq)[qi],   GenomicRanges::end(gs)[si]) -
+    pmax(GenomicRanges::start(gq)[qi], GenomicRanges::start(gs)[si]) + 1L
+
+  # Summarises the values mapped to one range. Character columns are joined
+  # regardless of `weight`, since a weighted mean of labels is meaningless;
+  # this is documented rather than signalled, because a table of features
+  # normally carries both kinds of column and refusing the whole call for one
+  # of them would be unhelpful.
+  .agg <- function(vals, wts = NULL) {
+    keep <- !is.na(vals)
+    if (!any(keep)) return(NA)
+    vals <- vals[keep]
+    if (!is.numeric(vals))
+      return(paste(sort(unique(as.character(vals))), collapse = ","))
+    if (weighted) {
+      wts <- as.numeric(wts[keep])
+      tot <- sum(wts)
+      if (!is.finite(tot) || tot <= 0) return(NA_real_)
+      sum(vals * wts) / tot
+    } else agg_fun(vals, na.rm = TRUE)
+  }
+
+  # Fraction of a range covered by at least one feature. The features are
+  # reduced first, so overlapping features are not counted twice and the
+  # result cannot exceed one; without that step the quantity would not be a
+  # fraction at all.
+  .covered_fraction <- function(gr_query, gr_feat) {
+    red <- GenomicRanges::reduce(gr_feat, ignore.strand = ignore_strand)
+    h   <- GenomicRanges::findOverlaps(gr_query, red,
+                                       ignore.strand = ignore_strand)
+    out <- rep(0, length(gr_query))
+    if (length(h) == 0L) return(out)
+    qi <- S4Vectors::queryHits(h); si <- S4Vectors::subjectHits(h)
+    w  <- .ov_width(gr_query, red, qi, si)
+    tot <- tapply(w, qi, sum)
+    out[as.integer(names(tot))] <- as.numeric(tot)
+    pmin(out / GenomicRanges::width(gr_query), 1)
   }
 
   # Build a data.frame of aggregated feature columns given Hits object
   # query = gr_query, subject = gr_features (already subset to feature_cols)
-  .aggregate_hits <- function(hits, n_query, gr_feat_sub) {
+  .aggregate_hits <- function(hits, n_query, gr_feat_sub, gr_query = NULL) {
     q_idx <- S4Vectors::queryHits(hits)
     s_idx <- S4Vectors::subjectHits(hits)
+    ov_w  <- if (weighted && length(q_idx))
+      .ov_width(gr_query, gr_feat_sub, q_idx, s_idx) else NULL
     meta  <- as.data.frame(GenomicRanges::mcols(gr_feat_sub)[, feature_cols,
                                                                drop = FALSE],
                             stringsAsFactors = FALSE)
@@ -202,7 +368,8 @@ integrate_granges <- function(
 
       if (length(q_idx) == 0) return(out)
 
-      agg_vals <- tapply(col_vals[s_idx], q_idx, .agg)
+      agg_vals <- tapply(seq_along(q_idx), q_idx, function(i)
+        .agg(col_vals[s_idx[i]], ov_w[i]))
       idx      <- as.integer(names(agg_vals))
       out[idx] <- as.vector(agg_vals)
       out
@@ -223,11 +390,18 @@ integrate_granges <- function(
       ignore.strand = ignore_strand
     )
 
-    feat_df <- .aggregate_hits(hits, length(gr_tm), gr_features)
+    feat_df <- .aggregate_hits(hits, length(gr_tm), gr_features, gr_tm)
 
     # Attach aggregated columns to gr_tm
     for (j in seq_along(out_names))
       GenomicRanges::mcols(gr_tm)[[out_names[j]]] <- feat_df[[out_names[j]]]
+
+    # Reported alongside the summary rather than instead of it: a weighted
+    # mean normalises by the covered bases, so a value computed from a
+    # quarter of a window looks exactly like one computed from all of it.
+    if (report_coverage)
+      GenomicRanges::mcols(gr_tm)[[paste0(prefix, "covered_frac")]] <-
+        .covered_fraction(gr_tm, gr_features)
 
     if (!keep_unmatched) {
       matched <- unique(S4Vectors::queryHits(hits))
@@ -292,10 +466,17 @@ integrate_granges <- function(
       gr_expanded, gr_features,
       ignore.strand = ignore_strand
     )
-    feat_df <- .aggregate_hits(hits, length(gr_tm), gr_features)
+    feat_df <- .aggregate_hits(hits, length(gr_tm), gr_features, gr_expanded)
 
     for (j in seq_along(out_names))
       GenomicRanges::mcols(gr_tm)[[out_names[j]]] <- feat_df[[out_names[j]]]
+
+    # Relative to the EXPANDED range, which is what the overlaps were found
+    # against; a fraction of the original range would not describe the
+    # summary sitting beside it.
+    if (report_coverage)
+      GenomicRanges::mcols(gr_tm)[[paste0(prefix, "covered_frac")]] <-
+        .covered_fraction(gr_expanded, gr_features)
 
     return(gr_tm)
   }
@@ -349,8 +530,12 @@ integrate_granges <- function(
       Tm_mean    <- rep(NA_real_, n_bins)
       n_tm       <- integer(n_bins)
 
+      ov_tm <- if (weighted && length(q_tm))
+        .ov_width(bins, gr_tm_c, q_tm, s_tm) else NULL
+
       if (length(q_tm) > 0) {
-        agg_tm <- tapply(tm_vals[s_tm], q_tm, .agg)
+        agg_tm <- tapply(seq_along(q_tm), q_tm, function(i)
+          .agg(tm_vals[s_tm[i]], ov_tm[i]))
         Tm_mean[as.integer(names(agg_tm))] <- as.numeric(agg_tm)
         n_tm <- tabulate(q_tm, nbins = n_bins)
       }
@@ -361,7 +546,8 @@ integrate_granges <- function(
         gc_vals  <- GenomicRanges::mcols(gr_tm_c)$GC
         GC_mean  <- rep(NA_real_, n_bins)
         if (length(q_tm) > 0) {
-          agg_gc <- tapply(gc_vals[s_tm], q_tm, .agg)
+          agg_gc <- tapply(seq_along(q_tm), q_tm, function(i)
+            .agg(gc_vals[s_tm[i]], ov_tm[i]))
           GC_mean[as.integer(names(agg_gc))] <- as.numeric(agg_gc)
         }
         GenomicRanges::mcols(bins)$GC_mean <- GC_mean
@@ -380,12 +566,16 @@ integrate_granges <- function(
           stringsAsFactors = FALSE
         )
 
+        ov_ft <- if (weighted && length(q_ft))
+          .ov_width(bins, gr_ft_c, q_ft, s_ft) else NULL
+
         for (j in seq_along(feature_cols)) {
           col_vals <- meta[[j]]
           if (is.numeric(col_vals)) out <- rep(NA_real_,     n_bins)
           else                      out <- rep(NA_character_, n_bins)
           if (length(q_ft) > 0) {
-            agg_vals <- tapply(col_vals[s_ft], q_ft, .agg)
+            agg_vals <- tapply(seq_along(q_ft), q_ft, function(i)
+              .agg(col_vals[s_ft[i]], ov_ft[i]))
             out[as.integer(names(agg_vals))] <- as.vector(agg_vals)
           }
           GenomicRanges::mcols(bins)[[out_names[j]]] <- out

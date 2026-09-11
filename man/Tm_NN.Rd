@@ -337,6 +337,42 @@ out
 # skipped automatically rather than applied on top of it.
 out_ls <- tm_nn(seqs, nn_table = "RNA_DNA_NN_Weber_2019_LS", Na = 100)
 out_ls$options[["Salt correction applied"]]
+
+# -- A parameter table supplied by the user --------------------------------
+# Any of nn_table, tmm_table, imm_table and de_table also accepts a matrix,
+# which is how a set the package does not ship, most obviously one covering
+# modified bases, is used without waiting for a new release.
+#
+# Start from a built-in set to get the required keys, then add a stack. The
+# key naming follows the built-in convention: top strand, "/", bottom
+# strand, so "MG/CG" would be a 5-methylcytosine followed by G, paired with
+# CG. The values here are illustrative and are NOT measured parameters.
+tbl <- TmCalculator:::get_table("DNA_NN_SantaLucia_2004")
+tbl <- rbind(tbl, "MG/CG" = c(-9.1, -24.0))
+
+# Optional attributes. "reference" names the built-in whose key set must be
+# present, which matters for RNA and hybrid tables because the default
+# reference is a DNA/DNA set. "salt_mM" marks the table as fitted at a
+# stated sodium concentration, so that it suppresses the salt correction at
+# that concentration exactly as the built-in condition-specific sets do.
+attr(tbl, "reference") <- "DNA_NN_SantaLucia_2004"
+
+out_user <- tm_nn(seqs, nn_table = tbl, Na = 50)
+out_user$options[["Thermodynamic NN values"]]
+# "user-supplied (reference: DNA_NN_SantaLucia_2004)"
+
+# Passing a built-in table back in through this route changes nothing: the
+# supplied table is reordered to the reference key order before use, so row
+# order carries no information.
+identical(tm_nn(seqs, nn_table = "DNA_NN_SantaLucia_2004")$gr$Tm,
+          tm_nn(seqs,
+                nn_table = TmCalculator:::get_table("DNA_NN_SantaLucia_2004")
+                )$gr$Tm)
+
+# A table missing a key is refused rather than tolerated. The compiled core
+# resolves each stack by name, so an absent key would contribute zero
+# enthalpy and entropy to every sequence containing that step, silently.
+try(tm_nn(seqs, nn_table = tbl[setdiff(rownames(tbl), "AA/TT"), ]))
 out_ls$options[["Parameter set fitted at [Na+] (mM)"]]
 
 }
