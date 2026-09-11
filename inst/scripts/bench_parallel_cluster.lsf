@@ -39,7 +39,11 @@
 #BSUB -e logs/parbench.%J.err
 
 set -euo pipefail
-mkdir -p logs results
+
+# Everything this job writes goes under the directory bsub was invoked from,
+# stated absolutely so the log says where to look rather than "results/".
+OUTDIR="$(pwd)/results"
+mkdir -p logs "$OUTDIR"
 
 # --- conda environment ---------------------------------------------------
 # A batch job starts a fresh non-interactive shell and inherits nothing from
@@ -72,6 +76,40 @@ Rscript -e 'for (p in c("TmCalculator", "BSgenome.Hsapiens.UCSC.hg38",
             cat("deps OK; TmCalculator ",
                 as.character(packageVersion("TmCalculator")), "\n")'
 
+# --- locate the R driver -------------------------------------------------
+# `bsub < file` feeds this script to LSF on stdin, so $0 and BASH_SOURCE do
+# not point at the original file and the script cannot find itself. The path
+# has to be searched for instead.
+#
+# The two candidate layouts differ by one directory: R strips the inst/
+# prefix at install time, so a source checkout has inst/scripts/ while an
+# installed package has scripts/. system.file() is the last resort because
+# it costs an R start-up, but it is the only one that works when the job is
+# submitted from an unrelated directory.
+BENCH_R=""
+for p in inst/scripts/bench_parallel_cluster.R \
+         scripts/bench_parallel_cluster.R \
+         ./bench_parallel_cluster.R; do
+  [ -f "$p" ] && { BENCH_R="$p"; break; }
+done
+if [ -z "$BENCH_R" ]; then
+  BENCH_R="$(Rscript -e 'cat(system.file("scripts", "bench_parallel_cluster.R",
+                                         package = "TmCalculator"))' \
+             2>/dev/null || true)"
+fi
+if [ ! -f "$BENCH_R" ]; then
+  echo "ERROR: cannot locate bench_parallel_cluster.R" >&2
+  echo "  submitted from : $(pwd)" >&2
+  echo "  looked for     : inst/scripts/, scripts/, ./, and system.file()" >&2
+  echo "  fix            : submit from the package root, or install the" >&2
+  echo "                   package so that system.file() resolves." >&2
+  exit 1
+fi
+BENCH_R="$(readlink -f "$BENCH_R")"
+echo "bench driver  : $BENCH_R"
+echo "output dir    : $OUTDIR"
+echo
+
 # --- node-local scratch --------------------------------------------------
 # LSF sets LSB_JOBTMPDIR on many sites; fall back to /tmp under the job id.
 # This must be LOCAL disk. If it resolves to a shared filesystem the whole
@@ -103,8 +141,8 @@ node_state "before"
 # --workers is given explicitly. The script's automatic sweep leaves one core
 # for the manager, so -n 6 would produce 1-5 and the table would silently be
 # missing the 6-worker row that the laptop has.
-Rscript inst/scripts/bench_parallel_cluster.R \
-  --outdir results \
+Rscript "$BENCH_R" \
+  --outdir "$OUTDIR" \
   --reps 3 \
   --segsize 50e6 \
   --workers 1,2,3,4,5,6 \
