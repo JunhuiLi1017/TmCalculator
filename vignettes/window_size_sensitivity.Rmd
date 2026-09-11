@@ -15,6 +15,14 @@ knitr::opts_chunk$set(
   message   = FALSE,
   warning   = FALSE,
   fig.align = "center",
+  # html_vignette inherits fig.retina = 2 from rmarkdown, which renders every
+  # figure at twice the nominal resolution and then scales it down in the
+  # browser. The pixel count, and therefore the size of the base64 blob
+  # embedded in the self-contained HTML, is four times larger for no visible
+  # gain in a vignette. Setting it to 1 is what keeps the installed size of
+  # doc/ within the limit R CMD check reports on.
+  fig.retina = 1,
+  dpi        = 96,
   fig.width = 7,
   fig.height = 6
 )

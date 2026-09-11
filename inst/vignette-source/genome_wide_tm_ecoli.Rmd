@@ -15,6 +15,14 @@ knitr::opts_chunk$set(
   message   = FALSE,
   warning   = FALSE,
   fig.align = "center",
+  # html_vignette inherits fig.retina = 2 from rmarkdown, which renders every
+  # figure at twice the nominal resolution and then scales it down in the
+  # browser. The pixel count, and therefore the size of the base64 blob
+  # embedded in the self-contained HTML, is four times larger for no visible
+  # gain in a vignette. Setting it to 1 is what keeps the installed size of
+  # doc/ within the limit R CMD check reports on.
+  fig.retina = 1,
+  dpi        = 96,
   fig.width = 7,
   fig.height = 6
 )
@@ -359,7 +367,7 @@ In linear mode each region is drawn as a separate stacked panel; in circular
 mode the regions are concatenated around the circle with small gaps between
 them.
 
-```{r zoom-multi-linear, fig.width=10, fig.height=9, fig.cap="Two zoomed regions, 0.1-0.5 Mb and 3.6-4.5 Mb, concatenated around the circle with a gap between them."}
+```{r zoom-multi-circular, fig.width=10, fig.height=9, fig.cap="Two zoomed regions, 0.1-0.5 Mb and 3.6-4.5 Mb, concatenated around the circle with a gap between them."}
 plot_genome_track(
   genome_name = genome_name,
   genome_size = chr_length,
@@ -510,65 +518,128 @@ W <- as.data.frame(tm_ASM584v2$gr[, c("Tm", "GC")])
 W <- W[!is.na(W$Tm) & !is.na(W$GC) & W$width == 200L, ]
 W <- W[order(W$start), ]
 
-## Largest Tm difference between two windows of identical GC inside a locus.
-best_pair <- function(d) {
-  g <- split(seq_len(nrow(d)), d$GC)
-  g <- g[lengths(g) >= 2L]
-  if (!length(g)) return(NULL)
+## Which windows lie inside a MutL-AR peak. Matched on coordinates alone:
+## the peak table and the window table both describe one contig, and
+## matching on sequence names would fail silently if one calls it by the
+## accession and the other by the genome package name.
+peaks <- as.data.frame(ecoli_rep_hotspots$all_peaks_IP_mutH)
+W$in_peak <- IRanges::overlapsAny(
+  IRanges::IRanges(W$start, W$end),
+  IRanges::IRanges(as.numeric(peaks$start), as.numeric(peaks$end)))
+
+## The k GC values inside a locus whose windows are furthest apart in Tm.
+## Each group contributes its two extreme windows; shading every window at
+## that GC would fill the panel with stripes and hide the tracks.
+top_groups <- function(d, k = 3L) {
+  g  <- split(seq_len(nrow(d)), d$GC)
+  g  <- g[lengths(g) >= 2L]
+  if (!length(g)) return(list())
   sp <- vapply(g, function(ix) diff(range(d$Tm[ix])), numeric(1))
-  ix <- g[[which.max(sp)]]
-  list(spread = max(sp),
-       rows   = ix[c(which.min(d$Tm[ix]), which.max(d$Tm[ix]))])
+  o  <- order(sp, decreasing = TRUE)[seq_len(min(k, length(g)))]
+  lapply(o, function(j) {
+    ix <- g[[j]]
+    list(gc = as.numeric(names(g)[j]), spread = unname(sp[j]),
+         rows = ix[c(which.min(d$Tm[ix]), which.max(d$Tm[ix]))])
+  })
 }
 
 n_loc  <- 100L                       # 100 x 200 bp = 20 kb
 starts <- seq_len(nrow(W) - n_loc + 1L)
-sc <- vapply(starts, function(i) {
-  b <- best_pair(W[i:(i + n_loc - 1L), ]); if (is.null(b)) 0 else b$spread
-}, numeric(1))
 
-i0   <- starts[which.max(sc)]
-d    <- W[i0:(i0 + n_loc - 1L), ]
-pair <- d[best_pair(d)$rows, ]
-pair[, c("seqnames", "start", "end", "GC", "Tm")]
+## Two restrictions on the candidate loci.
+##
+## Contiguity: a locus is n_loc consecutive ROWS of W, and W has had short
+## and ambiguous windows dropped, so consecutive rows need not be adjacent
+## on the chromosome. A locus spanning such a gap would be drawn with an
+## axis covering far more than 20 kb and would quietly stop being a zoom.
+##
+## Peaks: the panel is meant to say something about the regions this study
+## is about, not only about the model, so only loci centred on a MutL-AR
+## peak are considered.
+contig <- (W$start[seq(n_loc, nrow(W))] - W$start[starts]) == (n_loc - 1L) * 200L
+starts <- starts[contig]
+starts <- starts[W$in_peak[pmin(starts + n_loc %/% 2L, nrow(W))]]
+
+## Scored on the SUM of the top three spreads rather than the single best
+## one: a locus with one spectacular pair and nothing around it reads as a
+## peculiar sequence, whereas three groups at three GC values read as a
+## property of the model.
+sc <- vapply(starts, function(i)
+  sum(vapply(top_groups(W[i:(i + n_loc - 1L), ]), function(g) g$spread,
+             numeric(1))), numeric(1))
+
+i0 <- starts[which.max(sc)]
+d  <- W[i0:(i0 + n_loc - 1L), ]
+gs <- top_groups(d)
+
+do.call(rbind, lapply(gs, function(g)
+  data.frame(GC = g$gc, Tm_low = min(d$Tm[g$rows]), Tm_high = max(d$Tm[g$rows]),
+             difference = g$spread)))
 ```
 
-```{r zoom-locus, fig.width=8, fig.height=4, fig.cap="High-magnification view of the locus containing the largest melting-temperature difference between two windows of identical GC content. The two windows are shaded. Only the GC and Tm tracks are drawn: seven tracks in one linear panel leave each of them too little height to read at this scale."}
-tracks_zoom <- list(
-  list(type = "line", data = Tm, value_col = "GC", name = "GC content",
-       col = "#4A90E2", legend_font_col = "#4A90E2", height = 1),
-  list(type = "line", data = Tm, value_col = "Tm", name = "Melting temp",
-       col = "#E06666", legend_font_col = "#E06666", height = 1.4),
-  list(type = "highlight", data = pair[, c("seqnames", "start", "end")],
-       col = "#B7791F", alpha = 0.28)
-)
+```{r zoom-locus, fig.width=9, fig.height=4.5, fig.cap="High-magnification view of a 20 kb locus centred on a MutL-AR peak. Three pairs of windows are shaded, one pair per colour; the two windows of a pair have identical length and identical GC content and differ only in the arrangement of their bases. Yellow marks the MutL-AR peaks. Only the GC and Tm tracks are drawn: seven tracks in one linear panel leave each of them too little height to read at this scale."}
+grp_cols <- c("#B7791F", "#2E8B57", "#7D3C98")
+
+tracks_zoom <- c(
+  list(
+    ## The MutL-AR peaks are drawn as the ideogram, in the same black used
+    ## in the whole-genome map, so the three panels agree on what a peak
+    ## looks like. As the ideogram it also names the chromosome bar, which
+    ## is why `genome_name` below is the track name rather than the contig.
+    list(type = "rect", data = ecoli_rep_hotspots$all_peaks_IP_mutH,
+         col = "black", bg.col = "grey", name = "MutL-AR",
+         legend_font_col = "black", ideogram = TRUE, height = 0.5),
+    list(type = "line", data = Tm, value_col = "GC", name = "GC",
+         col = "#4A90E2", legend_font_col = "#4A90E2", height = 1),
+    list(type = "line", data = Tm, value_col = "Tm", name = "Tm",
+         col = "#E06666", legend_font_col = "#E06666", height = 1.4),
+    list(type = "highlight", data = ecoli_rep_hotspots$all_peaks_IP_mutH,
+         col = "#F1C40F", alpha = 0.18)),
+  lapply(seq_along(gs), function(i)
+    list(type = "highlight", data = d[gs[[i]]$rows, c("seqnames", "start", "end")],
+         col = grp_cols[i], alpha = 0.40)))
 
 plot_genome_track(
-  ## The chromosome bar is labelled with `genome_name`, and the BSgenome
-  ## package name is too long for a 20 kb panel; the accession is short and
-  ## says the same thing.
-  genome_name = chr_name,
+  genome_name = "MutL-AR",
   genome_size = chr_length,
   track_list  = tracks_zoom,
   zoom        = sprintf("%s:%d-%d", chr_name, min(d$start), max(d$end)),
   track.gap   = 0.06,
-  axis.cex    = 0.6,
+  axis.cex    = 0.8,
+  legend.show = FALSE,
   ## Without this the panel carries no base positions at all: the default
   ## tick spacing is 500 kb for any view under 10 Mb, which places no tick
   ## inside a 20 kb window.
-  base.tick.dist  = 2000,
+  base.tick.dist  = 5000,
   base.tick.units = TRUE
 )
+
+## plot_genome_track() drops highlight entries before building its legend,
+## so the shaded groups would otherwise be unlabelled.
+legend("topright", bty = "n", cex = 0.8, border = NA,
+       legend = c("GC", "Tm", "MutL-AR peak",
+                  vapply(gs, function(g)
+                    sprintf("GC %.1f%%:  Tm %.1f-%.1f", g$gc,
+                            min(d$Tm[g$rows]), max(d$Tm[g$rows])),
+                    character(1))),
+       fill = c("#4A90E2", "#E06666",
+                adjustcolor("#F1C40F", alpha.f = 0.18),
+                adjustcolor(grp_cols, alpha.f = 0.40)),
+       text.col = c("#4A90E2", "#E06666", "#B7950B", grp_cols))
 ```
 
-The GC track is flat across the two shaded windows and the Tm track is not.
-That is the whole argument for a nearest-neighbour model in one picture, and
-it is the panel used as Figure 2C in the manuscript; the combined figure is
-produced by `inst/scripts/make_figure2.R`.
+The GC track is flat across each shaded pair and the Tm track is not. That
+is the whole argument for a nearest-neighbour model in one picture, and it
+is the panel used as Figure 2C in the manuscript; the combined three-panel
+figure is produced by `inst/scripts/make_figure2.R`.
 
-One caveat worth stating plainly: this locus was selected *because* it is
-extreme, so it shows the largest effect rather than a typical one. The
-box plot above is the honest summary, and the two belong together.
+Two caveats worth stating plainly. This locus was selected *because* it is
+extreme, so it shows a large effect rather than a typical one; the box plot
+above is the honest summary and the two belong together. And the pairs are
+extreme within the locus but need not both lie inside a peak: the search
+places the locus on a peak, not every shaded window. Requiring both windows
+of a pair to be inside a peak is one argument away in
+`inst/scripts/make_figure2.R` (`--pairs-in-peaks`) and lowers the effect.
 
 ---
 
