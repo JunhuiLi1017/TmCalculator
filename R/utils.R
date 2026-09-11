@@ -114,27 +114,6 @@ check_filter_seq <- function(seq_list, method) {
   result
 }
 
-#' convert a vector of characters into a string
-#' 
-#' Simply convert a vector of characters such as c("H","e","l","l","o","W","o","r","l","d") into a single string "HelloWorld".
-#'
-#' @param characters A vector of characters 
-#' 
-#' @returns Retrun a strings
-#' 
-#' @author Junhui Li
-#' 
-#' @references 
-#' 
-#' \code{citation("TmCalculator")}
-#' 
-#' @keywords internal
-
-c2s <- function(characters){
-  strings <- paste0(characters,collapse = "")
-  return(strings)
-}
-
 #' convert a string into a vector of characters
 #' 
 #' Simply convert a single string such as "HelloWorld" into a vector of characters such as c("H","e","l","l","o","W","o","r","l","d")

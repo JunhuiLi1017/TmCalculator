@@ -14,7 +14,9 @@ knitr::opts_chunk$set(
   echo    = TRUE,
   eval    = FALSE,   # requires BSgenome.Hsapiens.UCSC.hg38 and long runtimes
   message = FALSE,
-  warning = FALSE
+  warning = FALSE,
+  fig.retina = 1,
+  dpi        = 72
 )
 ```
 

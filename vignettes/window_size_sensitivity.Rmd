@@ -22,7 +22,7 @@ knitr::opts_chunk$set(
   # gain in a vignette. Setting it to 1 is what keeps the installed size of
   # doc/ within the limit R CMD check reports on.
   fig.retina = 1,
-  dpi        = 96,
+  dpi        = 72,
   fig.width = 7,
   fig.height = 6
 )

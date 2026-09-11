@@ -150,20 +150,19 @@ distinction is what determines whether a coverage-like signal is summarised
 correctly at a boundary.
 
 Let \eqn{R_i} be the \eqn{i}-th range of \code{gr_tm}, \eqn{F_j} the
-\eqn{j}-th feature, \eqn{x_j} its value, and
-\eqn{w_{ij} = |R_i \cap F_j|} the number of base pairs they share. The set
-of features entering the summary of \eqn{R_i} is
-\eqn{S_i = \{ j : w_{ij} \ge \code{min_overlap} \}}, and
+\eqn{j}-th feature, \eqn{x_j} its value, and \eqn{w_{ij}} the number of
+base pairs \eqn{R_i} and \eqn{F_j} share. Write \eqn{m} for
+\code{min_overlap} and \eqn{f} for \code{agg_fun}. The features entering
+the summary of \eqn{R_i} are those with \eqn{w_{ij} \ge m}, and
 
-\deqn{v_i = \mathrm{agg\_fun}(\{x_j : j \in S_i\})}{
-      v_i = agg_fun({x_j : j in S_i})}
+\deqn{v_i = f(\{x_j : w_{ij} \ge m\})}{v_i = agg_fun({x_j : w_ij >= m})}
 
 with \code{weight = "none"}, or
 
-\deqn{v_i = \frac{\sum_{j \in S_i} w_{ij} x_j}{\sum_{j \in S_i} w_{ij}}}{
+\deqn{v_i = \frac{\sum_j w_{ij} x_j}{\sum_j w_{ij}}}{%
       v_i = sum_j w_ij x_j / sum_j w_ij}
 
-with \code{weight = "overlap"}.
+taken over the same features, with \code{weight = "overlap"}.
 
 The unweighted form gives a feature that overlaps by one base pair the same
 influence as one that spans the whole range. This is harmless where a signal
