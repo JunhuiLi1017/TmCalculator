@@ -22,28 +22,35 @@
 #
 # WHY THE MEMORY REQUEST IS NOT 16 GB. An earlier version asked for 16.2 GB
 # on the reasoning that the laptop had 16 GB, and the job was killed with
-# TERM_MEMLIMIT. The two numbers are not the same quantity. LSF enforces the
-# sum of resident set size over every process in the job, and a page shared
-# between processes is counted once per process; the laptop had 16 GB of
-# physical memory, where a shared page is one page. BSgenome memory-maps the
-# hg38 .2bit file, roughly 800 MB, into all seven R processes (one manager,
-# six workers): about 0.8 GB of physical memory, but about 5.6 GB against
-# the LSF limit. The R session baseline and the Bioconductor shared
-# libraries are counted the same way.
+# TERM_MEMLIMIT after 29 minutes.
 #
-# Raising the request therefore does not give this job more physical memory
-# than the laptop had. It stops the scheduler from killing it on a metric
-# that overcounts. The comparison between the two environments rests on
-# max_rss_gb, which the R driver measures per worker in both places and
-# which is unaffected by what the quota is set to. With the quota at 16.2 GB
-# the run produced no measurements at all, so nothing could be compared.
+# The first explanation attempted here was that LSF sums resident set size
+# over processes and so counts a page shared between them once per process,
+# and that BSgenome's memory-mapped .2bit file was therefore being charged
+# seven times. The sampling below was added to test that, and refuted it.
+# PSS, which divides each shared page among the processes sharing it, tracks
+# RSS almost exactly: at the peak, 23241 MB of summed RSS against 23198 MB
+# of summed PSS, a ratio of 1.002. There is essentially nothing shared.
 #
-# The remaining difference is real and is a result rather than a defect: the
-# laptop's demand approached its physical memory and macOS compressed and
-# paged, which is what slows the workers and produces the rise in dynamic
-# dispatch beyond five workers. This node has 376 GB, so the same demand
-# costs nothing. That difference cannot be removed by tightening the quota,
-# because Linux under a cgroup limit kills where macOS degrades.
+# The reason is that PSOCK workers are independent processes. Each attaches
+# the packages and calls getSeq() for itself, building its own DNAStringSet
+# in anonymous memory; nothing is inherited and nothing is mapped in common.
+# Seven R processes at roughly 3.3 GB each is 23 GB, and that 23 GB is real.
+# The 16.2 GB request was not mis-accounted, it was too small.
+#
+# The sampling is kept because the measurement is worth having in its own
+# right, and because the refuted hypothesis is a plausible one that someone
+# reading this file would otherwise re-derive.
+#
+# The remaining difference between the environments is real and is a result
+# rather than a defect: the laptop's demand approached its physical memory
+# and macOS compressed and paged, which slows the workers and produces the
+# rise beyond five workers in the two strategies that scale well enough to
+# reach the ceiling. This node has 376 GB, so the same demand costs nothing.
+# That difference cannot be removed by tightening the quota, because Linux
+# under a cgroup limit kills where macOS degrades. The comparison between
+# the two rests on max_rss_gb, measured per worker by the R driver in both
+# places and unaffected by what the quota is set to.
 #
 # WHAT STILL HAS TO BE PINNED. The cluster is heterogeneous: Xeon Gold 6230,
 # EPYC 7702, EPYC 9334 and E5-2699 v4 all accept jobs. Three repetitions
@@ -165,9 +172,15 @@ node_state() {
 # RSS summed over processes is what LSF enforces, and it counts a shared page
 # once per process that maps it. PSS divides each shared page by the number
 # of processes sharing it, so summing PSS over the job gives the physical
-# memory the job actually occupies. The gap between the two is the number a
-# reader needs: it is why sizing a request from RSS asks for several times
-# what the work requires.
+# memory the job actually occupies.
+#
+# Measured on this workload the two agree to 1.002x, which is the evidence
+# for the note at the top of this file: PSOCK workers share essentially
+# nothing, so the summed RSS is not an overcount and a request has to cover
+# the full per-process footprint times the worker count. The pair is still
+# reported because a workload that did share -- a forked backend, or a
+# genome held in a shared mapping -- would separate them, and a reader
+# sizing a request needs to know which case they are in.
 #
 # Sampled rather than continuous, so this is a floor on the peak, not the
 # peak. The per-worker peak that the comparison with the laptop rests on is
@@ -200,7 +213,7 @@ mem_report() {
         printf "  samples                : %d (10 s apart)\n", n
         printf "  peak sum of RSS        : %d MB   <- what LSF enforces\n", mr
         printf "  peak sum of PSS        : %d MB   <- physical memory used\n", mp
-        if (mp > 0) printf "  overcount factor       : %.2fx\n", mr / mp
+        if (mp > 0) printf "  RSS / PSS             : %.3fx\n", mr / mp
         printf "  R processes at RSS peak: %d\n", mrn
       }' "$MEMLOG"
   echo "  per-sample log         : $MEMLOG"
