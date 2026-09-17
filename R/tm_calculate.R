@@ -365,6 +365,25 @@
 #'   nn_table = "RNA_DNA_NN_Weber_2019_LS",
 #'   Na = 100
 #' )
+#'
+#' # Genome scale. The source is named rather than loaded, because each
+#' # worker opens it for itself; `regions` says what to cover and `window`
+#' # says at what resolution.
+#' hg38 <- "BSgenome.Hsapiens.UCSC.hg38"
+#' tm_calculate(hg38, regions = "chr21:10e6-20e6", window = 200, slide = 200)
+#'
+#' # Five processes. Tasks are divided by region, never by splitting the
+#' # sequences of one region, so only coordinates cross between them.
+#' library(BiocParallel)
+#' whole <- tm_calculate(hg38, window = 200, slide = 200,
+#'                       BPPARAM = SnowParam(workers = 5))
+#' whole$gr
+#'
+#' # The same, for a FASTA file and for sequences already in R. With
+#' # window = NULL, the default, each record returns a single Tm, which is
+#' # what a file of probes or primers calls for.
+#' tm_calculate("probes.fa", BPPARAM = SnowParam(workers = 4))
+#' tm_calculate(c("ACGTGCTAGCTAGCTAGC", "GGCCATATATGCGC"))
 #' }
 #'
 #' @seealso \code{\link{tm_nn}} for the nearest-neighbor method and the full
@@ -479,7 +498,7 @@ tm_calculate <- function(input_seq,
     ((file.exists(input_seq) && !dir.exists(input_seq)) ||
        requireNamespace(input_seq, quietly = TRUE))
   if (!a_source && is.null(regions) && is.null(window) && is.null(BPPARAM)) {
-    gr <- if (methods::is(input_seq, "GRanges")) input_seq
+    gr <- if (methods::is(input_seq, "GRanges")) .tm_complete_gr(input_seq)
           else to_genomic_ranges(input_seq = input_seq,
                                  complement_seq = complement_seq)
     return(.tm_model(gr, model))
@@ -492,6 +511,14 @@ tm_calculate <- function(input_seq,
     # genome, where the columns run to about 500 MB per large chromosome.
     keep_sequence <- src$kind %in% c("sequences", "granges")
 
+  # Resolved against the source the caller gave, not against the staged copy
+  # below. `regions` names the caller's own sequences, and those names do not
+  # always survive staging: a GRanges with two ranges on chr1 cannot put
+  # "chr1" on two FASTA records, where a record name has to identify one
+  # record. Resolving first also means a GRanges source is selected by
+  # overlap, which is what having coordinates makes possible.
+  req <- .tm_regions(regions, src)
+
   if (src$kind %in% c("sequences", "granges")) {
     # Staged to a file so that the workers read the sequences rather than
     # receive them, which is what moves window construction and result
@@ -503,10 +530,11 @@ tm_calculate <- function(input_seq,
       else src$seqs
     path <- .spill_fasta(seqs, tmpdir)
     on.exit(unlink(path), add = TRUE)
+    # Records are written in input order, so req$idx still addresses the
+    # right one; req$name keeps the caller's name for the output.
     src  <- .tm_source(path)
   }
 
-  req <- .tm_regions(regions, src)
   if (is.null(window)) {
     # One window per region is right for a probe and absurd for a chromosome:
     # the nearest-neighbour model is not calibrated at that length, and the
@@ -535,6 +563,35 @@ tm_calculate <- function(input_seq,
   result
 }
 
+
+# ---------------------------------------------------------------------------
+#' Fill in a GRanges that carries sequences but not their complements
+#'
+#' Every other input form reaches \code{\link{to_genomic_ranges}}, which
+#' derives the complement. A \code{GRanges} handed straight to
+#' \code{\link{tm_calculate}} skipped that step, so an object built with a
+#' \code{sequence} column and nothing else (which is exactly what
+#' \code{regions} treats as a source) reached the compiled core with some
+#' sequences and no complements and failed there, on a message about
+#' \code{cseqs} that says nothing about what the caller did.
+#'
+#' The complement is the plain base-for-base one, not the reverse
+#' complement: \code{tm_nn()} reads the two strands in register, so
+#' reversing one would pair every position with the wrong partner.
+#'
+#' @param gr A \code{GRanges}.
+#' @return The same object, with a \code{complement} column.
+#' @keywords internal
+.tm_complete_gr <- function(gr) {
+  mc <- GenomicRanges::mcols(gr)
+  if (is.null(mc$sequence))
+    stop("A GRanges given as 'input_seq' must carry a 'sequence' column.\n",
+         "  To profile coordinates against a genome, pass the genome as ",
+         "'input_seq' and the coordinates as 'regions'.")
+  if (is.null(mc$complement))
+    gr$complement <- generate_complement(as.character(mc$sequence))
+  gr
+}
 
 # ---------------------------------------------------------------------------
 #' Apply the selected model to windows that already carry their sequence

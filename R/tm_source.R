@@ -71,6 +71,23 @@
 }
 
 
+#' Where a source's records sit in the coordinate system the caller cares about
+#'
+#' Staging a \code{GRanges} to a FASTA turns each range into a record that
+#' starts at 1, so without this the profile of a range at chr1:1001-1060
+#' would come back as chr1:1-60. Every other source already numbers from the
+#' coordinate the caller asked about, so its offset is zero.
+#'
+#' @param idx Row indices into the source.
+#' @param src A source from \code{\link{.tm_source}}.
+#' @return A numeric vector of offsets to add to record-relative positions.
+#' @keywords internal
+.tm_offsets <- function(idx, src) {
+  if (src$kind != "granges") return(rep(0, length(idx)))
+  as.numeric(BiocGenerics::start(src$gr))[idx] - 1
+}
+
+
 #' Resolve `regions` against a source
 #'
 #' Accepts names, numbers, \code{"name:start-end"} strings, a mixture, or a
@@ -96,6 +113,7 @@
     } else seq_along(lens)
     return(data.frame(idx = idx, name = names(lens)[idx],
                       start = 1, end = as.numeric(lens[idx]), whole = TRUE,
+                      offset = .tm_offsets(idx, src),
                       stringsAsFactors = FALSE))
   }
 
@@ -116,6 +134,7 @@
     }
     return(data.frame(idx = idx, name = names(lens)[idx], start = 1,
                       end = as.numeric(lens[idx]), whole = TRUE,
+                      offset = .tm_offsets(idx, src),
                       stringsAsFactors = FALSE))
   }
 
@@ -164,6 +183,7 @@
 
   out <- data.frame(idx = idx, name = names(lens)[idx], start = st, end = en,
                     whole = st == 1 & en == as.numeric(lens[idx]),
+                    offset = .tm_offsets(idx, src),
                     stringsAsFactors = FALSE)
   out$name[!nzchar(out$name)] <- sprintf("seq%d", out$idx[!nzchar(out$name)])
   out <- out[order(out$idx, out$start), , drop = FALSE]
@@ -283,6 +303,7 @@
   pieces <- list()
   for (i in seq_len(nrow(req))) {
     base <- list(idx = req$idx[i], name = req$name[i],
+                 offset = if (is.null(req$offset)) 0 else req$offset[i],
                  whole = req$whole[i] && src$kind == "bsgenome")
     if (unit == "region" || (req$end[i] - req$start[i] + 1) <= segment_size) {
       pieces[[length(pieces) + 1L]] <-
@@ -307,13 +328,14 @@
     if (joinable) {
       run$idx2   <- p$idx
       run$names  <- c(run$names, p$name)
+      run$offs   <- c(run$offs, p$offset)
       run$starts <- c(run$starts, p$start)
       run$ends   <- c(run$ends, p$end)
       run$bases  <- run$bases + (p$end - p$start + 1)
     } else {
       flush()
       run <- list(idx1 = p$idx, idx2 = p$idx, names = p$name,
-                  starts = p$start, ends = p$end,
+                  offs = p$offset, starts = p$start, ends = p$end,
                   bases = p$end - p$start + 1, mergeable = isTRUE(p$entire))
     }
   }
@@ -473,8 +495,11 @@
     starts <- if (n <= w) 1L else seq(1L, n - w + 1L, by = s)
     piece  <- as.character(Biostrings::subseq(rep(x, length(starts)),
                                               start = starts, width = w))
-    off <- a - 1L                     # absolute, so segments reassemble
-    names(piece) <- sprintf("%s:%d-%d", task$names[k],
+    # Record-relative position, plus where the record itself begins in the
+    # caller's coordinates. The first term makes segments of one record
+    # reassemble; the second keeps a staged GRanges on its original ranges.
+    off <- a - 1L + (if (is.null(task$offs)) 0 else task$offs[k])
+    names(piece) <- sprintf("%s:%.0f-%.0f", task$names[k],
                             off + starts, off + starts + w - 1L)
     seqs <- c(seqs, piece)
   }

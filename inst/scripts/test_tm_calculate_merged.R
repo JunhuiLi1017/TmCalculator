@@ -14,12 +14,32 @@ suppressPackageStartupMessages({
   library(TmCalculator)
   library(GenomicRanges)
 })
-SRC <- Sys.getenv("TM_SRC", ".")
-for (f in c("tm_source.R", "tm_calculate.R")) {
-  if (!file.exists(file.path(SRC, f)))
-    stop("Set TM_SRC to the package's R/ directory (missing ", f, ")")
-  source(file.path(SRC, f))
-}
+## -- find the two files under test ------------------------------------------
+# Tried in order: an explicit TM_SRC, the directory this script sits in
+# resolved back to the package's R/, the working directory, and R/ below it.
+# The script lives in inst/scripts/, so ../../R is the checkout's R/ whether
+# it is run from the package root, from inst/scripts/, or by absolute path.
+NEEDED <- c("tm_source.R", "tm_calculate.R")
+here <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE))
+here <- if (length(here)) dirname(normalizePath(here[1])) else NA_character_
+cand <- c(Sys.getenv("TM_SRC"),
+          if (!is.na(here)) file.path(here, "..", "..", "R"),
+          if (!is.na(here)) file.path(here, "..", "..", "..", "R"),
+          ".", "R", "../R")
+cand <- unique(cand[nzchar(cand)])
+SRC  <- NULL
+for (d in cand)
+  if (all(file.exists(file.path(d, NEEDED)))) { SRC <- d; break }
+if (is.null(SRC))
+  stop("Cannot find ", paste(NEEDED, collapse = " and "), ".\n",
+       "  Run this from the package root, or set TM_SRC to its R/ directory:\n",
+       "    TM_SRC=/path/to/TmCalculator/R Rscript ",
+       if (!is.na(here)) file.path(here, "test_tm_calculate_merged.R")
+       else "test_tm_calculate_merged.R", "\n",
+       "  Looked in: ", paste(normalizePath(cand, mustWork = FALSE),
+                              collapse = "\n             "))
+cat("sources under test : ", normalizePath(SRC), "\n", sep = "")
+for (f in NEEDED) source(file.path(SRC, f))
 
 PKG <- "BSgenome.Hsapiens.UCSC.hg38"
 if (!requireNamespace(PKG, quietly = TRUE))
@@ -47,13 +67,18 @@ same  <- function(a, b)
   identical(start(a), start(b)) &&
   isTRUE(all.equal(a$Tm, b$Tm)) && isTRUE(all.equal(a$GC, b$GC))
 prof  <- function(...) do.call(tm_calculate, c(list(...), ARGS))$gr
+# Assignments outside check() used to halt the run at the first failure, so a
+# single bug hid every check after it. safe() turns an error into a value the
+# later checks can fail on individually.
+safe  <- function(e) tryCatch(e, error = function(err) {
+  cat(sprintf("  ERROR %s\n", conditionMessage(err))); err })
 
 ## -- 1. The direct route is untouched ---------------------------------------
 cat("\n1. Sequences in, one Tm each: the behaviour that must not change\n")
 
 seqs <- c("ATGCGATGCGAAGGCGATGGCGTGTAGAATAGATCACATACTGCATAGCTGATC",
           "ATGCGATGCGCCCGGAGATAGAAGGCGTAGATACAGATCAGTAGCACCTTGAGAC")
-old <- tm_calculate(seqs)
+old <- safe(tm_calculate(seqs))
 check("returns a TmCalculator object", inherits(old, "TmCalculator"))
 check("regression values unchanged",
       isTRUE(all.equal(round(old$gr$Tm, 5), c(67.06562, 69.64434), tolerance = 0.1)))
@@ -63,42 +88,42 @@ check("sequence columns kept for supplied sequences",
 ## -- 2. A genome, and the invariant that matters ----------------------------
 cat("\n2. A BSgenome source: regions, tiling, segmenting\n")
 
-one <- prof(PKG, regions = REG, window = 200, slide = 200, unit = "region",
-            verbose = FALSE)
-bins <- make_genomiccoord(bsgenome = PKG, chromosomes = "chr21",
-                          window = 200, slide = 200, start = 10000001,
-                          end = 10500000, strand = "+", trim_N = "none",
-                          verbose = FALSE)
-manual <- do.call(tm_calculate,
-                  c(list(input_seq = to_genomic_ranges_fast(
-                    list(pkg_name = PKG, seq = bins), method = "preload_chr")),
-                    ARGS))$gr
+one <- safe(prof(PKG, regions = REG, window = 200, slide = 200, unit = "region",
+            verbose = FALSE))
+bins <- safe(make_genomiccoord(bsgenome = PKG, chromosomes = "chr21",
+                               window = 200, slide = 200, start = 10000001,
+                               end = 10500000, strand = "+", trim_N = "none",
+                               verbose = FALSE))
+manual <- safe(do.call(tm_calculate,
+                       c(list(input_seq = to_genomic_ranges_fast(
+                         list(pkg_name = PKG, seq = bins), method = "preload_chr")),
+                         ARGS))$gr)
 check("agrees with the hand-written three-step route", same(one, manual))
 check("sequence columns dropped for a genome source",
       !any(c("sequence", "complement") %in% names(mcols(one))))
 
-seg <- prof(PKG, regions = REG, window = 200, slide = 200, unit = "segment",
-            segment_size = 200e3, verbose = FALSE)
+seg <- safe(prof(PKG, regions = REG, window = 200, slide = 200, unit = "segment",
+            segment_size = 200e3, verbose = FALSE))
 check("segmenting does not change the windows", same(seg, one))
 # A segment size that is not a multiple of slide is rounded down, which is
 # the case most likely to go wrong silently.
-seg2 <- prof(PKG, regions = REG, window = 200, slide = 200, unit = "segment",
-             segment_size = 123456, verbose = FALSE)
+seg2 <- safe(prof(PKG, regions = REG, window = 200, slide = 200, unit = "segment",
+                  segment_size = 123456, verbose = FALSE))
 check("ragged segment_size still aligns to the grid", same(seg2, one))
 
 ## -- 3. regions, in every form ----------------------------------------------
 cat("\n3. Region forms\n")
 
 small <- c("chr21:10000001-10100000", "chr22:15000001-15100000")
-a <- prof(PKG, regions = small,      unit = "region", window = 200, verbose = FALSE)
-b <- prof(PKG, regions = rev(small), unit = "region", window = 200, verbose = FALSE)
+a <- safe(prof(PKG, regions = small,      unit = "region", window = 200, verbose = FALSE))
+b <- safe(prof(PKG, regions = rev(small), unit = "region", window = 200, verbose = FALSE))
 check("two regions on two chromosomes", length(unique(seqnames(a))) == 2L)
 check("result order is genomic, not the order typed", same(a, b))
 
-c1 <- prof(PKG, regions = "chr21:10000001-10100000", window = 200, verbose = FALSE)
-c2 <- prof(PKG, regions = "chr21:10,000,001-10,100,000", window = 200, verbose = FALSE)
-c3 <- prof(PKG, regions = GRanges("chr21", IRanges(10000001, 10100000)),
-           window = 200, verbose = FALSE)
+c1 <- safe(prof(PKG, regions = "chr21:10000001-10100000", window = 200, verbose = FALSE))
+c2 <- safe(prof(PKG, regions = "chr21:10,000,001-10,100,000", window = 200, verbose = FALSE))
+c3 <- safe(prof(PKG, regions = GRanges("chr21", IRanges(10000001, 10100000)),
+                window = 200, verbose = FALSE))
 check("commas in coordinates parse", same(c1, c2))
 check("a GRanges selects the same region", same(c1, c3))
 
@@ -131,8 +156,8 @@ oligos <- vapply(seq_len(40), function(i)
   paste(sample(c("A", "C", "G", "T"), 60, TRUE), collapse = ""), character(1))
 named <- oligos; names(named) <- sprintf("oligo_%02d", seq_along(named))
 
-ref <- tm_calculate(oligos)$gr
-v1  <- prof(named, verbose = FALSE)
+ref <- safe(tm_calculate(oligos)$gr)
+v1 <- safe(prof(named, verbose = FALSE))
 check("one row per sequence", length(v1) == length(named))
 check("Tm unchanged by the staging round trip",
       isTRUE(all.equal(sort(v1$Tm), sort(ref$Tm))))
@@ -140,9 +165,9 @@ check("names become seqnames", all(as.character(seqnames(v1)) %in% names(named))
 check("no temporary file left behind",
       !length(list.files(tempdir(), pattern = "^tm_.*\\.fa$")))
 
-v2 <- prof(named, regions = "oligo_03", verbose = FALSE)
+v2 <- safe(prof(named, regions = "oligo_03", verbose = FALSE))
 check("regions selects by the caller's name", length(v2) == 1L)
-v3 <- prof(unname(oligos), regions = "3:1-20", verbose = FALSE)
+v3 <- safe(prof(unname(oligos), regions = "3:1-20", verbose = FALSE))
 check("an unnamed vector is addressed by position",
       length(v3) == 1L && width(v3) == 20L)
 check("\"3:1-20\" is the third sequence's first 20 bases",
@@ -154,11 +179,18 @@ cat("\n4b. A GRanges source, selected by overlap\n")
 gsrc <- GRanges(c("chrA", "chrA", "chrB"),
                 IRanges(c(1, 1001, 1), width = c(60, 60, 60)),
                 sequence = unname(oligos[1:3]))
-g0 <- prof(gsrc, verbose = FALSE)
+g0 <- safe(prof(gsrc, verbose = FALSE))
 check("all ranges when regions is NULL", length(g0) == 3L)
 
 check("a seqname takes every range on it",
       length(prof(gsrc, regions = "chrA", verbose = FALSE)) == 2L)
+# Staging turns each range into a FASTA record that starts at 1, so without
+# an offset the second range would come back at 1-60 instead of 1001-1060.
+check("a staged GRanges keeps its own coordinates",
+      identical(start(prof(gsrc, regions = "chrA", verbose = FALSE)),
+                c(1L, 1001L)))
+check("a sequence-only GRanges needs no complement column",
+      inherits(safe(tm_calculate(gsrc, method = "tm_nn")), "TmCalculator"))
 check("an interval takes only what it overlaps",
       length(prof(gsrc, regions = "chrA:1-100", verbose = FALSE)) == 1L)
 check("a one-base overlap still counts",
@@ -186,11 +218,11 @@ if (!requireNamespace("BiocParallel", quietly = TRUE)) {
   cat("  SKIP  BiocParallel not installed\n")
 } else {
   suppressPackageStartupMessages(library(BiocParallel))
-  par <- prof(PKG, regions = REG, window = 200, slide = 200,
-              unit = "segment", segment_size = 200e3,
-              BPPARAM = SnowParam(workers = 2), verbose = FALSE)
+  par <- safe(prof(PKG, regions = REG, window = 200, slide = 200,
+                   unit = "segment", segment_size = 200e3,
+                   BPPARAM = SnowParam(workers = 2), verbose = FALSE))
   check("two workers reproduce the serial result", same(par, one))
-  pseq <- prof(named, BPPARAM = SnowParam(workers = 2), verbose = FALSE)
+  pseq <- safe(prof(named, BPPARAM = SnowParam(workers = 2), verbose = FALSE))
   check("staged sequences survive two workers",
         isTRUE(all.equal(sort(pseq$Tm), sort(ref$Tm))))
 }

@@ -2,187 +2,38 @@
 % Please edit documentation in R/tm_profile.R
 \name{tm_profile}
 \alias{tm_profile}
-\title{Melting temperature profile over a genome, a FASTA file, or a set of sequences}
+\title{Genome-scale Tm profiling (deprecated)}
 \usage{
-tm_profile(
-  seq_source,
-  regions = NULL,
-  window = 200L,
-  slide = window,
-  unit = c("segment", "region"),
-  segment_size = 5e+07,
-  BPPARAM = NULL,
-  keep_sequence = FALSE,
-  tmpdir = tempdir(),
-  verbose = TRUE,
-  ...
-)
+tm_profile(seq_source, ...)
 }
 \arguments{
-\item{seq_source}{Where the sequence comes from. One of:
-\itemize{
-  \item the name of an installed \pkg{BSgenome} package, e.g.
-    \code{"BSgenome.Hsapiens.UCSC.hg38"}. A package name rather than a
-    loaded object, because each worker opens the source itself;
-  \item the path to a FASTA file, optionally gzipped;
-  \item a character vector of two or more sequences, which is staged as
-    a temporary FASTA file under \code{tmpdir} and removed on exit. For
-    a single sequence, and for a few thousand short ones, the staging
-    and the worker start-up cost more than the calculation: use
-    \code{\link{tm_calculate}} there.
-}}
-
-\item{regions}{What to tile. Any of:
-  \itemize{
-    \item chromosome or record names, or numbers: \code{1:2},
-      \code{c("chr1", "chr2")}, \code{c("contig_7", "contig_9")};
-    \item coordinate strings \code{"name:start-end"}, e.g.
-      \code{c("chr1:1-10000000", "chrX:5,000,000-6,000,000")}. Commas and
-      scientific notation in the numbers are accepted;
-    \item a mixture of the two, \code{c("chr21", "chr1:1-10e6")};
-    \item a \code{GRanges} object, whose ranges are used directly.
-  }
-  For a BSgenome source the \code{chr} prefix is added or removed as the
-  genome requires, so \code{1:2} works on a UCSC genome and
-  \code{c("chr1", "chr2")} on an Ensembl one; FASTA record names are
-  matched exactly, since they are arbitrary.
-
-  The default is \code{GenomeInfoDb::standardChromosomes()} of the
-  genome, or every record of the FASTA file. For GRCh38 that is the 24
-  assembled chromosomes \emph{and the mitochondrion}, chrM, which is what
-  Bioconductor means by standard; name the chromosomes explicitly if the
-  mitochondrial genome does not belong in the profile.}
-
-\item{window}{Window width in base pairs. \code{NULL} means one window
-per region, which is what short records such as array probes or primers
-call for, and is the default when \code{seq_source} is a vector of
-sequences. Records shorter than \code{window} are returned whole.}
-
-\item{slide}{Step between window starts, defaulting to \code{window},
-which gives a non-overlapping tiling. Ignored when \code{window} is
-\code{NULL}.}
-
-\item{unit}{How the requested regions are turned into tasks.
-\code{"segment"} cuts them into pieces of about \code{segment_size} bp;
-\code{"region"} makes one task per requested region. Segments are
-faster and need less memory per worker, because no worker ever holds a
-whole large chromosome.}
-
-\item{segment_size}{Task size in base pairs when \code{unit = "segment"}.
-Rounded down to a multiple of \code{slide}, and offsets are measured
-from each region's own start, so the window grid is identical to the one
-a single unsegmented task would produce. Default 50 Mb.}
-
-\item{BPPARAM}{A \code{BiocParallelParam} from \pkg{BiocParallel}, e.g.
-\code{SnowParam(workers = 5)}. \code{NULL} (the default) runs the tasks
-sequentially in this process with no dependency on \pkg{BiocParallel}.
-Tasks are dispatched longest first, one at a time, which is what keeps
-the workers busy to the end of the run.}
-
-\item{keep_sequence}{Keep the \code{sequence} and \code{complement}
-columns in the result. \code{FALSE} by default: they are roughly 500 MB
-per large chromosome, and returning them from a worker costs more than
-the calculation.}
-
-\item{tmpdir}{Directory for the temporary FASTA file written when
-\code{seq_source} is a vector of sequences. Worth setting on a cluster,
-where the default \code{tempdir()} is often a small partition.}
-
-\item{verbose}{Report the task count and the number of windows.}
-
-\item{...}{Passed to \code{\link{tm_calculate}}: \code{method},
-\code{nn_table}, \code{Na} and the other model arguments.}
+\item{seq_source, ...}{Passed to \code{\link{tm_calculate}}.}
 }
 \value{
-A \code{GRanges} object in genomic order, carrying \code{Tm} and
-  \code{GC} metadata columns, with the chromosome or record name in its
-  \code{seqnames}.
-
-  When \code{seq_source} is a vector of sequences the result is keyed by
-  input position, \code{seq1}, \code{seq2} and so on, rather than by the
-  caller's names, so that a sequence dropped for containing \code{N} can
-  still be identified; the caller's names, if the vector had any, are
-  returned in a \code{name} column.
+A \code{GRanges}, as before.
 }
 \description{
-Builds a Tm profile from a sequence source: a \pkg{BSgenome} package, a
-FASTA file, or a vector of sequences. The requested regions are tiled
-into windows and a melting temperature is computed for each. This is the
-batch and parallel entry point of the package;
-\code{\link{tm_calculate}} is the single-call one.
+\code{tm_profile()} has been merged into \code{\link{tm_calculate}}, which
+now accepts the same four sources and the same \code{regions} argument.
+The two functions had come to take the same inputs and to differ only in
+whether they spread the work over processes, which is a property of the
+call rather than a reason for a second function.
 }
 \details{
-Parallelism pays here because a task is self-contained: it opens the
-source itself and builds its own windows, fetches its own sequence and
-assembles its own result, so only a name and a coordinate pair cross
-between processes. A vector of sequences is staged as a temporary FASTA
-file for the same reason, so that the workers read it rather than receive
-it. Dividing the sequences of a single \code{tm_calculate()} call among
-workers is the arrangement that does not pay, because it parallelises the
-inner loop alone and leaves window construction, sequence retrieval and
-result assembly in the calling process. See
-\code{vignette("hg38_performance_parallel", package = "TmCalculator")}.
-}
-\section{Assembly gaps}{
+The translation is mechanical: the first argument keeps its meaning and
+every other argument keeps its name.
 
-  A task covering a whole chromosome of a BSgenome trims the leading and
-  trailing assembly gaps, since a telomeric run of N carries no windows.
-  A task covering a user-specified region, or any FASTA record, does not
-  trim, because the requested start is the requested start. Windows
-  containing N are dropped in every case.
+\preformatted{
+  tm_profile(hg38, regions = 1:2, window = 200)
+  tm_calculate(hg38, regions = 1:2, window = 200)
 }
 
-\section{Choosing the worker count}{
-
-  Memory, not cores, is usually the binding constraint: each worker holds
-  the sequences of its own task. Measured on GRCh38 at 200 bp, peak
-  resident memory per worker is 4.74 to 4.87 GB when the unit is a whole
-  chromosome and 1.86 GB when it is a 50 Mb segment. A workable rule is
-  the smaller of the number of physical cores less one, and the available
-  memory less 4 GB divided by 2 GB per worker.
-}
-
-\examples{
-\dontrun{
-library(BiocParallel)
-hg38 <- "BSgenome.Hsapiens.UCSC.hg38"
-
-# Whole genome, 50 Mb tasks, five workers
-tm <- tm_profile(hg38, window = 200, slide = 200,
-                 method = "tm_nn", nn_table = "DNA_NN_SantaLucia_2004",
-                 Na = 50, BPPARAM = SnowParam(workers = 5))
-
-# Chromosomes 1 and 2 only. These are equivalent.
-tm_profile(hg38, regions = 1:2, method = "tm_nn")
-tm_profile(hg38, regions = c("chr1", "chr2"), method = "tm_nn")
-
-# The 24 assembled chromosomes without the mitochondrion
-tm_profile(hg38, regions = paste0("chr", c(1:22, "X", "Y")))
-
-# Explicit regions, and a mixture of regions and whole chromosomes
-tm_profile(hg38, regions = c("chr1:1-10000000", "chrX:5,000,000-6,000,000"))
-tm_profile(hg38, regions = c("chr21", "chr1:1-10e6"))
-
-# Regions from an existing object, for example a set of promoters
-tm_profile(hg38, regions = promoters_gr, window = 50, slide = 25)
-
-# A FASTA assembly, tiled the same way
-tm_profile("contigs.fa.gz", window = 200, slide = 200,
-           BPPARAM = SnowParam(workers = 4))
-
-# Short records, one Tm each: array probes, primers, synthetic oligos
-probe_tm <- tm_profile("probes.fa", window = NULL, method = "tm_nn", Na = 50)
-
-# Sequences already in R. Staged to a temporary FASTA so that the workers
-# read them; worth it for large sets, not for a handful.
-tm_profile(oligos, method = "tm_nn", Na = 50,
-           BPPARAM = SnowParam(workers = 5))
-}
-
+One difference is worth knowing. \code{tm_profile()} returned a bare
+\code{GRanges}; \code{tm_calculate()} returns a \code{TmCalculator}
+object, so the profile is \code{$gr}. This wrapper returns the
+\code{GRanges}, as it always did, so existing code keeps working until you
+move it over.
 }
 \seealso{
-\code{\link{tm_calculate}}, which this function calls once per
-  task, for sequences already in hand; \code{\link{make_genomiccoord}} for
-  the tiling and \code{\link{integrate_granges}} for combining the
-  resulting profile with other genomic data.
+\code{\link{tm_calculate}}.
 }

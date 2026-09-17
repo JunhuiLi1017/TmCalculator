@@ -82,7 +82,8 @@ tm <- tm_calculate(hg38, window = 200, slide = 200,
 ```
 
 Same windows, same Tm values, about a third of the time. How the genome is
-divided changes the runtime, not the result.
+divided changes the runtime, not the result. See the sweep below for how
+far adding workers gets you.
 
 Everything else is a refinement of those two calls: which regions, which
 thermodynamic model, and how many workers.
@@ -313,8 +314,8 @@ will understate the speedup:
 for (n in 1:6) {
   t <- system.time(
     tm_calculate(hg38, regions = "chr21", window = 200, slide = 200,
-               method = "tm_nn", segment_size = 10e6,
-               BPPARAM = SnowParam(workers = n), verbose = FALSE))
+                 method = "tm_nn", segment_size = 10e6,
+                 BPPARAM = SnowParam(workers = n), verbose = FALSE))
   cat(sprintf("%d workers: %.1f s\n", n, t[["elapsed"]]))
 }
 ```
