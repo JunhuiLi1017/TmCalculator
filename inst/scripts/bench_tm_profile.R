@@ -54,12 +54,18 @@ UNIT     <- getarg("--unit", "segment")
 PKG      <- getarg("--genome", "BSgenome.Hsapiens.UCSC.hg38")
 NN       <- getarg("--nn-table", "DNA_NN_Breslauer_1986")
 NA_MM    <- as.numeric(getarg("--na", "50"))
-REGIONS  <- getarg("--regions", NA_character_)   # e.g. "chr21,chr22"; NA = all
+# The 24 assembled human chromosomes, named explicitly. tm_profile()'s own
+# default is GenomeInfoDb::standardChromosomes(), which for hg38 also returns
+# chrM; including it would change the window count and the table would no
+# longer line up with the sweeps already published for this genome. Pass
+# --regions all to get the function's default instead.
+REGIONS  <- getarg("--regions", paste(paste0("chr", c(1:22, "X", "Y")),
+                                      collapse = ","))
 MEMLOG   <- getarg("--memlog", file.path(OUTDIR, "mem_sampling.tsv"))
 TMPDIR   <- getarg("--tmpdir", tempdir())
 
 CALIBRATE <- !identical(getarg("--no-calibrate", "no"), "yes")
-regions <- if (is.na(REGIONS)) NULL else strsplit(REGIONS, ",")[[1]]
+regions <- if (identical(REGIONS, "all")) NULL else strsplit(REGIONS, ",")[[1]]
 dir.create(OUTDIR, showWarnings = FALSE, recursive = TRUE)
 
 for (p in c(PKG, "BiocParallel"))
@@ -115,13 +121,26 @@ run_one <- function(n_workers) {
 # assembly gaps and would tile to nothing.
 startup_of <- stats::setNames(rep(NA_real_, length(WORKERS)), as.character(WORKERS))
 if (CALIBRATE) {
-  sl  <- GenomeInfoDb::seqlengths(get(PKG, envir = asNamespace(PKG)))
-  if (!is.null(regions)) sl <- sl[intersect(regions, names(sl))]
-  if (!length(sl)) sl <- GenomeInfoDb::seqlengths(get(PKG, envir = asNamespace(PKG)))
-  ch  <- names(sl)[which.min(sl)]
-  mid <- floor(sl[[ch]] / 2)
-  tiny <- sprintf("%s:%d-%d", ch, mid, mid + 2e5)
-  cat(sprintf("calibrating start-up on %s\n", tiny))
+  gobj <- get(PKG, envir = asNamespace(PKG))
+  sl   <- GenomeInfoDb::seqlengths(gobj)
+  # Only the sequences this sweep will actually touch. Left unrestricted, the
+  # shortest sequence in hg38 is an unplaced 970 bp scaffold, and asking for
+  # 200 kb of it is an error rather than a fast calibration.
+  pick <- if (is.null(regions)) GenomeInfoDb::standardChromosomes(gobj) else regions
+  pick <- intersect(sub("^(?!chr)", "chr", pick, perl = TRUE), names(sl))
+  if (!length(pick)) pick <- names(sl)
+  sl   <- sl[pick]
+  # Shortest of those, but long enough to tile: a sequence below one window
+  # would calibrate on an empty result.
+  sl   <- sl[sl >= max(2L * WINDOW, 1L)]
+  if (!length(sl)) stop("no requested sequence is long enough to calibrate on")
+  ch   <- names(sl)[which.min(sl)]
+  len  <- sl[[ch]]
+  span <- min(2e5, len)
+  from <- max(1, floor((len - span) / 2))          # middle, so not an end gap
+  tiny <- sprintf("%s:%.0f-%.0f", ch, from, min(from + span - 1, len))
+  cat(sprintf("calibrating start-up on %s (%s of %s bp)\n", tiny,
+              format(span, big.mark = ","), format(len, big.mark = ",")))
   for (w in WORKERS) {
     bp <- if (w <= 1L) NULL else SnowParam(workers = w)
     el <- system.time(tm_profile(PKG, regions = tiny, window = WINDOW,

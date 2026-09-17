@@ -205,6 +205,7 @@ Rscript "$BENCH_R" \
   --unit    segment \
   --segsize 50e6 \
   --genome  BSgenome.Hsapiens.UCSC.hg38 \
+  --regions chr1,chr2,chr3,chr4,chr5,chr6,chr7,chr8,chr9,chr10,chr11,chr12,chr13,chr14,chr15,chr16,chr17,chr18,chr19,chr20,chr21,chr22,chrX,chrY \
   --nn-table DNA_NN_Breslauer_1986 \
   --na      50 \
   --memlog  "$MEMLOG" \
