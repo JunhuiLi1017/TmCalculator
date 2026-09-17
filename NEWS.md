@@ -190,9 +190,13 @@
   unchanged: no alphabet restriction, case preserved, sequences named by the
   first word of the header.
 
-* **`BiocParallel` moved from Imports to Suggests.** It was used only by the
-  within-call `BPPARAM` path removed above (see Breaking changes); the
-  parallel vignette and the benchmark scripts still use it.
+* **`BiocParallel` stays in Imports.** It briefly moved to Suggests when the
+  within-call `BPPARAM` path was removed (see Breaking changes), on the
+  reasoning that nothing in the package used it any more. Merging
+  `tm_profile()` into `tm_calculate()` put it back: `.tm_run()` dispatches
+  the tasks of a genome-scale call with `bplapply()`, so dividing the work is
+  something the package does rather than something a user assembles around
+  it, and the dependency is not optional.
 
 * **`BSgenome` moved from Imports to Suggests, cutting load time by about
   two thirds.** Attaching it pulls in rtracklayer, Rsamtools,
