@@ -39,11 +39,11 @@ This vignette answers three questions, in order:
 
 **Before you start.** You need a BSgenome package for the genome you want to
 profile; this vignette uses `BSgenome.Hsapiens.UCSC.hg38`. **BiocParallel**
-is needed only if you want more than one worker. Neither is required for
-`tm_calculate()` to run in a single process.
+comes with TmCalculator, so there is nothing to install for the parallel
+part; attach it when you want to name a backend.
 
 ```{r install, eval=FALSE}
-BiocManager::install(c("BSgenome.Hsapiens.UCSC.hg38", "BiocParallel"))
+BiocManager::install("BSgenome.Hsapiens.UCSC.hg38")
 ```
 
 The hg38 chunks below are not evaluated when the vignette is built, since

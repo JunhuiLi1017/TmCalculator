@@ -111,6 +111,46 @@ seg2 <- safe(prof(PKG, regions = REG, window = 200, slide = 200, unit = "segment
                   segment_size = 123456, verbose = FALSE))
 check("ragged segment_size still aligns to the grid", same(seg2, one))
 
+## -- 2b. The sequence really is the sequence at those coordinates ----------
+# preload_chr loads the span the windows cover rather than the chromosome
+# they sit on, so every window start is shifted by the span's own start
+# before extraction. Get that wrong and the whole profile slides along the
+# chromosome with nothing internal to contradict it: the segmented and
+# unsegmented runs would agree with each other, both wrong. The only test
+# that catches it compares against the genome itself.
+cat("\n2b. Window sequences against getSeq at the same coordinates\n")
+
+gobj <- safe(get(sub("^BSgenome\\.([^.]+)\\..*$", "\\1", PKG),
+                 envir = asNamespace(PKG)))
+truth <- function(gr)
+  as.character(Biostrings::getSeq(gobj, as.character(seqnames(gr)),
+                                  start = start(gr), end = end(gr)))
+
+# Two spans with different starts: an error of the form "always drop the
+# offset" survives one of these only if lo happens to be 1.
+for (rg in c("chr21:10200001-10203000", "chr21:31415927-31418927")) {
+  w <- safe(prof(PKG, regions = rg, window = 200, slide = 200,
+                 keep_sequence = TRUE, verbose = FALSE))
+  check(sprintf("%s: sequences match the genome", rg),
+        identical(as.character(w$sequence), truth(w)))
+  check(sprintf("%s: first window starts where asked", rg),
+        start(w)[1] == as.numeric(sub(".*:(\\d+)-.*", "\\1", rg)))
+}
+
+# The same region reached as one task and as three must agree, and both must
+# agree with the genome: this is what makes the offset arithmetic load-bearing
+# rather than merely self-consistent.
+s1 <- safe(prof(PKG, regions = "chr21:10200001-10203000", window = 200,
+                slide = 200, unit = "region", keep_sequence = TRUE,
+                verbose = FALSE))
+s3 <- safe(prof(PKG, regions = "chr21:10200001-10203000", window = 200,
+                slide = 200, unit = "segment", segment_size = 1000,
+                keep_sequence = TRUE, verbose = FALSE))
+check("one task and three give the same sequences", same(s1, s3) &&
+        identical(as.character(s1$sequence), as.character(s3$sequence)))
+check("three tasks still match the genome",
+      identical(as.character(s3$sequence), truth(s3)))
+
 ## -- 3. regions, in every form ----------------------------------------------
 cat("\n3. Region forms\n")
 

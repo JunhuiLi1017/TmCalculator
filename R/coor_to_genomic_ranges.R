@@ -29,11 +29,13 @@
 #'   \describe{
 #'     \item{\code{"vectorized"}}{One \code{getSeq()} call per genome package
 #'       (default). Best when windows are scattered across many chromosomes.}
-#'     \item{\code{"preload_chr"}}{Load each chromosome once and extract all
-#'       of its windows in a single \code{extractAt()} call. Recommended for
-#'       dense tiling of one or a few chromosomes (e.g. genome-wide sliding
-#'       windows), where it is several times faster than \code{getSeq()};
-#'       holds one chromosome in memory at a time.}
+#'     \item{\code{"preload_chr"}}{Load the span the windows cover in one
+#'       read and extract all of them in a single \code{extractAt()} call.
+#'       Recommended for dense tiling of one or a few chromosomes (e.g.
+#'       genome-wide sliding windows), where it is several times faster than
+#'       \code{getSeq()}. Memory is the covered span, not the chromosome, so
+#'       a request for part of a chromosome reads only that part; windows
+#'       scattered along a whole chromosome still span it.}
 #'   }
 #'
 #' @return A \code{GRanges} object with metadata columns:
@@ -342,16 +344,37 @@ coor_to_genomic_ranges <- function(
 
     chrs_needed <- unique(parsed$chr[idx_pkg])
 
+    # Chromosome lengths from the index rather than from the sequence, since
+    # they are needed to clamp the request before anything is loaded.
+    chr_lens <- GenomeInfoDb::seqlengths(genome)
+
     for (chr in chrs_needed) {
       idx_chr <- idx_pkg[parsed$chr[idx_pkg] == chr]
 
+      # Load the span these windows actually cover, not the chromosome they
+      # sit on. Loading the chromosome cost the same whether the caller
+      # wanted all of it or 200 kb of it, and a segmented genome-scale run
+      # asks for one piece at a time: five 50 Mb segments of chr1 decompressed
+      # 249 Mb each, five times over, to cover 249 Mb once. Windows scattered
+      # the length of a chromosome still span it, so nothing is lost in the
+      # case this was written for; a dense run over part of one now reads
+      # what it uses.
+      chr_len <- if (!is.na(chr_lens[chr])) as.numeric(chr_lens[[chr]]) else Inf
+      lo <- max(1, min(parsed$win_start[idx_chr], na.rm = TRUE))
+      hi <- min(chr_len, max(parsed$win_end[idx_chr], na.rm = TRUE))
+      if (!is.finite(hi) || hi < lo) {
+        next  # nothing addressable on this chromosome
+      }
+
       message(sprintf(
-        "  Preloading %s from %s (%s intervals) ...",
-        chr, pkg, format(length(idx_chr), big.mark = ",")
+        "  Preloading %s:%s-%s from %s (%s Mb, %s intervals) ...",
+        chr, format(lo, big.mark = ","), format(hi, big.mark = ","), pkg,
+        format(round((hi - lo + 1) / 1e6, 1), nsmall = 1),
+        format(length(idx_chr), big.mark = ",")
       ))
 
       chr_seq <- tryCatch(
-        genome[[chr]],
+        Biostrings::getSeq(genome, names = chr, start = lo, end = hi),
         error = function(e) {
           message(sprintf("  ERROR loading %s: %s", chr, conditionMessage(e)))
           return(NULL)
@@ -364,9 +387,11 @@ coor_to_genomic_ranges <- function(
         chr_seq <- Biostrings::unmasked(chr_seq)
       }
 
-      chr_len  <- length(chr_seq)
-      starts_i <- pmax(1L, parsed$win_start[idx_chr])
-      ends_i   <- pmin(chr_len, parsed$win_end[idx_chr])
+      # Window coordinates are the caller's, absolute on the chromosome; the
+      # loaded piece starts at `lo`, so every one shifts by lo - 1.
+      span     <- length(chr_seq)
+      starts_i <- pmax(1L, as.integer(parsed$win_start[idx_chr] - lo + 1))
+      ends_i   <- pmin(span, as.integer(parsed$win_end[idx_chr] - lo + 1))
 
       # One C-level call extracts all windows as lightweight views of the
       # loaded chromosome -- no per-window S4 objects, no as.list()/unlist().

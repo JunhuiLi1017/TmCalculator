@@ -404,6 +404,7 @@
 #' @param keep_sequence Keep the sequence columns in the result.
 #' @param verbose Report task and window counts.
 #' @return A \code{GRanges} in source order.
+#' @importFrom BiocParallel bplapply bptasks<-
 #' @keywords internal
 .tm_run <- function(tasks, src, window, slide, model, BPPARAM,
                     keep_sequence, verbose) {
@@ -425,9 +426,6 @@
   if (is.null(BPPARAM)) {
     res <- lapply(tasks[ord], function(tk) do.call(worker, c(list(tk), args)))
   } else {
-    if (!requireNamespace("BiocParallel", quietly = TRUE))
-      stop("BPPARAM was supplied but BiocParallel is not installed. ",
-           "Install it, or leave BPPARAM = NULL to run in this process.")
     # One task at a time rather than one pre-split block per worker: with
     # tasks of unequal length, pre-splitting leaves workers idle at the end.
     BiocParallel::bptasks(BPPARAM) <- length(tasks)

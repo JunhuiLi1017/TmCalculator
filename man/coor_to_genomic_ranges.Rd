@@ -36,11 +36,13 @@ from \code{sequence}.}
 \describe{
   \item{\code{"vectorized"}}{One \code{getSeq()} call per genome package
     (default). Best when windows are scattered across many chromosomes.}
-  \item{\code{"preload_chr"}}{Load each chromosome once and extract all
-    of its windows in a single \code{extractAt()} call. Recommended for
-    dense tiling of one or a few chromosomes (e.g. genome-wide sliding
-    windows), where it is several times faster than \code{getSeq()};
-    holds one chromosome in memory at a time.}
+  \item{\code{"preload_chr"}}{Load the span the windows cover in one
+    read and extract all of them in a single \code{extractAt()} call.
+    Recommended for dense tiling of one or a few chromosomes (e.g.
+    genome-wide sliding windows), where it is several times faster than
+    \code{getSeq()}. Memory is the covered span, not the chromosome, so
+    a request for part of a chromosome reads only that part; windows
+    scattered along a whole chromosome still span it.}
 }}
 }
 \value{

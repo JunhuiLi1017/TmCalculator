@@ -96,11 +96,10 @@
   present. Values from `tm_gc()`, `tm_wallace()` and `gc()` are unchanged.
 
 * **`BPPARAM` no longer divides the sequences of one call, and is gone from
-  `tm_nn()`, `tm_gc()` and `tm_wallace()` entirely; `BiocParallel` is no
-  longer imported.** `tm_calculate()` keeps a `BPPARAM`, but it now means
-  something else: the work is divided by region, with each task opening the
-  source for itself, and never by splitting the sequences of one region
-  among workers. With the compiled nearest-neighbor core the per-window loop is
+  `tm_nn()`, `tm_gc()` and `tm_wallace()` entirely.** `tm_calculate()` keeps
+  a `BPPARAM`, but it now means something else: the work is divided by
+  region, with each task opening the source for itself, and never by
+  splitting the sequences of one region among workers. With the compiled nearest-neighbor core the per-window loop is
   a minority of a call's runtime; the rest (N filtering, coercion, result
   assembly) runs once in the calling process and cannot be divided. Measured
   on chr1 of GRCh38 (about 1.2 million windows), `SnowParam(5)` never beat
@@ -109,11 +108,11 @@
   therefore offered a slower path and no faster one, and it is gone rather
   than kept as a no-op, so that calls passing it fail loudly.
 
-  Parallelism belongs outside the call, one region per worker, each a
-  serial `tm_calculate()`. That pattern needs no support from this package
-  and works with any backend; `vignette("hg38_performance_parallel")`
-  measures it with `BiocParallel` across a whole genome, which is why
-  `BiocParallel` remains in Suggests.
+  Parallelism is now the business of `tm_calculate()` itself, one region per
+  worker, which is why `BiocParallel` stays in Imports rather than moving to
+  Suggests: dividing the work is part of what the function does, not an
+  optional extra a user assembles around it.
+  `vignette("hg38_performance_parallel")` measures it across a whole genome.
 
 * **`tm_nn()` now reports GC on the same definition it already used for salt
   correction.** It previously reported `(G+C)/length` while correcting with
@@ -123,6 +122,25 @@
   unchanged in all cases.
 
 ## Performance
+
+* **`coor_to_genomic_ranges(method = "preload_chr")` now loads the span its
+  windows cover, not the chromosome they sit on.** The preload path called
+  `genome[[chr]]`, which decompresses the whole chromosome whatever was
+  asked for, so a request for 200 kb of chr21 read all 46.7 Mb of it. That
+  cost was paid once per task, and a segmented genome-scale run is many
+  tasks per chromosome: five 50 Mb segments of chr1 each decompressed its
+  full 249 Mb, five times over, to cover 249 Mb once. The span is now read
+  in one `getSeq()` call and window coordinates are shifted onto it.
+
+  Windows scattered along a whole chromosome still span it, so the case the
+  preload path was written for is unchanged. A dense run over part of a
+  chromosome, which is what `regions` and `segment_size` produce, reads what
+  it uses. Sequences and Tm values are identical either way;
+  `inst/scripts/test_tm_calculate_merged.R` pins them against `getSeq()` at
+  the same coordinates rather than against another run of this code, since a
+  mistake in the shift would move the whole profile consistently and agree
+  with itself.
+
 
 * **`tm_gc()` is roughly 260× faster.** On the *E. coli* case study (23,208
   windows of 200 bp) it fell from 51.7 s to 0.198 s, and is now faster than
