@@ -53,8 +53,8 @@ assumed, not checked, and it is wrong; see item 4.)
    no 0.5 GB of sequence copied per worker, and none of the
    copy-on-write page duplication that makes `MulticoreParam()`
    counterproductive today. A single process would then saturate all
-   cores, which is what makes `BPPARAM` worth supplying for a single
-   chromosome rather than only across chromosomes. Avoid OpenMP (absent
+   cores, which would give a single chromosome the speedup that the
+   removed `BPPARAM` path could not. Avoid OpenMP (absent
    from Apple clang); RcppParallel/TBB is the portable route.
 
    With items 1-3 combined, chr1 should drop from ~52 s to ~15 s
@@ -107,10 +107,10 @@ assumed, not checked, and it is wrong; see item 4.)
      (item 6).
 
 5. **Guard against oversubscription once threading lands.** With
-   in-core threads *and* `BPPARAM`, `SnowParam(5)` running an 8-thread
-   core requests 40 cores. Decide and document the composition rule —
-   most likely: threads default to 1 when a multi-worker BPPARAM is
-   supplied, overridable explicitly — and add a test that the two
+   in-core threads *and* region-level workers, `SnowParam(5)` running an
+   8-thread core requests 40 cores. Decide and document the composition
+   rule — most likely: threads default to 1 when the call is running on
+   a worker, overridable explicitly — and add a test that the two
    mechanisms never multiply silently.
 
 ## API hygiene
@@ -181,31 +181,65 @@ assumed, not checked, and it is wrong; see item 4.)
 
 ## Documentation and interoperability
 
-9. **Verify and document `BatchtoolsParam()` on an HPC scheduler.**
-   `.bp_map_chunks()` calls `BiocParallel::bplapply()` generically, so any
-   `BiocParallelParam` is accepted by construction — including
-   `DoparParam()` (bridging to any registered foreach backend, and through
-   `doFuture` to the future framework) and `BatchtoolsParam()` (SLURM, LSF,
-   SGE, Torque). None of this is tested: `tests/testthat/test_tm_calculate.R`
-   covers only `SerialParam` and `SnowParam`, so cluster support is currently
-   an inference from the generic call, not a verified feature, and is
-   deliberately not claimed in the manuscript.
+9. **Verify and document a scheduler backend for region-level runs.**
+   With `BPPARAM` removed from the calls, the only parallelism the package
+   is involved in is the region-level pattern of the hg38 vignette, where
+   `BiocParallel` backends are used unchanged. `BatchtoolsParam()` (SLURM,
+   LSF, SGE, Torque) should therefore work for dispatching whole regions,
+   but it is untested; while on the LSF cluster, try
+   `BatchtoolsParam(cluster = "lsf")` once with the vignette's segment
+   dispatch and, if it works, document it there.
 
-   Concretely: while running `inst/scripts/bench_parallel_cluster.R` on the
-   LSF cluster, try `BatchtoolsParam(cluster = "lsf")` once. If it works,
-   document it in `?tm_calculate` and add a skipped-unless-available test.
-   The practical value is that users could dispatch to a scheduler from R
-   without writing submission scripts. Note the likely obstacle before
-   spending time on it: batchtools workers are separate R sessions on other
-   nodes, so the package and the BSgenome must be installed there, and the
-   within-call chunking would ship sequence data across the network — which
-   is the pattern already shown to be slower than region-level parallelism.
-   Expect it to be useful for dispatching whole regions, not for `BPPARAM`
-   inside a single call.
+10. **A probe and primer vignette: probe Tm against its target-site Tm.**
+   `tm_profile("probes.fa", window = NULL)` already returns one Tm per
+   record, and the Introduction motivates the package partly by probe Tm
+   harmonisation on microarrays, but nothing in the package demonstrates
+   it. The vignette worth writing is not "compute Tm for a list of
+   oligos", which is one line, but the comparison only this package can
+   make cheaply: the Tm of a probe as synthesised against the Tm of the
+   genomic window it is meant to bind.
+
+   Sketch:
+
+   - take a real probe set, a subset of an Infinium EPIC manifest read
+     with `illuminaio`, `minfi` or `sesame`, so the sequences and their
+     hg38 coordinates come from the same place; no manifest parsing is
+     added to this package, the vignette starts from what those packages
+     return;
+   - probe side: `tm_profile("probes.fa", window = NULL)`, or
+     `tm_calculate()` straight from the character vector;
+   - target side: `tm_profile(hg38, regions = probe_gr, window = NULL)`,
+     which is the same call the hg38 vignette already shows, at a
+     different scale;
+   - compare the two distributions, and show where they diverge: the
+     probe-target duplex is not the perfect duplex the default parameters
+     assume.
+
+   That last point is what carries the second half of this item. The
+   mismatch and dangling-end tables are shipped and reachable through
+   `tmm_table`, `imm_table` and `de_table`, and nothing documents them
+   beyond the argument list. A probe context is where they are actually
+   needed: an Infinium probe ends at the interrogated base, so the
+   terminal-mismatch and dangling-end terms are the difference between the
+   matched and the mismatched allele, and a worked example there would
+   also exercise the user-supplied-table path added for Comment 1.4.
+
+   Two prerequisites, both of which are why this is not in 1.1.0: a probe
+   set has to be chosen that can be redistributed or fetched
+   reproducibly, and the hybrid duplex needs deciding on, since an
+   Infinium probe binds bisulfite-converted DNA and a whole-genome
+   parameter set is not obviously the right one for it.
 
 ## Done in 1.1.0 (for reference)
 
-- BPPARAM (BiocParallel) in tm_calculate/tm_nn/tm_gc/tm_wallace.
+- `tm_profile()`: one call from a sequence source (BSgenome package or
+  FASTA file) plus regions to a Tm profile, dispatching one region per
+  worker. `window = NULL` gives one window per region, which covers short
+  records such as probes and primers.
+- BPPARAM removed from tm_calculate/tm_nn/tm_gc/tm_wallace; BiocParallel
+  moved to Suggests (still used by the hg38 vignette and benchmarks).
+- `tool_comparison` vignette retired: the cross-tool benchmark belongs to
+  the paper, and its script and CSVs ship in `inst/`.
 - Rcpp nearest-neighbor core (~10x serial speedup); sequence cleaning
   moved into the core.
 - Lazy `result$df` via `$.TmCalculator`.

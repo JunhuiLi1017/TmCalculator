@@ -22,15 +22,6 @@
 #'    
 #' @param ambiguous Ambiguous bases are taken into account to compute the G and C content when ambiguous is TRUE.
 #'
-#' @param BPPARAM A \code{\link[BiocParallel]{BiocParallelParam}} object
-#'   specifying the parallel backend, e.g.
-#'   \code{BiocParallel::MulticoreParam(4)} (Unix/macOS) or
-#'   \code{BiocParallel::SnowParam(4)} (all platforms). The default,
-#'   \code{NULL}, runs serially in the calling process. Passing
-#'   \code{BiocParallel::SerialParam()} is equivalent but constructs an S4
-#'   object on every call, which is measurable when the function is called
-#'   repeatedly on small inputs.
-#'
 #' @returns Returns a list of sequences with updated Tm attributes
 #' 
 #' @export
@@ -54,24 +45,17 @@
 #' 
 #' @export tm_wallace
 
-tm_wallace <- function(gr_seq, ambiguous = FALSE,
-                       BPPARAM = NULL) {
+tm_wallace <- function(gr_seq, ambiguous = FALSE) {
   # Filter sequence
   gr_seq$sequence <- check_filter_seq(gr_seq$sequence, method = "tm_wallace")
 
-  # Checked here rather than in .tm_wallace_chunk(): a warning raised on a
-  # BiocParallel worker is collected and re-emitted out of order, or lost
-  # entirely on some backends, and it would fire once per chunk instead of
-  # once per call.
+  # Checked here rather than in .tm_wallace_chunk() so that it fires once
+  # per call, on the full input.
   .warn_wallace_length(gr_seq$sequence)
 
-  # Calculate Tm for each sequence (chunked, optionally in parallel)
-  all_seqs <- as.character(gr_seq$sequence)
-  chunk_res <- .bp_map_chunks(
-    n = length(gr_seq),
-    make_chunk = function(idx) list(sequence = all_seqs[idx]),
-    worker = .tm_wallace_chunk,
-    BPPARAM = BPPARAM,
+  # Calculate Tm for all sequences in one vectorised pass
+  chunk_res <- .tm_wallace_chunk(
+    list(sequence = as.character(gr_seq$sequence)),
     ambiguous = ambiguous
   )
 
@@ -121,9 +105,8 @@ tm_wallace <- function(gr_seq, ambiguous = FALSE,
   invisible(TRUE)
 }
 
-# -- Chunk worker: Wallace-rule Tm over a block of sequences ------------------
-# Called by .bp_map_chunks(), either directly (serial) or on a BiocParallel
-# worker. `chunk` is list(sequence=) for this worker's block.
+# -- Wallace-rule Tm over a block of sequences --------------------------------
+# `chunk` is list(sequence=) for the whole input.
 #' @keywords internal
 .tm_wallace_chunk <- function(chunk, ambiguous) {
   seqs <- chunk$sequence

@@ -36,8 +36,7 @@ tm_nn(
   DMSO = 0,
   formamide_unit = list(value = 0, unit = "percent"),
   dmso_factor = 0.75,
-  formamide_factor = 0.65,
-  BPPARAM = NULL
+  formamide_factor = 0.65
 )
 }
 \arguments{
@@ -208,17 +207,6 @@ Other published values: 0.5, 0.6, 0.675}
 \item{formamide_factor}{Coefficient of melting temperature (Tm) decrease per percent formamide.
 Default: 0.65
 Literature reports values ranging from 0.6 to 0.72}
-
-\item{BPPARAM}{A \code{\link[BiocParallel]{BiocParallelParam}} object
-specifying the parallel backend. \code{BiocParallel::SnowParam(n)} is
-recommended; \code{BiocParallel::MulticoreParam} can be slower than
-serial on large inputs because copy-on-write interacts badly with R's
-garbage collector (see \code{\link{tm_calculate}}). The default,
-\code{NULL}, runs serially in the calling process; passing
-\code{BiocParallel::SerialParam()} is equivalent but constructs an S4
-object on every call. Sequences are split
-into one chunk per worker, so parallelization pays off for large inputs
-(e.g. genome-wide windows) rather than a handful of primers.}
 }
 \value{
 A \code{TmCalculator} list with:

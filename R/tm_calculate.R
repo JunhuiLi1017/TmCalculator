@@ -258,29 +258,6 @@
 #' @param mismatch Logical. If TRUE, every '.' in the sequence is counted as a mismatch.
 #'   Only applicable for the GC method. Default: TRUE
 #'
-#' @param BPPARAM A \code{\link[BiocParallel]{BiocParallelParam}} object
-#'   specifying the parallel backend used to distribute the Tm computation
-#'   across workers. \code{BiocParallel::SnowParam(n)} (socket
-#'   clusters, all platforms including Windows) is recommended: workers are
-#'   fresh processes that receive only their own chunk of sequences.
-#'   \code{BiocParallel::MulticoreParam(n)} (forked processes, Unix/macOS) is
-#'   NOT recommended for large inputs: forked workers inherit the parent
-#'   session via copy-on-write, and R's garbage collector then forces the
-#'   kernel to duplicate inherited pages in every worker, which can consume
-#'   more time than the computation itself. \code{n} should not exceed the
-#'   number of physical cores. The default, \code{NULL}, runs serially in the
-#'   calling process. Passing \code{BiocParallel::SerialParam()} gives the
-#'   same result, but a \code{BiocParallelParam} is an S4 object that would
-#'   then be constructed and queried on every call; that cost is invisible on
-#'   a genome-scale call and noticeable when the function is invoked in a
-#'   loop over short sequences. Sequences are split into one contiguous chunk
-#'   per worker, so results are identical to the serial run. With the
-#'   compiled nearest-neighbor core, the serial default is typically fastest
-#'   up to around a million sequences: worker startup and sequence
-#'   serialization outweigh the parallel gain. Reserve \code{BPPARAM} for
-#'   substantially larger jobs, or parallelize at a coarser level (e.g. one
-#'   chromosome per worker, each a serial \code{tm_calculate} call).
-#'
 #' @details
 #' The three methods differ in resolution and in the range of sequence lengths
 #' over which they are calibrated, so they are not interchangeable.
@@ -340,13 +317,6 @@
 #'   method = "tm_nn",
 #'   nn_table = "RNA_DNA_NN_Weber_2019_LS",
 #'   Na = 100
-#' )
-#'
-#' # Genome-wide windows: distribute computation across 4 workers
-#' result_par <- tm_calculate(
-#'   input_seq,
-#'   method = "tm_nn",
-#'   BPPARAM = BiocParallel::SnowParam(workers = 4)
 #' )
 #' }
 #'
@@ -422,8 +392,7 @@ tm_calculate <- function(input_seq,
                         formamide_unit = list(value = 0, unit = "percent"),
                         dmso_factor = 0.75,
                         formamide_factor = 0.65,
-                        mismatch = TRUE,
-                        BPPARAM = NULL) {
+                        mismatch = TRUE) {
   # Validate method argument
   method <- match.arg(method, several.ok = FALSE)
 
@@ -466,8 +435,7 @@ tm_calculate <- function(input_seq,
       DMSO = DMSO,
       formamide_unit = formamide_unit,
       dmso_factor = dmso_factor,
-      formamide_factor = formamide_factor,
-      BPPARAM = BPPARAM
+      formamide_factor = formamide_factor
     )
   }
 
@@ -487,16 +455,14 @@ tm_calculate <- function(input_seq,
       DMSO = DMSO,
       formamide_unit = formamide_unit,
       dmso_factor = dmso_factor,
-      formamide_factor = formamide_factor,
-      BPPARAM = BPPARAM
+      formamide_factor = formamide_factor
     )
   }
 
   if ("tm_wallace" %in% method) {
     result <- tm_wallace(
       gr_seq = gr,
-      ambiguous = ambiguous,
-      BPPARAM = BPPARAM
+      ambiguous = ambiguous
     )
   }
 

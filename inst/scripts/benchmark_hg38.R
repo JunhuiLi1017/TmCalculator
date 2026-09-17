@@ -80,17 +80,15 @@ rm(res21, res21b); base::gc()
 ## -- 2. chr1: full pipeline (genome file now cached = 'warm disk') ---------
 res1 <- run_chr("chr1", "chr1")
 
-## -- 3. chr1: within-call BPPARAM, same session, back to back --------------
+## -- 3. chr1: tm_calculate() alone, same session --------------------------
+## (Up to 1.0.x this section also timed the within-call BPPARAM path; that
+## argument was removed in 1.1.0 because SnowParam(n) never beat the serial
+## run here. Parallelism is measured at the chromosome level in sections 4-5.)
 gr1 <- res1$gr
 t_serial <- system.time(
   tm_s <- suppressWarnings(tm_calculate(gr1, method = "tm_nn", Na = 50)))
-note("chr1 BPPARAM", "SerialParam (default)", t_serial)
-t_snow <- system.time(
-  tm_p <- suppressWarnings(tm_calculate(gr1, method = "tm_nn", Na = 50,
-                                        BPPARAM = SnowParam(n_workers))))
-note("chr1 BPPARAM", sprintf("SnowParam(%d)", n_workers), t_snow)
-stopifnot(all.equal(tm_s$gr$Tm, tm_p$gr$Tm))   # results identical
-rm(res1, gr1, tm_s, tm_p); base::gc()
+note("chr1 tm_calculate", "serial", t_serial)
+rm(res1, gr1, tm_s); base::gc()
 
 ## -- 4. chromosome-level parallelism: chr10-chr19 --------------------------
 chr_worker <- function(chr, pkg) {

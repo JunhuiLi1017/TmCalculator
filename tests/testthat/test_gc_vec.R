@@ -45,7 +45,6 @@ test_that(".gc_vec handles the degenerate cases gc() special-cases", {
 })
 
 test_that("tm_gc is unchanged by the vectorised chunk worker", {
-  skip_if_not_installed("BiocParallel")
   set.seed(13)
   seqs <- vapply(seq_len(150), function(i)
     paste0(sample(c("A", "C", "G", "T"), 200, TRUE), collapse = ""), character(1))

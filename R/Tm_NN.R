@@ -199,17 +199,6 @@
 #'   Default: 0.65
 #'   Literature reports values ranging from 0.6 to 0.72
 #'
-#' @param BPPARAM A \code{\link[BiocParallel]{BiocParallelParam}} object
-#'   specifying the parallel backend. \code{BiocParallel::SnowParam(n)} is
-#'   recommended; \code{BiocParallel::MulticoreParam} can be slower than
-#'   serial on large inputs because copy-on-write interacts badly with R's
-#'   garbage collector (see \code{\link{tm_calculate}}). The default,
-#'   \code{NULL}, runs serially in the calling process; passing
-#'   \code{BiocParallel::SerialParam()} is equivalent but constructs an S4
-#'   object on every call. Sequences are split
-#'   into one chunk per worker, so parallelization pays off for large inputs
-#'   (e.g. genome-wide windows) rather than a handful of primers.
-#'
 #' @details
 #' 
 #'  DNA_NN_Breslauer_1986: Breslauer K J (1986) <doi:10.1073/pnas.83.11.3746>
@@ -340,8 +329,6 @@
 #'
 #' @author Junhui Li
 #'
-#' @importFrom BiocParallel bplapply bpnworkers SerialParam
-#'
 #' @examples
 #'
 #' input_seq <- c("AAAATTTTTTTCCCCCCCCCCCCCCGGGGGGGGGGGGTGTGCGCTGC",
@@ -451,8 +438,7 @@ tm_nn <- function(gr_seq,
                   DMSO           = 0,
                   formamide_unit = list(value = 0, unit = "percent"),
                   dmso_factor    = 0.75,
-                  formamide_factor     = 0.65,
-                  BPPARAM        = NULL) {
+                  formamide_factor     = 0.65) {
 
   # -- Validate args once ----------------------------------------------------
   # Each table argument is either a built-in name or a user-supplied matrix.
@@ -531,23 +517,15 @@ tm_nn <- function(gr_seq,
     stop("No valid regions left for tm_nn calculation after filtering sequences with 'N'.")
   }
 
-  # -- Process all sequences (chunked, optionally in parallel) ---------------
-  n   <- length(gr_seq)
-
-  # Keep the raw columns (possibly DNAStringSet); slices are coerced to
-  # character per chunk so PSOCK workers never receive an XVector whose
-  # serialization would drag the whole shared pool along.
+  # -- Process all sequences in one compiled pass ----------------------------
   # Reuse the mcols already extracted above when the object was not subset.
-  mc        <- if (any(has_n)) GenomicRanges::mcols(gr_seq) else mc0
-  all_seqs  <- mc$sequence
-  all_cseqs <- mc$complement
+  # The columns may be a DNAStringSet; they are coerced to character once
+  # here, which is what the C++ core takes.
+  mc <- if (any(has_n)) GenomicRanges::mcols(gr_seq) else mc0
 
-  chunk_res <- .bp_map_chunks(
-    n = n,
-    make_chunk = function(idx) list(sequence = as.character(all_seqs[idx]),
-                                    complement = as.character(all_cseqs[idx])),
-    worker = .tm_nn_chunk,
-    BPPARAM = BPPARAM,
+  chunk_res <- .tm_nn_chunk(
+    list(sequence = as.character(mc$sequence),
+         complement = as.character(mc$complement)),
     ambiguous = ambiguous, shift = shift,
     nn_tbl = nn_tbl, tmm_tbl = tmm_tbl, imm_tbl = imm_tbl, de_tbl = de_tbl,
     end_tbl = end_tbl,
@@ -662,9 +640,8 @@ tm_nn <- function(gr_seq,
        ds = as.numeric(tbl[, 2]))
 }
 
-# -- Chunk worker: NN Tm/GC over a block of sequences (Rcpp-backed) -----------
-# Called by .bp_map_chunks(), either directly (serial) or on a BiocParallel
-# worker. `chunk` is list(sequence=, complement=) for this worker's block.
+# -- NN Tm/GC over a block of sequences (Rcpp-backed) -------------------------
+# `chunk` is list(sequence=, complement=) for the whole input.
 #
 # The C++ core (src/tm_nn_core.cpp) uppercases each sequence, strips
 # characters outside A/C/G/T/I (the former check_filter_seq step, now on the

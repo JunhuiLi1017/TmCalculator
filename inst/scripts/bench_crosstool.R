@@ -715,9 +715,9 @@ if (any(!usable)) {
       "in the output directory to see how far the run got.\n", sep = "")
 }
 
-# Fixed per-call overhead dominates at small n: constructing the GRanges,
-# converting five parameter tables for the compiled core and initialising
-# BiocParallel cost the same whether one sequence is submitted or a million.
+# Fixed per-call overhead dominates at small n: constructing the GRanges and
+# converting five parameter tables for the compiled core cost the same
+# whether one sequence is submitted or a million.
 # Throughput measured below the size at which compute_s exceeds that overhead
 # is a measurement of start-up, not of the calculation, and will understate a
 # batch-oriented tool relative to a per-sequence one.

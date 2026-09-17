@@ -1,5 +1,39 @@
 # TmCalculator 1.1.0
 
+## New features
+
+* **`tm_profile()` builds a Tm profile from a sequence source and a set of
+  regions.** It tiles the requested regions into windows, retrieves each
+  window's sequence and computes its Tm, returning one `GRanges`. The
+  source is given by name, either an installed `BSgenome` package or the
+  path to a FASTA file, because each task opens the source itself: only a
+  record name and a coordinate pair cross between processes, and no
+  sequence is ever serialized. That is what makes parallelism worth having
+  here, where dividing the sequences of a single `tm_calculate()` call is
+  not (see Breaking changes).
+
+  `regions` takes chromosome or record names, numbers, `"name:start-end"`
+  strings, a mixture of those, or a `GRanges`. On a BSgenome the `chr`
+  prefix is added or removed as the genome requires; FASTA record names are
+  matched exactly. Supply a `BPPARAM` to spread the tasks over workers, or
+  leave it `NULL` to run them in this process with no dependency on
+  `BiocParallel`.
+
+  `window = NULL` gives one window per region, which is the form short
+  records call for: a FASTA of array probes, primers or synthetic oligos
+  returns one Tm per record.
+
+  A vector of sequences is also accepted, and is staged as a temporary
+  FASTA file so that the workers read it rather than receive it. That is
+  not a detour: it moves window construction, complement generation and
+  result assembly into the worker as well, where sending the sequences
+  over a socket would parallelise the inner loop alone. The result is
+  keyed by input position so that a sequence dropped for containing `N`
+  can still be identified, with the caller's names returned in a `name`
+  column. For a handful of sequences the staging and the worker start-up
+  cost more than the calculation; `tm_calculate()` remains the right call
+  there.
+
 ## Bug fix affecting all nearest-neighbor Tm values
 
 * **Four of the six reverse-complement rows added to every nearest-neighbor
@@ -52,6 +86,23 @@
   values 100× larger than before, and slightly larger again wherever N is
   present. Values from `tm_gc()`, `tm_wallace()` and `gc()` are unchanged.
 
+* **The `BPPARAM` argument has been removed from `tm_calculate()`,
+  `tm_nn()`, `tm_gc()` and `tm_wallace()`, and `BiocParallel` is no longer
+  imported.** With the compiled nearest-neighbor core the per-window loop is
+  a minority of a call's runtime; the rest (N filtering, coercion, result
+  assembly) runs once in the calling process and cannot be divided. Measured
+  on chr1 of GRCh38 (about 1.2 million windows), `SnowParam(5)` never beat
+  the serial run: worker start-up and shipping half a gigabyte of sequence
+  to the workers cost more than the loop they were dividing. The argument
+  therefore offered a slower path and no faster one, and it is gone rather
+  than kept as a no-op, so that calls passing it fail loudly.
+
+  Parallelism belongs outside the call, one region per worker, each a
+  serial `tm_calculate()`. That pattern needs no support from this package
+  and works with any backend; `vignette("hg38_performance_parallel")`
+  measures it with `BiocParallel` across a whole genome, which is why
+  `BiocParallel` remains in Suggests.
+
 * **`tm_nn()` now reports GC on the same definition it already used for salt
   correction.** It previously reported `(G+C)/length` while correcting with
   `(G+C)/(A+C+G+T)`. The two differ only when inosine is present, since `I`
@@ -96,19 +147,6 @@
   across the Biostrings, S4Vectors and GenomicRanges accessors, and removing
   it would require keeping the hot path out of S4 entirely.
 
-* **`BPPARAM` now defaults to `NULL` rather than
-  `BiocParallel::SerialParam()`** in `tm_calculate()`, `tm_nn()`, `tm_gc()`
-  and `tm_wallace()`. The two are equivalent in behaviour: `.bp_map_chunks()`
-  has always called the worker directly whenever the backend has a single
-  worker, so `SerialParam()` was constructed, queried through the S4 generic
-  `bpnworkers()`, and then not used. Profiling showed that construction
-  accounted for roughly half the per-call cost of `tm_nn()` on a short input.
-
-  The saving is a fixed amount per call, not per sequence, so it is invisible
-  on a genome-scale run and worth having when the functions are called in a
-  loop over individual oligonucleotides. Passing an explicit
-  `SerialParam()` still works and still runs serially.
-
 ## Dependencies
 
 * **`seqinr` is no longer required.** It was used for `s2c()`/`c2s()` in
@@ -121,6 +159,10 @@
   reject the RNA input this package supports. FASTA parsing behaviour is
   unchanged: no alphabet restriction, case preserved, sequences named by the
   first word of the header.
+
+* **`BiocParallel` moved from Imports to Suggests.** It was used only by the
+  within-call `BPPARAM` path removed above (see Breaking changes); the
+  parallel vignette and the benchmark scripts still use it.
 
 * **`BSgenome` moved from Imports to Suggests, cutting load time by about
   two thirds.** Attaching it pulls in rtracklayer, Rsamtools,

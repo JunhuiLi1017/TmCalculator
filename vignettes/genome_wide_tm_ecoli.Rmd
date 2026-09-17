@@ -183,68 +183,61 @@ cat("Length:    ", format(chr_length, big.mark = ","), "bp\n")
 
 ---
 
-# Step 2 — Generate Genomic Windows
+# Step 2 — Compute the genome-wide Tm profile
 
-`make_genomiccoord()` tiles the chromosome into non-overlapping 200 bp bins.
-
-```{r make-coord}
-runtime0 <- system.time({
-  bins_gc <- make_genomiccoord(
-    bsgenome    = genome_name,
-    chromosomes = chr_name,
-    window      = 200L,
-    slide       = 200L,
-    start       = 1,
-    end         = chr_length,
-    strand      = "+"
-  )
-})
-
-cat("Total windows:", length(bins_gc), "\n")
-cat(sprintf("Window generation: %.2f s (elapsed)\n", runtime0["elapsed"]))
-```
-
-Resolve coordinates against the BSgenome package:
-
-```{r coor-to-gr}
-input_new <- list(pkg_name = genome_name, seq = bins_gc)
-runtime1 <- system.time({
-  gr_batch <- to_genomic_ranges_fast(input_new)
-})
-
-cat(sprintf(
-  "Coordinate resolution: %.2f s (elapsed)\n",
-  runtime1["elapsed"]
-))
-```
-
----
-
-# Step 3 — Compute Genome-wide Tm
+`tm_profile()` does the whole of it in one call: it tiles the requested
+regions, retrieves the sequence for each window, and computes a melting
+temperature for every window. Its first argument is the source the
+sequence comes from, either the name of a BSgenome package as here or the
+path to a FASTA file. It takes a package name rather than a loaded object
+because when the work is spread over several processes each one opens the
+source itself.
 
 We use nearest-neighbour thermodynamics with the Breslauer *et al.* (1986)
 parameter set at 50 mM Na+, matching the Methods of Hasenauer *et al.*
 (2025), who computed Tm with this package and the same parameters.
 
-```{r tm-calculate}
-runtime2 <- system.time({
-  tm_ASM584v2 <- tm_calculate(
-    gr_batch,
+```{r tm-profile}
+runtime <- system.time({
+  tm_ecoli <- tm_profile(
+    seq_source = genome_name,  # a BSgenome package name, or a FASTA path
+    regions  = chr_name,     # the whole chromosome; "U00096.3:1-100000" would
+    unit     = "region",     #   tile a sub-region instead
+    window   = 200L,
+    slide    = 200L,         # slide == window gives a non-overlapping tiling
     method   = "tm_nn",
     nn_table = "DNA_NN_Breslauer_1986",
-    Na       = 50            # mM; standard PCR-like conditions
+    Na       = 50,           # mM; standard PCR-like conditions
+    verbose  = FALSE
   )
 })
 
 cat(sprintf(
-  "Tm calculation: %.2f s (elapsed) for %s windows\n",
-  runtime2["elapsed"],
-  format(length(bins_gc), big.mark = ",")
+  "Tm profile: %.2f s (elapsed) for %s windows\n",
+  runtime[["elapsed"]], format(length(tm_ecoli), big.mark = ",")
 ))
 
-Tm <- as.data.frame(tm_ASM584v2$gr[, c("Tm", "GC")])
+Tm <- as.data.frame(tm_ecoli[, c("Tm", "GC")])
 summary(Tm[, c("Tm", "GC")])
 ```
+
+The result is an ordinary `GRanges`, so the coordinates, the melting
+temperatures and the GC percentages travel together through everything
+that follows.
+
+```{r profile-head}
+head(tm_ecoli, 3)
+```
+
+A chromosome of 4.6 Mb is small enough to profile in one process. On a
+mammalian genome the same call takes a `BPPARAM` and spreads the tiles
+over workers; `vignette("hg38_performance_parallel")` covers that, together
+with the forms `regions` accepts and how to choose a worker count.
+
+For sequences that are already in hand, as character vectors, a FASTA file
+or a `GRanges` carrying a `sequence` column, use `tm_calculate()` instead:
+`tm_profile()` is the entry point for coordinates in a reference genome,
+and `tm_calculate()` for sequences.
 
 ---
 
@@ -432,9 +425,11 @@ does not.
 
 ```{r gc-vs-tm-data}
 ## The GC-content prediction for the same windows, for comparison.
-tm_gc_ecoli <- tm_calculate(gr_batch, method = "tm_gc",
-                            variant = "Schildkraut1965", Na = 50)
-GCmod <- as.data.frame(tm_gc_ecoli$gr[, c("Tm", "GC")])
+tm_gc_ecoli <- tm_profile(genome_name, regions = chr_name, unit = "region",
+                          window = 200L, slide = 200L,
+                          method = "tm_gc", variant = "Schildkraut1965",
+                          Na = 50, verbose = FALSE)
+GCmod <- as.data.frame(tm_gc_ecoli[, c("Tm", "GC")])
 
 ## Keep only windows whose GC percentage is an exact integer. A 200 bp
 ## window can only take GC values in steps of 0.5%, so binning 49.5% with
@@ -448,7 +443,7 @@ prep <- function(d) {
   d$GCi <- as.integer(d$GC)
   d
 }
-Cnn <- prep(as.data.frame(tm_ASM584v2$gr[, c("Tm", "GC")]))
+Cnn <- prep(as.data.frame(tm_ecoli[, c("Tm", "GC")]))
 Cgc <- prep(GCmod)
 
 cnt <- table(Cnn$GCi)
@@ -514,7 +509,7 @@ in one place, scan for the locus in which two windows of exactly equal GC
 content are furthest apart in Tm, then zoom to it.
 
 ```{r find-locus}
-W <- as.data.frame(tm_ASM584v2$gr[, c("Tm", "GC")])
+W <- as.data.frame(tm_ecoli[, c("Tm", "GC")])
 W <- W[!is.na(W$Tm) & !is.na(W$GC) & W$width == 200L, ]
 W <- W[order(W$start), ]
 
@@ -665,7 +660,7 @@ seqlevels(mutH_peaks) <- "U00096.3"
 mutH_peaks$peak_id <- paste0("mutH_", seq_along(mutH_peaks))
 
 tm_annot <- integrate_granges(
-  gr_tm          = tm_ASM584v2$gr,
+  gr_tm          = tm_ecoli,
   gr_features    = mutH_peaks,
   strategy       = "overlap",
   feature_cols   = "peak_id",
@@ -716,10 +711,11 @@ On a standard desktop computer (single core, R 4.4, compiled Rcpp nearest-neighb
 
 | Step | Function | Time (elapsed) |
 |------|----------|---------------|
-| Window generation | `make_genomiccoord()` | ~`r sprintf("%.2f", runtime0["elapsed"])` s |
-| Sequence extraction | `to_genomic_ranges_fast()` | ~`r sprintf("%.2f", runtime1["elapsed"])` s |
-| Tm calculation (23,208 windows) | `tm_calculate()` | ~`r sprintf("%.2f", runtime2["elapsed"])` s |
-| **Total** | | **~`r sprintf("%.2f", runtime0["elapsed"] + runtime1["elapsed"] + runtime2["elapsed"])` s** |
+| Tiling, sequence retrieval and Tm for 23,208 windows | `tm_profile()` | ~`r sprintf("%.2f", runtime[["elapsed"]])` s |
+
+The same call on the human genome, where there are 14.7 million windows
+rather than 23,208, takes about ten minutes in one process and about three
+minutes over five workers; see `vignette("hg38_performance_parallel")`.
 
 ---
 

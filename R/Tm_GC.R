@@ -62,15 +62,6 @@
 #' @param formamide_factor Coefficient of Tm decrease per percent formamide. Default: 0.65
 #'   Several papers report factors between 0.6 and 0.72.
 #'
-#' @param BPPARAM A \code{\link[BiocParallel]{BiocParallelParam}} object
-#'   specifying the parallel backend, e.g.
-#'   \code{BiocParallel::MulticoreParam(4)} (Unix/macOS) or
-#'   \code{BiocParallel::SnowParam(4)} (all platforms). The default,
-#'   \code{NULL}, runs serially in the calling process. Passing
-#'   \code{BiocParallel::SerialParam()} is equivalent but constructs an S4
-#'   object on every call, which is measurable when the function is called
-#'   repeatedly on small inputs.
-#'
 #' @returns Returns a list with two components:
 #'   - Tm: A list of sequences with updated Tm attributes
 #'   - Options: A list containing calculation parameters and method information
@@ -125,8 +116,7 @@ tm_gc <- function(gr_seq,
                   DMSO = 0,
                   formamide_unit = list(value = 0, unit = "percent"),
                   dmso_factor = 0.75,
-                  formamide_factor = 0.65,
-                  BPPARAM = NULL) {
+                  formamide_factor = 0.65) {
   variant <- match.arg(variant)
   salt_method <- match.arg(salt_method)
   
@@ -168,13 +158,9 @@ tm_gc <- function(gr_seq,
     gc_coef <- as.numeric(gc_coef)[1:4]
   }
 
-  # Calculate Tm for each sequence (chunked, optionally in parallel)
-  all_seqs <- as.character(gr_seq$sequence)
-  chunk_res <- .bp_map_chunks(
-    n = length(gr_seq),
-    make_chunk = function(idx) list(sequence = all_seqs[idx]),
-    worker = .tm_gc_chunk,
-    BPPARAM = BPPARAM,
+  # Calculate Tm for all sequences in one vectorised pass
+  chunk_res <- .tm_gc_chunk(
+    list(sequence = as.character(gr_seq$sequence)),
     ambiguous = ambiguous, gc_coef = gc_coef, mismatch = mismatch,
     salt_method_eff = salt_method_eff,
     Na = Na, K = K, Tris = Tris, Mg = Mg, dNTPs = dNTPs,
@@ -228,9 +214,8 @@ tm_gc <- function(gr_seq,
   return(result_list)
 }
 
-# -- Chunk worker: GC-method Tm over a block of sequences ---------------------
-# Called by .bp_map_chunks(), either directly (serial) or on a BiocParallel
-# worker. `chunk` is list(sequence=) for this worker's block.
+# -- GC-method Tm over a block of sequences -----------------------------------
+# `chunk` is list(sequence=) for the whole input.
 #' @keywords internal
 .tm_gc_chunk <- function(chunk, ambiguous, gc_coef, mismatch, salt_method_eff,
                          Na, K, Tris, Mg, dNTPs,
