@@ -42,8 +42,13 @@
 #'   For a BSgenome source the \code{chr} prefix is added or removed as the
 #'   genome requires, so \code{1:2} works on a UCSC genome and
 #'   \code{c("chr1", "chr2")} on an Ensembl one; FASTA record names are
-#'   matched exactly, since they are arbitrary. Default: every standard
-#'   chromosome of the genome, or every record of the FASTA file.
+#'   matched exactly, since they are arbitrary.
+#'
+#'   The default is \code{GenomeInfoDb::standardChromosomes()} of the
+#'   genome, or every record of the FASTA file. For GRCh38 that is the 24
+#'   assembled chromosomes \emph{and the mitochondrion}, chrM, which is what
+#'   Bioconductor means by standard; name the chromosomes explicitly if the
+#'   mitochondrial genome does not belong in the profile.
 #' @param window Window width in base pairs. \code{NULL} means one window
 #'   per region, which is what short records such as array probes or primers
 #'   call for, and is the default when \code{seq_source} is a vector of
@@ -114,6 +119,9 @@
 #' # Chromosomes 1 and 2 only. These are equivalent.
 #' tm_profile(hg38, regions = 1:2, method = "tm_nn")
 #' tm_profile(hg38, regions = c("chr1", "chr2"), method = "tm_nn")
+#'
+#' # The 24 assembled chromosomes without the mitochondrion
+#' tm_profile(hg38, regions = paste0("chr", c(1:22, "X", "Y")))
 #'
 #' # Explicit regions, and a mixture of regions and whole chromosomes
 #' tm_profile(hg38, regions = c("chr1:1-10000000", "chrX:5,000,000-6,000,000"))

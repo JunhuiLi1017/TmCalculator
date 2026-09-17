@@ -45,10 +45,15 @@ length(tm)
 ## [1] 14687330
 ```
 
-With no `regions` argument that covers the standard chromosomes, chr1 to
-chr22, chrX and chrY. Leave `BPPARAM` out and the same call runs in one
-process, with no dependency on **BiocParallel** at all: how the genome is
-divided changes the runtime, not the windows.
+With no `regions` argument that covers `GenomeInfoDb::standardChromosomes()`
+of the genome, which for GRCh38 is the 24 assembled chromosomes *and* chrM.
+Name the chromosomes explicitly if the mitochondrion does not belong in the
+profile; the sweep below uses `paste0("chr", c(1:22, "X", "Y"))` for that
+reason, and its 14,687,330 windows are the 24 without it.
+
+Leave `BPPARAM` out and the same call runs in one process, with no
+dependency on **BiocParallel** at all: how the genome is divided changes the
+runtime, not the windows.
 
 # What you can profile
 
@@ -76,7 +81,8 @@ is often a small partition.
 ## Chromosomes or records, by name or by number. On a BSgenome the chr
 ## prefix is added or removed to match the genome, so the same code works
 ## on UCSC and on Ensembl; FASTA record names are matched exactly.
-tm_profile(hg38, regions = 1:22)
+tm_profile(hg38, regions = 1:22)                     # autosomes only
+tm_profile(hg38, regions = paste0("chr", c(1:22, "X", "Y")))   # no chrM
 tm_profile(hg38, regions = c("chr1", "chr2"))
 tm_profile("contigs.fa.gz", regions = c("contig_7", "contig_9"))
 
