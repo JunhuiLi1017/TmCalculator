@@ -2,37 +2,46 @@
 
 ## New features
 
-* **`tm_profile()` builds a Tm profile from a sequence source and a set of
-  regions.** It tiles the requested regions into windows, retrieves each
-  window's sequence and computes its Tm, returning one `GRanges`. The
-  source is given by name, either an installed `BSgenome` package or the
-  path to a FASTA file, because each task opens the source itself: only a
-  record name and a coordinate pair cross between processes, and no
-  sequence is ever serialized. That is what makes parallelism worth having
-  here, where dividing the sequences of a single `tm_calculate()` call is
-  not (see Breaking changes).
+* **`tm_calculate()` now takes a source and a set of regions, and can spread
+  the work over processes.** It accepted four kinds of input already; it can
+  now be told which part of that input to use, how finely to tile it, and how
+  many workers to divide it among:
 
-  `regions` takes chromosome or record names, numbers, `"name:start-end"`
-  strings, a mixture of those, or a `GRanges`. On a BSgenome the `chr`
-  prefix is added or removed as the genome requires; FASTA record names are
-  matched exactly. Supply a `BPPARAM` to spread the tasks over workers, or
-  leave it `NULL` to run them in this process with no dependency on
-  `BiocParallel`.
+  ```r
+  tm_calculate("BSgenome.Hsapiens.UCSC.hg38", window = 200, slide = 200,
+               BPPARAM = SnowParam(workers = 5))          # a whole genome
+  tm_calculate("contigs.fa.gz", regions = c("contig_7", "contig_9:1-50000"))
+  tm_calculate(oligos)                                    # unchanged
+  ```
 
-  `window = NULL` gives one window per region, which is the form short
-  records call for: a FASTA of array probes, primers or synthetic oligos
-  returns one Tm per record.
+  `regions` means the same thing for every source, because the identifier
+  before the colon is resolved against whatever names the source itself
+  offers and falls back to position. So `"chr1"` is a chromosome in a
+  BSgenome, a record in a FASTA file and a `seqname` in a `GRanges`, and
+  `"1:1-200"` is the first 200 bases of the first sequence in an unnamed
+  character vector.
 
-  A vector of sequences is also accepted, and is staged as a temporary
-  FASTA file so that the workers read it rather than receive it. That is
-  not a detour: it moves window construction, complement generation and
-  result assembly into the worker as well, where sending the sequences
-  over a socket would parallelise the inner loop alone. The result is
-  keyed by input position so that a sequence dropped for containing `N`
-  can still be identified, with the caller's names returned in a `name`
-  column. For a handful of sequences the staging and the worker start-up
-  cost more than the calculation; `tm_calculate()` remains the right call
-  there.
+  Parallelism divides the work **by region and never by the sequences of one
+  region**. Each task opens the source itself, so only a name and a
+  coordinate pair cross between processes; sequences supplied directly are
+  staged to a temporary FASTA for the same reason. That is the arrangement
+  that pays: dividing the sequences of a single call parallelises the inner
+  loop alone and leaves window construction, sequence retrieval and result
+  assembly in the calling process, which measured slower than not dividing
+  them at all.
+
+  A call that passes sequences and nothing else behaves exactly as before,
+  and takes the same short path through the function.
+
+* **`tm_profile()` is deprecated**, having been merged into
+  `tm_calculate()`. It still works, warns once per session, and returns a
+  bare `GRanges` as it always did; `tm_calculate()` returns a `TmCalculator`
+  object, so the profile is `$gr`.
+
+* **FASTA input keeps its record names.** `tm_calculate("reads.fa")`
+  previously labelled every window `chr1`, because a record name that is not
+  in `chr:start-end` form fell through to the default; the record name now
+  becomes the `seqname`. Tm values are unaffected.
 
 ## Bug fix affecting all nearest-neighbor Tm values
 
@@ -86,9 +95,12 @@
   values 100× larger than before, and slightly larger again wherever N is
   present. Values from `tm_gc()`, `tm_wallace()` and `gc()` are unchanged.
 
-* **The `BPPARAM` argument has been removed from `tm_calculate()`,
-  `tm_nn()`, `tm_gc()` and `tm_wallace()`, and `BiocParallel` is no longer
-  imported.** With the compiled nearest-neighbor core the per-window loop is
+* **`BPPARAM` no longer divides the sequences of one call, and is gone from
+  `tm_nn()`, `tm_gc()` and `tm_wallace()` entirely; `BiocParallel` is no
+  longer imported.** `tm_calculate()` keeps a `BPPARAM`, but it now means
+  something else: the work is divided by region, with each task opening the
+  source for itself, and never by splitting the sequences of one region
+  among workers. With the compiled nearest-neighbor core the per-window loop is
   a minority of a call's runtime; the rest (N filtering, coercion, result
   assembly) runs once in the calling process and cannot be divided. Measured
   on chr1 of GRCh38 (about 1.2 million windows), `SnowParam(5)` never beat

@@ -22,11 +22,11 @@ knitr::opts_chunk$set(
 
 # Introduction
 
-`tm_profile()` turns a genome, or any set of regions in it, into a melting
+`tm_calculate()` turns a genome, or any set of regions in it, into a melting
 temperature profile: it tiles the regions into windows, fetches each
-window's sequence, computes a Tm, and returns one `GRanges`. One call does
-what would otherwise take three, and on a mammalian genome it spreads the
-work across processes.
+window's sequence, computes a Tm, and returns the lot as one object. The
+same call takes sequences you already have, so there is one function to
+learn; on a mammalian genome it spreads the work across processes.
 
 This vignette answers three questions, in order:
 
@@ -40,7 +40,7 @@ This vignette answers three questions, in order:
 **Before you start.** You need a BSgenome package for the genome you want to
 profile; this vignette uses `BSgenome.Hsapiens.UCSC.hg38`. **BiocParallel**
 is needed only if you want more than one worker. Neither is required for
-`tm_profile()` to run in a single process.
+`tm_calculate()` to run in a single process.
 
 ```{r install, eval=FALSE}
 BiocManager::install(c("BSgenome.Hsapiens.UCSC.hg38", "BiocParallel"))
@@ -52,26 +52,33 @@ built from measurements that ship with the package.
 
 # Quick start
 
-The smallest useful call needs a genome and nothing else:
+The smallest genome-scale call needs a genome and a window width:
 
 ```{r quick-start}
 library(TmCalculator)
 hg38 <- "BSgenome.Hsapiens.UCSC.hg38"
 
-tm <- tm_profile(hg38)
+tm <- tm_calculate(hg38, window = 200, slide = 200)$gr
 tm
 ## GRanges object with 14687412 ranges and 2 metadata columns:
 ##       seqnames      ranges strand |        Tm        GC
 ```
 
+`tm_calculate()` returns a `TmCalculator` object: `$gr` is the profile and
+`$options` records the model and tiling it was produced with.
+
 That tiles every standard chromosome into non-overlapping 200 bp windows
-and computes a nearest-neighbour Tm for each, in a single process. Adding
-workers is one more argument:
+and computes a nearest-neighbour Tm for each, in a single process. The
+window width has no default at genome scale, and is not meant to: it is the
+resolution of the profile, so it belongs in the call rather than in a
+default that quietly decides how many rows come back. Adding workers is one
+more argument:
 
 ```{r quick-start-parallel}
 library(BiocParallel)
 
-tm <- tm_profile(hg38, BPPARAM = SnowParam(workers = 5))
+tm <- tm_calculate(hg38, window = 200, slide = 200,
+                   BPPARAM = SnowParam(workers = 5))$gr
 ```
 
 Same windows, same Tm values, about a third of the time. How the genome is
@@ -88,9 +95,9 @@ The first argument says where sequence comes from. It is given by *name*,
 not as a loaded object, because each worker opens the source for itself.
 
 ```{r sources}
-tm_profile(hg38)                       # an installed BSgenome package
-tm_profile("contigs.fa.gz")            # a FASTA file, gzip is fine
-tm_profile(oligos)                     # a character vector of sequences
+tm_calculate(hg38, window = 200)         # an installed BSgenome package
+tm_calculate("contigs.fa.gz", window = 200)   # a FASTA file, gzip is fine
+tm_calculate(oligos)                     # a character vector of sequences
 ```
 
 A vector of sequences is staged as a temporary FASTA under `tmpdir` and
@@ -109,32 +116,43 @@ default `tempdir()` is often a small partition.
 ## Chromosomes or records, by name or by number. On a BSgenome the chr
 ## prefix is added or removed to match the genome, so the same code works on
 ## UCSC and on Ensembl; FASTA record names are matched exactly.
-tm_profile(hg38, regions = 1:22)                                # autosomes
-tm_profile(hg38, regions = paste0("chr", c(1:22, "X", "Y")))    # no chrM
-tm_profile("contigs.fa.gz", regions = c("contig_7", "contig_9"))
+tm_calculate(hg38, regions = 1:22, window = 200)               # autosomes
+tm_calculate(hg38, regions = paste0("chr", c(1:22, "X", "Y")), # no chrM
+             window = 200)
+tm_calculate("contigs.fa.gz", regions = c("contig_7", "contig_9"),
+             window = 200)
 
 ## Coordinate intervals. Commas and scientific notation are accepted, so a
 ## number pasted out of a genome browser works as it stands.
-tm_profile(hg38, regions = c("chr1:1-10e6", "chrX:5,000,000-6,000,000"))
+tm_calculate(hg38, regions = c("chr1:1-10e6", "chrX:5,000,000-6,000,000"),
+             window = 200)
 
 ## A mixture, when some chromosomes are wanted whole and others in part.
-tm_profile(hg38, regions = c(1:20, "chr21:1-10e6", "X", "Y"))
+tm_calculate(hg38, regions = c(1:20, "chr21:1-10e6", "X", "Y"), window = 200)
 
 ## A GRanges, when the regions come from an annotation.
 prom <- promoters(genes(TxDb.Hsapiens.UCSC.hg38.knownGene),
                   upstream = 1000, downstream = 500)
-tm_profile(hg38, regions = prom, window = 50, slide = 25)
+tm_calculate(hg38, regions = prom, window = 50, slide = 25)
 
-## window = NULL gives one window per region, which is what short records
-## call for: a FASTA of array probes, primers or synthetic oligos returns one
-## Tm per record. It is the default when sequences are passed directly.
-tm_profile("probes.fa", window = NULL)
-tm_profile(oligos, BPPARAM = SnowParam(5))
+## A GRanges carrying its own sequences is a source rather than a query, and
+## then regions selects by overlap: a seqname takes every range on it, an
+## interval takes the ranges it meets. Whole ranges come back, not clipped
+## pieces of them, since their sequences are already fixed.
+tm_calculate(probes_gr, regions = "chr7")
+tm_calculate(probes_gr, regions = "chr7:1-1e6")
+
+## window = NULL, the default, gives one window per region, which is what
+## short records call for: a FASTA of array probes, primers or synthetic
+## oligos returns one Tm per record. It is refused for a region over 1 Mb,
+## where a single Tm would mean nothing.
+tm_calculate("probes.fa", window = NULL)
+tm_calculate(oligos, BPPARAM = SnowParam(5))
 ```
 
 Three things are worth knowing before you trust the output.
 
-*The default includes chrM.* With no `regions`, `tm_profile()` covers
+*The default includes chrM.* With no `regions`, a BSgenome source covers
 `GenomeInfoDb::standardChromosomes()`, which for GRCh38 is the 24 assembled
 chromosomes **and** the mitochondrion. Name the chromosomes explicitly if
 that does not belong in your profile. The sweep later in this vignette uses
@@ -148,7 +166,7 @@ tiled from the start you asked for. Windows containing N are dropped either
 way.
 
 *Overlapping regions are not merged.* They produce windows that appear twice
-in the result, so `tm_profile()` warns rather than double-counting them
+in the result, so `tm_calculate()` warns rather than double-counting them
 quietly.
 
 ## Array probes
@@ -166,9 +184,9 @@ own Tm. Only a name and a coordinate pair cross between processes, so no
 sequence is ever serialized. `unit` decides how tasks are cut.
 
 ```{r unit}
-tm_profile(hg38, unit = "segment", segment_size = 50e6,   # default: 73 tasks
+tm_calculate(hg38, unit = "segment", segment_size = 50e6,   # default: 73 tasks
            BPPARAM = SnowParam(workers = 5))
-tm_profile(hg38, unit = "region",                         # 24 tasks
+tm_calculate(hg38, unit = "region",                         # 24 tasks
            BPPARAM = SnowParam(workers = 5))
 ```
 
@@ -205,7 +223,7 @@ cols <- c("strategy", "n_workers", "wall_s", "max_rss_gb")
 read_sweep <- function(file, env) {
   d <- utils::read.csv(system.file("extdata", file, package = "TmCalculator"),
                        stringsAsFactors = FALSE)
-  d <- d[d$strategy == "segment", cols]      # the default unit of tm_profile()
+  d <- d[d$strategy == "segment", cols]      # the default unit of tm_calculate()
   d$env <- env
   d
 }
@@ -290,7 +308,7 @@ will understate the speedup:
 ```{r sweep-your-machine}
 for (n in 1:6) {
   t <- system.time(
-    tm_profile(hg38, regions = "chr21", window = 200, slide = 200,
+    tm_calculate(hg38, regions = "chr21", window = 200, slide = 200,
                method = "tm_nn", segment_size = 10e6,
                BPPARAM = SnowParam(workers = n), verbose = FALSE))
   cat(sprintf("%d workers: %.1f s\n", n, t[["elapsed"]]))
@@ -305,8 +323,8 @@ two CSV files read here, `bench_parallel_strategy.csv` and
 `bench_parallel_cluster.csv` in `extdata`, so re-running one on your own
 hardware means replacing a file.
 
-`bench_tm_profile.R` in the same directory times `tm_profile()` itself over
-a range of worker counts, with `bench_tm_profile.lsf` to submit it, and is
+`bench_tm_calculate.R` in the same directory times `tm_calculate()` itself over
+a range of worker counts, with `bench_tm_calculate.lsf` to submit it, and is
 the one to reach for when sizing a new machine.
 
 # What comes back
@@ -325,24 +343,27 @@ The sequence and complement columns are dropped by default, since they run
 to roughly 500 MB per large chromosome; pass `keep_sequence = TRUE` if you
 need them.
 
-# When to use `tm_calculate()` instead
+# One function, two ways of using it
 
-`tm_profile()` starts from coordinates in a source it can open. When the
-sequences are already in hand, and there are few enough that parallelism
-would not pay, use `tm_calculate()`:
+`tm_calculate()` starts either from a source it can open, as above, or from
+sequences you already hold:
 
 ```{r tm-calculate}
-tm_calculate(c("ACGTGCTAGCTAGCTAGC", "GGCCATATATGCGC"),
-             method = "tm_nn", Na = 50)
+tm_calculate(c("ACGTGCTAGCTAGCTAGC", "GGCCATATATGCGC"), method = "tm_nn", Na = 50)
 ```
 
-Do not try to parallelise a single `tm_calculate()` call. With the compiled
-core the per-window loop is a minority of a call's cost; window
-construction, sequence retrieval and result assembly run once in the calling
-process, and sending the sequences to workers costs more than the loop it
-divides. Measured on chromosome 1, splitting one call across five workers
-was never faster than the serial call. Parallelism belongs at the level of
-regions, which is what `tm_profile()` does.
+Given sequences and nothing else it does exactly what it has always done,
+one Tm per sequence, by the shortest path through the function. Add
+`regions`, `window` or `BPPARAM` and the profiling machinery engages.
+
+What it will not do is divide the sequences of one region among workers.
+With the compiled core the per-window loop is a minority of a call's cost;
+window construction, sequence retrieval and result assembly run once, and
+sending the sequences to workers costs more than the loop it divides.
+Measured on chromosome 1, splitting one call across five workers was never
+faster than not splitting it. Parallelism therefore divides by region, and
+sequences handed in directly are staged to a temporary file so that the
+workers read them rather than receive them.
 
 # Session information
 

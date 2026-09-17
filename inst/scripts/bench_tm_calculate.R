@@ -1,20 +1,20 @@
 #!/usr/bin/env Rscript
 # ===========================================================================
-# Worker-count sweep for tm_profile() on a whole genome.
+# Worker-count sweep for tm_calculate() on a whole genome.
 #
-#   Rscript bench_tm_profile.R --outdir results --workers 1,2,3,4,5,6 --reps 3
+#   Rscript bench_tm_calculate.R --outdir results --workers 1,2,3,4,5,6 --reps 3
 #
 # This measures the shipped function rather than a hand-rolled dispatch
 # loop, which is the difference from bench_parallel_strategy.R: that script
-# implemented three partitioning strategies to decide which one tm_profile()
+# implemented three partitioning strategies to decide which one tm_calculate()
 # should use, and this one times the result.
 #
-# WHAT IS MEASURED. Wall-clock time of one tm_profile() call, including
+# WHAT IS MEASURED. Wall-clock time of one tm_calculate() call, including
 # worker start-up, since that is what a user waits through. Peak memory per
-# worker is not measured inside R: tm_profile() offers no hook inside its
+# worker is not measured inside R: tm_calculate() offers no hook inside its
 # tasks, and instrumenting it for a benchmark would mean shipping a
 # benchmark's needs in a user-facing function. It is sampled from outside
-# instead, by the sampler in bench_tm_profile.lsf, and joined onto each run
+# instead, by the sampler in bench_tm_calculate.lsf, and joined onto each run
 # by timestamp at the end of this script. On a machine without that sampler
 # the memory columns are NA and the timings are unaffected.
 #
@@ -54,7 +54,7 @@ UNIT     <- getarg("--unit", "segment")
 PKG      <- getarg("--genome", "BSgenome.Hsapiens.UCSC.hg38")
 NN       <- getarg("--nn-table", "DNA_NN_Breslauer_1986")
 NA_MM    <- as.numeric(getarg("--na", "50"))
-# The 24 assembled human chromosomes, named explicitly. tm_profile()'s own
+# The 24 assembled human chromosomes, named explicitly. tm_calculate()'s own
 # default is GenomeInfoDb::standardChromosomes(), which for hg38 also returns
 # chrM; including it would change the window count and the table would no
 # longer line up with the sweeps already published for this genome. Pass
@@ -71,7 +71,7 @@ dir.create(OUTDIR, showWarnings = FALSE, recursive = TRUE)
 for (p in c(PKG, "BiocParallel"))
   if (!requireNamespace(p, quietly = TRUE)) stop("missing package: ", p)
 
-cat(sprintf(paste0("tm_profile sweep\n",
+cat(sprintf(paste0("tm_calculate sweep\n",
                    "  genome    : %s\n  regions   : %s\n",
                    "  window    : %d   slide: %d   unit: %s   segment: %.0f\n",
                    "  workers   : %s\n  reps      : %d\n",
@@ -90,11 +90,12 @@ run_one <- function(n_workers) {
   bp <- if (n_workers <= 1L) NULL else SnowParam(workers = n_workers)
   t0 <- as.numeric(Sys.time())
   el <- system.time({
-    prof <- tm_profile(PKG, regions = regions,
-                       window = WINDOW, slide = SLIDE,
-                       unit = UNIT, segment_size = SEGSIZE,
-                       BPPARAM = bp, tmpdir = TMPDIR, verbose = FALSE,
-                       method = "tm_nn", nn_table = NN, Na = NA_MM)
+    prof <- tm_calculate(PKG, regions = regions,
+                         window = WINDOW, slide = SLIDE,
+                         unit = UNIT, segment_size = SEGSIZE,
+                         BPPARAM = bp, tmpdir = TMPDIR, verbose = FALSE,
+                         keep_sequence = FALSE,
+                         method = "tm_nn", nn_table = NN, Na = NA_MM)$gr
   })[["elapsed"]]
   t1 <- as.numeric(Sys.time())
   out <- list(
@@ -143,12 +144,13 @@ if (CALIBRATE) {
               format(span, big.mark = ","), format(len, big.mark = ",")))
   for (w in WORKERS) {
     bp <- if (w <= 1L) NULL else SnowParam(workers = w)
-    el <- system.time(tm_profile(PKG, regions = tiny, window = WINDOW,
-                                 slide = SLIDE, unit = UNIT,
-                                 segment_size = SEGSIZE, BPPARAM = bp,
-                                 tmpdir = TMPDIR, verbose = FALSE,
-                                 method = "tm_nn", nn_table = NN,
-                                 Na = NA_MM))[["elapsed"]]
+    el <- system.time(tm_calculate(PKG, regions = tiny, window = WINDOW,
+                                   slide = SLIDE, unit = UNIT,
+                                   segment_size = SEGSIZE, BPPARAM = bp,
+                                   tmpdir = TMPDIR, verbose = FALSE,
+                                   keep_sequence = FALSE,
+                                   method = "tm_nn", nn_table = NN,
+                                   Na = NA_MM))[["elapsed"]]
     startup_of[as.character(w)] <- el
     cat(sprintf("  %d workers: %5.1f s\n", w, el))
   }
@@ -238,9 +240,9 @@ agg$efficiency <- agg$speedup / agg$n_workers
 agg$speedup_compute <- agg$compute_s[agg$n_workers == min(agg$n_workers)] /
   agg$compute_s
 
-csv <- file.path(OUTDIR, "bench_tm_profile.csv")
+csv <- file.path(OUTDIR, "bench_tm_calculate.csv")
 utils::write.csv(bench, csv, row.names = FALSE)
-utils::write.csv(agg, file.path(OUTDIR, "bench_tm_profile_summary.csv"),
+utils::write.csv(agg, file.path(OUTDIR, "bench_tm_calculate_summary.csv"),
                  row.names = FALSE)
 
 cat("\n=== median over repetitions ===\n")
@@ -258,5 +260,5 @@ if (is.finite(frac) && frac > 0.25)
                          "genome, or read speedup_compute rather than ",
                          "speedup."), 100 * frac), call. = FALSE)
 cat(sprintf("\nwrote %s\n      %s\n", csv,
-            file.path(OUTDIR, "bench_tm_profile_summary.csv")))
+            file.path(OUTDIR, "bench_tm_calculate_summary.csv")))
 cat("\nsessionInfo:\n"); print(sessionInfo())

@@ -191,7 +191,7 @@ assumed, not checked, and it is wrong; see item 4.)
    dispatch and, if it works, document it there.
 
 10. **A probe and primer vignette: probe Tm against its target-site Tm.**
-   `tm_profile("probes.fa", window = NULL)` already returns one Tm per
+   `tm_calculate("probes.fa", window = NULL)` already returns one Tm per
    record, and the Introduction motivates the package partly by probe Tm
    harmonisation on microarrays, but nothing in the package demonstrates
    it. The vignette worth writing is not "compute Tm for a list of
@@ -206,9 +206,9 @@ assumed, not checked, and it is wrong; see item 4.)
      hg38 coordinates come from the same place; no manifest parsing is
      added to this package, the vignette starts from what those packages
      return;
-   - probe side: `tm_profile("probes.fa", window = NULL)`, or
+   - probe side: `tm_calculate("probes.fa", window = NULL)`, or
      `tm_calculate()` straight from the character vector;
-   - target side: `tm_profile(hg38, regions = probe_gr, window = NULL)`,
+   - target side: `tm_calculate(hg38, regions = probe_gr, window = NULL)`,
      which is the same call the hg38 vignette already shows, at a
      different scale;
    - compare the two distributions, and show where they diverge: the
@@ -232,10 +232,11 @@ assumed, not checked, and it is wrong; see item 4.)
 
 ## Done in 1.1.0 (for reference)
 
-- `tm_profile()`: one call from a sequence source (BSgenome package or
-  FASTA file) plus regions to a Tm profile, dispatching one region per
-  worker. `window = NULL` gives one window per region, which covers short
-  records such as probes and primers.
+- `tm_calculate()` absorbed `tm_profile()`: one function from any of four
+  sources (BSgenome package, FASTA file, sequences, GRanges) plus `regions`
+  to a Tm profile, dispatching one region per worker. `window = NULL` gives
+  one window per region, which covers short records such as probes and
+  primers. `tm_profile()` remains as a deprecated alias for one cycle.
 - BPPARAM removed from tm_calculate/tm_nn/tm_gc/tm_wallace; BiocParallel
   moved to Suggests (still used by the hg38 vignette and benchmarks).
 - `tool_comparison` vignette retired: the cross-tool benchmark belongs to

@@ -1,10 +1,10 @@
 #!/bin/bash
 # ===========================================================================
-# LSF submission for bench_tm_profile.R
+# LSF submission for bench_tm_calculate.R
 #
-#   bsub < inst/scripts/bench_tm_profile.lsf
+#   bsub < inst/scripts/bench_tm_calculate.lsf
 #
-# Times the shipped tm_profile() over one to six workers on hg38, matching
+# Times the shipped tm_calculate() over one to six workers on hg38, matching
 # the laptop sweep so that the only variable between the two tables is the
 # hardware. Worker counts, memory and repetitions are therefore chosen to
 # match the laptop, not to make use of the node.
@@ -13,10 +13,10 @@
 # this run asks for the same, so that the two environments differ in their
 # processors and not in their quota.
 #
-# An earlier attempt at 16 GB, before tm_profile() existed, was killed with
+# An earlier attempt at 16 GB, before the profiling path existed, was killed with
 # TERM_MEMLIMIT: the hand-rolled dispatch it replaced returned each task's
 # GRanges with its sequence and complement columns intact, and six PSOCK
-# workers plus their manager reached about 23 GB. tm_profile() drops those
+# workers plus their manager reached about 23 GB. tm_calculate() drops those
 # columns in the worker, and the same sweep at 48 GB then peaked at 15.5 GB
 # over thirteen processes. That is what makes 16 GB worth asking for now.
 #
@@ -46,15 +46,15 @@
 # neighbours did not matter; a wide one is a result and belongs in the
 # footnote.
 # ===========================================================================
-#BSUB -J tmprofile_bench16
+#BSUB -J tmcalc_bench16
 #BSUB -q long                 # adjust to a queue whose limit exceeds -W
 #BSUB -W 12:00                # 6 worker counts x 3 reps, ~10 min at 1 worker
 #BSUB -n 6                    # matches the laptop's 6 physical cores
 #BSUB -R "span[hosts=1]"      # all slots on one machine (PSOCK is node-local)
 #BSUB -R "select[model=='x6_420X_IntelRXeonRGold6230CPU210GHz']"
 #BSUB -R "rusage[mem=2667]"   # MB per slot; 6 x 2667 = 16 GB. See above.
-#BSUB -o logs/tmprofile16.%J.out
-#BSUB -e logs/tmprofile16.%J.err
+#BSUB -o logs/tmcalc16.%J.out
+#BSUB -e logs/tmcalc16.%J.err
 
 set -euo pipefail
 
@@ -87,8 +87,8 @@ R --version | head -1
 Rscript -e 'for (p in c("TmCalculator", "BSgenome.Hsapiens.UCSC.hg38",
                         "BiocParallel"))
               if (!requireNamespace(p, quietly = TRUE)) stop("missing: ", p)
-            if (is.null(TmCalculator::tm_profile))
-              stop("this TmCalculator has no tm_profile()")
+            if (!"regions" %in% names(formals(TmCalculator::tm_calculate)))
+              stop("this TmCalculator predates the merged tm_calculate()")
             cat("deps OK; TmCalculator ",
                 as.character(packageVersion("TmCalculator")), "\n")'
 
@@ -99,18 +99,18 @@ Rscript -e 'for (p in c("TmCalculator", "BSgenome.Hsapiens.UCSC.hg38",
 # inst/ prefix; system.file() is last because it costs an R start-up, but it
 # is the only one that works from an unrelated directory.
 BENCH_R=""
-for p in inst/scripts/bench_tm_profile.R \
-         scripts/bench_tm_profile.R \
-         ./bench_tm_profile.R; do
+for p in inst/scripts/bench_tm_calculate.R \
+         scripts/bench_tm_calculate.R \
+         ./bench_tm_calculate.R; do
   [ -f "$p" ] && { BENCH_R="$p"; break; }
 done
 if [ -z "$BENCH_R" ]; then
-  BENCH_R="$(Rscript -e 'cat(system.file("scripts", "bench_tm_profile.R",
+  BENCH_R="$(Rscript -e 'cat(system.file("scripts", "bench_tm_calculate.R",
                                          package = "TmCalculator"))' \
              2>/dev/null || true)"
 fi
 if [ ! -f "$BENCH_R" ]; then
-  echo "ERROR: cannot locate bench_tm_profile.R" >&2
+  echo "ERROR: cannot locate bench_tm_calculate.R" >&2
   echo "  submitted from : $(pwd)" >&2
   echo "  looked for     : inst/scripts/, scripts/, ./, and system.file()" >&2
   echo "  fix            : submit from the package root, or install the" >&2
@@ -123,7 +123,7 @@ echo "output dir    : $OUTDIR"
 echo
 
 # --- node-local scratch --------------------------------------------------
-# Used for tm_profile's tmpdir. It must be LOCAL disk: if it resolves to a
+# Used for tm_calculate's tmpdir. It must be LOCAL disk: if it resolves to a
 # shared filesystem the staging path is measuring the network. Check with
 # `df -T "$SCRATCH"` in the log before trusting any sequence-input timing.
 SCRATCH="${LSB_JOBTMPDIR:-/tmp/$LSB_JOBID}"
@@ -145,7 +145,7 @@ node_state() {
 }
 
 # --- memory sampling -----------------------------------------------------
-# tm_profile() has no hook inside its tasks and is not going to grow one for
+# tm_calculate() has no hook inside its tasks and is not going to grow one for
 # a benchmark, so memory is measured from outside. Three numbers per sample:
 #
 #   rss_mb   summed over the job's R processes. This is what LSF enforces.
@@ -234,7 +234,7 @@ echo
 echo "=== memory footprint over the whole sweep ==="
 mem_report
 echo
-echo "Per-run memory is joined onto bench_tm_profile.csv by timestamp;"
+echo "Per-run memory is joined onto bench_tm_calculate.csv by timestamp;"
 echo "this block is the envelope over every run together."
 echo
 

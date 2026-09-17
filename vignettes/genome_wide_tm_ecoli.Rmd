@@ -66,7 +66,7 @@ The workflow covers four steps:
 
 1. **Get a reference genome** as a BSgenome package: use the one Bioconductor
    ships for your assembly, or forge one when there is none.
-2. **Compute the Tm profile** for every window with `tm_profile()`, which
+2. **Compute the Tm profile** for every window with `tm_calculate()`, which
    tiles the genome, retrieves the sequence and computes Tm in one call.
 3. **Visualise** the profile with `plot_genome_track()`: circular plots,
    linear plots, zoom views, and multi-omics overlays.
@@ -87,7 +87,8 @@ library(GenomicRanges)
 
 # Step 1 — The reference genome {#build-bsgenome}
 
-`tm_profile()` retrieves sequence from a BSgenome package, so the first
+`tm_calculate()` retrieves sequence from a BSgenome package when you give
+it one, so the first
 question is whether one already exists for your assembly.
 
 **If Bioconductor ships your assembly, use it.** `BSgenome::available.genomes()`
@@ -198,7 +199,7 @@ cat("Length:    ", format(chr_length, big.mark = ","), "bp\n")
 
 # Step 2 — Compute the genome-wide Tm profile
 
-`tm_profile()` does the whole of it in one call: it tiles the requested
+`tm_calculate()` does the whole of it in one call: it tiles the requested
 regions, retrieves the sequence for each window, and computes a melting
 temperature for every window. Its first argument is the source the
 sequence comes from, either the name of a BSgenome package as here or the
@@ -212,8 +213,8 @@ parameter set at 50 mM Na+, matching the Methods of Hasenauer *et al.*
 
 ```{r tm-profile}
 runtime <- system.time({
-  tm_ecoli <- tm_profile(
-    seq_source = genome_name,  # a BSgenome package name, or a FASTA path
+  tm_ecoli <- tm_calculate(
+    input_seq = genome_name,   # a BSgenome package name, a FASTA path, or sequences
     regions  = chr_name,     # the whole chromosome; "U00096.3:1-100000" would
     unit     = "region",     #   tile a sub-region instead
     window   = 200L,
@@ -222,7 +223,7 @@ runtime <- system.time({
     nn_table = "DNA_NN_Breslauer_1986",
     Na       = 50,           # mM; standard PCR-like conditions
     verbose  = FALSE
-  )
+  )$gr                       # $gr is the profile; the object also carries $options
 })
 
 cat(sprintf(
@@ -243,14 +244,16 @@ head(tm_ecoli, 3)
 ```
 
 A chromosome of 4.6 Mb is small enough to profile in one process. On a
-mammalian genome the same call takes a `BPPARAM` and spreads the tiles
-over workers; `vignette("hg38_performance_parallel")` covers that, together
-with the forms `regions` accepts and how to choose a worker count.
+mammalian genome the same call takes a `BPPARAM` and spreads the tiles over
+workers; `vignette("hg38_performance_parallel")` covers that, together with
+the forms `regions` accepts and how to choose a worker count.
 
-For sequences that are already in hand, as character vectors, a FASTA file
-or a `GRanges` carrying a `sequence` column, use `tm_calculate()` instead:
-`tm_profile()` is the entry point for coordinates in a reference genome,
-and `tm_calculate()` for sequences.
+The same function takes sequences directly, which is the form to use when
+they are already in hand rather than in a genome:
+
+```{r tm-calculate-seqs}
+tm_calculate(c("ACGTGCTAGCTAGCTAGC", "GGCCATATATGCGC"), method = "tm_nn", Na = 50)
+```
 
 ---
 
@@ -438,10 +441,10 @@ does not.
 
 ```{r gc-vs-tm-data}
 ## The GC-content prediction for the same windows, for comparison.
-tm_gc_ecoli <- tm_profile(genome_name, regions = chr_name, unit = "region",
-                          window = 200L, slide = 200L,
-                          method = "tm_gc", variant = "Schildkraut1965",
-                          Na = 50, verbose = FALSE)
+tm_gc_ecoli <- tm_calculate(genome_name, regions = chr_name, unit = "region",
+                            window = 200L, slide = 200L,
+                            method = "tm_gc", variant = "Schildkraut1965",
+                            Na = 50, verbose = FALSE)$gr
 GCmod <- as.data.frame(tm_gc_ecoli[, c("Tm", "GC")])
 
 ## Keep only windows whose GC percentage is an exact integer. A 200 bp
@@ -611,7 +614,7 @@ On a standard desktop computer (single core, R 4.4, compiled Rcpp nearest-neighb
 
 | Step | Function | Time (elapsed) |
 |------|----------|---------------|
-| Tiling, sequence retrieval and Tm for 23,208 windows | `tm_profile()` | ~`r sprintf("%.2f", runtime[["elapsed"]])` s |
+| Tiling, sequence retrieval and Tm for 23,208 windows | `tm_calculate()` | ~`r sprintf("%.2f", runtime[["elapsed"]])` s |
 
 The same call on the human genome, where there are 14.7 million windows
 rather than 23,208, takes about ten minutes in one process and about three
