@@ -39,6 +39,7 @@ set -euo pipefail
 OUTDIR="$(pwd)/results_laptop"
 mkdir -p "$OUTDIR"
 
+
 # --- locate the R driver ---------------------------------------------------
 # Unlike the LSF script this one keeps its $0, so the sibling file is the
 # first place to look; the other two cover being run from the package root
