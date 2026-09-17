@@ -52,13 +52,13 @@ built from measurements that ship with the package.
 
 # Quick start
 
-The smallest useful call needs a genome and nothing else:
+The smallest genome-scale call needs a genome and a window width:
 
 ```{r quick-start}
 library(TmCalculator)
 hg38 <- "BSgenome.Hsapiens.UCSC.hg38"
 
-tm <- tm_calculate(hg38)$gr
+tm <- tm_calculate(hg38, window = 200, slide = 200)$gr
 tm
 ## GRanges object with 14687412 ranges and 2 metadata columns:
 ##       seqnames      ranges strand |        Tm        GC
@@ -68,13 +68,17 @@ tm
 `$options` records the model and tiling it was produced with.
 
 That tiles every standard chromosome into non-overlapping 200 bp windows
-and computes a nearest-neighbour Tm for each, in a single process. Adding
-workers is one more argument:
+and computes a nearest-neighbour Tm for each, in a single process. The
+window width has no default at genome scale, and is not meant to: it is the
+resolution of the profile, so it belongs in the call rather than in a
+default that quietly decides how many rows come back. Adding workers is one
+more argument:
 
 ```{r quick-start-parallel}
 library(BiocParallel)
 
-tm <- tm_calculate(hg38, BPPARAM = SnowParam(workers = 5))$gr
+tm <- tm_calculate(hg38, window = 200, slide = 200,
+                   BPPARAM = SnowParam(workers = 5))$gr
 ```
 
 Same windows, same Tm values, about a third of the time. How the genome is
@@ -91,8 +95,8 @@ The first argument says where sequence comes from. It is given by *name*,
 not as a loaded object, because each worker opens the source for itself.
 
 ```{r sources}
-tm_calculate(hg38)                       # an installed BSgenome package
-tm_calculate("contigs.fa.gz")            # a FASTA file, gzip is fine
+tm_calculate(hg38, window = 200)         # an installed BSgenome package
+tm_calculate("contigs.fa.gz", window = 200)   # a FASTA file, gzip is fine
 tm_calculate(oligos)                     # a character vector of sequences
 ```
 
@@ -112,25 +116,36 @@ default `tempdir()` is often a small partition.
 ## Chromosomes or records, by name or by number. On a BSgenome the chr
 ## prefix is added or removed to match the genome, so the same code works on
 ## UCSC and on Ensembl; FASTA record names are matched exactly.
-tm_calculate(hg38, regions = 1:22)                                # autosomes
-tm_calculate(hg38, regions = paste0("chr", c(1:22, "X", "Y")))    # no chrM
-tm_calculate("contigs.fa.gz", regions = c("contig_7", "contig_9"))
+tm_calculate(hg38, regions = 1:22, window = 200)               # autosomes
+tm_calculate(hg38, regions = paste0("chr", c(1:22, "X", "Y")), # no chrM
+             window = 200)
+tm_calculate("contigs.fa.gz", regions = c("contig_7", "contig_9"),
+             window = 200)
 
 ## Coordinate intervals. Commas and scientific notation are accepted, so a
 ## number pasted out of a genome browser works as it stands.
-tm_calculate(hg38, regions = c("chr1:1-10e6", "chrX:5,000,000-6,000,000"))
+tm_calculate(hg38, regions = c("chr1:1-10e6", "chrX:5,000,000-6,000,000"),
+             window = 200)
 
 ## A mixture, when some chromosomes are wanted whole and others in part.
-tm_calculate(hg38, regions = c(1:20, "chr21:1-10e6", "X", "Y"))
+tm_calculate(hg38, regions = c(1:20, "chr21:1-10e6", "X", "Y"), window = 200)
 
 ## A GRanges, when the regions come from an annotation.
 prom <- promoters(genes(TxDb.Hsapiens.UCSC.hg38.knownGene),
                   upstream = 1000, downstream = 500)
 tm_calculate(hg38, regions = prom, window = 50, slide = 25)
 
-## window = NULL gives one window per region, which is what short records
-## call for: a FASTA of array probes, primers or synthetic oligos returns one
-## Tm per record. It is the default when sequences are passed directly.
+## A GRanges carrying its own sequences is a source rather than a query, and
+## then regions selects by overlap: a seqname takes every range on it, an
+## interval takes the ranges it meets. Whole ranges come back, not clipped
+## pieces of them, since their sequences are already fixed.
+tm_calculate(probes_gr, regions = "chr7")
+tm_calculate(probes_gr, regions = "chr7:1-1e6")
+
+## window = NULL, the default, gives one window per region, which is what
+## short records call for: a FASTA of array probes, primers or synthetic
+## oligos returns one Tm per record. It is refused for a region over 1 Mb,
+## where a single Tm would mean nothing.
 tm_calculate("probes.fa", window = NULL)
 tm_calculate(oligos, BPPARAM = SnowParam(5))
 ```
@@ -169,18 +184,22 @@ own Tm. Only a name and a coordinate pair cross between processes, so no
 sequence is ever serialized. `unit` decides how tasks are cut.
 
 ```{r unit}
-tm_calculate(hg38, unit = "segment", segment_size = 50e6,   # default: 73 tasks
-           BPPARAM = SnowParam(workers = 5))
-tm_calculate(hg38, unit = "region",                         # 24 tasks
-           BPPARAM = SnowParam(workers = 5))
+tm_calculate(hg38, window = 200, unit = "segment",   # the default: 73 tasks
+             segment_size = 50e6, BPPARAM = SnowParam(workers = 5))
+tm_calculate(hg38, window = 200, unit = "region",    # 24 tasks
+             BPPARAM = SnowParam(workers = 5))
 ```
+
+The two calls return the same profile, row for row. `regions` and `window`
+decide what is computed; `unit` and `segment_size` decide only how that work
+is handed out, and segment boundaries are held to multiples of `slide` so
+the window grid cannot shift when the segmenting changes.
 
 **Segments are the better default**, for two reasons. Chromosome 1 is an
 indivisible task of 249 Mb, so with one task per chromosome the run cannot
 finish before chromosome 1 does, however many workers are available. And a
 worker holding a 50 Mb segment needs less memory than one holding a whole
-chromosome. Segment boundaries fall on multiples of `slide`, so the window
-grid, and therefore the result, is identical either way.
+chromosome.
 
 **Prefer `SnowParam()` to `MulticoreParam()`.** Forked workers share the
 manager's memory copy-on-write, but R's garbage collector writes to every

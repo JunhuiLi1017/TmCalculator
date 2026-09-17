@@ -184,18 +184,22 @@ own Tm. Only a name and a coordinate pair cross between processes, so no
 sequence is ever serialized. `unit` decides how tasks are cut.
 
 ```{r unit}
-tm_calculate(hg38, unit = "segment", segment_size = 50e6,   # default: 73 tasks
-           BPPARAM = SnowParam(workers = 5))
-tm_calculate(hg38, unit = "region",                         # 24 tasks
-           BPPARAM = SnowParam(workers = 5))
+tm_calculate(hg38, window = 200, unit = "segment",   # the default: 73 tasks
+             segment_size = 50e6, BPPARAM = SnowParam(workers = 5))
+tm_calculate(hg38, window = 200, unit = "region",    # 24 tasks
+             BPPARAM = SnowParam(workers = 5))
 ```
+
+The two calls return the same profile, row for row. `regions` and `window`
+decide what is computed; `unit` and `segment_size` decide only how that work
+is handed out, and segment boundaries are held to multiples of `slide` so
+the window grid cannot shift when the segmenting changes.
 
 **Segments are the better default**, for two reasons. Chromosome 1 is an
 indivisible task of 249 Mb, so with one task per chromosome the run cannot
 finish before chromosome 1 does, however many workers are available. And a
 worker holding a 50 Mb segment needs less memory than one holding a whole
-chromosome. Segment boundaries fall on multiples of `slide`, so the window
-grid, and therefore the result, is identical either way.
+chromosome.
 
 **Prefer `SnowParam()` to `MulticoreParam()`.** Forked workers share the
 manager's memory copy-on-write, but R's garbage collector writes to every
