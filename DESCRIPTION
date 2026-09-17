@@ -1,8 +1,8 @@
 Package: TmCalculator
 Type: Package
 Title: Genome-Wide Nucleic Acid Melting Temperature Profiling and Multi-Omics Integration
-Version: 1.1.0
-Date: 2026-09-12
+Version: 1.1.1
+Date: 2026-09-17
 Authors@R: c(
     person(given = "Junhui", family = "Li", email = "ljh.biostat@gmail.com", role = c("cre","aut"),
            comment = c(ORCID = "0000-0003-3973-1700")),
@@ -19,6 +19,7 @@ Imports:
     Biostrings,
     GenomeInfoDb,
     GenomicRanges,
+    BiocParallel,
     IRanges,
     Rcpp,
     S4Vectors,
@@ -29,7 +30,6 @@ LinkingTo:
     Rcpp
 Suggests: 
     BSgenome,
-    BiocParallel,
     testthat (>= 3.0.0),
     knitr,
     rmarkdown,
