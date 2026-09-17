@@ -1,10 +1,10 @@
 ---
-title: "Genome-Scale Tm Profiling with tm_profile()"
+title: "Genome-Scale Tm Profiling on hg38: Inputs, Parallel Execution and Performance"
 author: "Junhui Li, Lihua Julie Zhu"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Genome-Scale Tm Profiling with tm_profile()}
+  %\VignetteIndexEntry{Genome-Scale Tm Profiling on hg38: Inputs, Parallel Execution and Performance}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -20,70 +20,97 @@ knitr::opts_chunk$set(
 )
 ```
 
-`tm_profile()` builds a melting temperature profile from a sequence source
-and a set of regions. It tiles the regions into windows, fetches each
-window's sequence, computes a Tm, and returns one `GRanges`. On a mammalian
-genome it spreads the work across processes, which is the difference
-between ten minutes and three.
+# Introduction
 
-This vignette covers the two things that matter in practice: what you can
-ask it to profile, and how many workers to give it. The computation chunks
-are not evaluated when the vignette is built, since they need
-`BSgenome.Hsapiens.UCSC.hg38` and take minutes; the timing table and figure
-are built from measurements that ship with the package.
+`tm_profile()` turns a genome, or any set of regions in it, into a melting
+temperature profile: it tiles the regions into windows, fetches each
+window's sequence, computes a Tm, and returns one `GRanges`. One call does
+what would otherwise take three, and on a mammalian genome it spreads the
+work across processes.
 
-```{r libraries}
+This vignette answers three questions, in order:
+
+1. **What can I give it?** A BSgenome package, a FASTA file, or sequences
+   already in R, and any set of regions within them.
+2. **How does it divide the work?** Into tasks, one region or one segment
+   each, dispatched to workers.
+3. **How many workers should I use, and how long will it take?** Measured on
+   the human genome in two hardware environments.
+
+**Before you start.** You need a BSgenome package for the genome you want to
+profile; this vignette uses `BSgenome.Hsapiens.UCSC.hg38`. **BiocParallel**
+is needed only if you want more than one worker. Neither is required for
+`tm_profile()` to run in a single process.
+
+```{r install, eval=FALSE}
+BiocManager::install(c("BSgenome.Hsapiens.UCSC.hg38", "BiocParallel"))
+```
+
+The hg38 chunks below are not evaluated when the vignette is built, since
+they take minutes; the timing table and the figure are evaluated, and are
+built from measurements that ship with the package.
+
+# Quick start
+
+The smallest useful call needs a genome and nothing else:
+
+```{r quick-start}
 library(TmCalculator)
-library(BiocParallel)
-
 hg38 <- "BSgenome.Hsapiens.UCSC.hg38"
 
-tm <- tm_profile(hg38, window = 200, slide = 200,
-                 method = "tm_nn", nn_table = "DNA_NN_SantaLucia_2004",
-                 Na = 50, BPPARAM = SnowParam(workers = 5))
-length(tm)
-## [1] 14687330
+tm <- tm_profile(hg38)
+tm
+## GRanges object with 14687412 ranges and 2 metadata columns:
+##       seqnames      ranges strand |        Tm        GC
 ```
 
-With no `regions` argument that covers `GenomeInfoDb::standardChromosomes()`
-of the genome, which for GRCh38 is the 24 assembled chromosomes *and* chrM.
-Name the chromosomes explicitly if the mitochondrion does not belong in the
-profile; the sweep below uses `paste0("chr", c(1:22, "X", "Y"))` for that
-reason, and its 14,687,330 windows are the 24 without it.
+That tiles every standard chromosome into non-overlapping 200 bp windows
+and computes a nearest-neighbour Tm for each, in a single process. Adding
+workers is one more argument:
 
-Leave `BPPARAM` out and the same call runs in one process, with no
-dependency on **BiocParallel** at all: how the genome is divided changes the
-runtime, not the windows.
+```{r quick-start-parallel}
+library(BiocParallel)
 
-# What you can profile
+tm <- tm_profile(hg38, BPPARAM = SnowParam(workers = 5))
+```
 
-The first argument is where the sequence comes from, given by *name* so
-that each worker can open it itself: an installed BSgenome package, or the
-path to a FASTA file.
+Same windows, same Tm values, about a third of the time. How the genome is
+divided changes the runtime, not the result.
+
+Everything else is a refinement of those two calls: which regions, which
+thermodynamic model, and how many workers.
+
+# What can I give it?
+
+## The sequence source
+
+The first argument says where sequence comes from. It is given by *name*,
+not as a loaded object, because each worker opens the source for itself.
 
 ```{r sources}
-tm_profile(hg38)                       # a BSgenome package
-tm_profile("contigs.fa.gz")            # a FASTA assembly, gzip is fine
-tm_profile(oligos)                     # sequences already in R
+tm_profile(hg38)                       # an installed BSgenome package
+tm_profile("contigs.fa.gz")            # a FASTA file, gzip is fine
+tm_profile(oligos)                     # a character vector of sequences
 ```
 
-The third form is staged as a temporary FASTA under `tmpdir` and removed on
-exit, so that the workers read the sequences rather than receive them. That
-is worth doing for a large set, because it moves window construction and
-result assembly into the worker too; for a handful of sequences the staging
+A vector of sequences is staged as a temporary FASTA under `tmpdir` and
+deleted on exit, so that the workers read it rather than receive it. That is
+worth doing for a large set, because it moves window construction and result
+assembly into the workers as well; for a handful of sequences the staging
 and the worker start-up cost more than the calculation, and `tm_calculate()`
-is the right call. Set `tmpdir` on a cluster, where the default `tempdir()`
-is often a small partition.
+is the right call. On a cluster, set `tmpdir` to node-local scratch: the
+default `tempdir()` is often a small partition.
 
-`regions` says what to take from it, in whichever form is at hand.
+## The regions
+
+`regions` says what to take from the source, in whichever form is at hand.
 
 ```{r regions}
 ## Chromosomes or records, by name or by number. On a BSgenome the chr
-## prefix is added or removed to match the genome, so the same code works
-## on UCSC and on Ensembl; FASTA record names are matched exactly.
-tm_profile(hg38, regions = 1:22)                     # autosomes only
-tm_profile(hg38, regions = paste0("chr", c(1:22, "X", "Y")))   # no chrM
-tm_profile(hg38, regions = c("chr1", "chr2"))
+## prefix is added or removed to match the genome, so the same code works on
+## UCSC and on Ensembl; FASTA record names are matched exactly.
+tm_profile(hg38, regions = 1:22)                                # autosomes
+tm_profile(hg38, regions = paste0("chr", c(1:22, "X", "Y")))    # no chrM
 tm_profile("contigs.fa.gz", regions = c("contig_7", "contig_9"))
 
 ## Coordinate intervals. Commas and scientific notation are accepted, so a
@@ -99,30 +126,44 @@ prom <- promoters(genes(TxDb.Hsapiens.UCSC.hg38.knownGene),
 tm_profile(hg38, regions = prom, window = 50, slide = 25)
 
 ## window = NULL gives one window per region, which is what short records
-## call for: a FASTA of array probes, primers or synthetic oligos returns
-## one Tm per record. It is the default when sequences are passed directly.
-tm_profile("probes.fa", window = NULL, method = "tm_nn", Na = 50)
-tm_profile(oligos, method = "tm_nn", Na = 50, BPPARAM = SnowParam(5))
+## call for: a FASTA of array probes, primers or synthetic oligos returns one
+## Tm per record. It is the default when sequences are passed directly.
+tm_profile("probes.fa", window = NULL)
+tm_profile(oligos, BPPARAM = SnowParam(5))
 ```
 
-Two behaviours are worth knowing. A region naming a whole chromosome has
-its leading and trailing assembly gaps trimmed, since a telomeric run of N
-carries no windows; a region given by coordinate is tiled from the start
-you asked for. And overlapping regions produce windows that appear twice,
-so `tm_profile()` warns rather than quietly double-counting them.
+Three things are worth knowing before you trust the output.
+
+*The default includes chrM.* With no `regions`, `tm_profile()` covers
+`GenomeInfoDb::standardChromosomes()`, which for GRCh38 is the 24 assembled
+chromosomes **and** the mitochondrion. Name the chromosomes explicitly if
+that does not belong in your profile. The sweep later in this vignette uses
+`paste0("chr", c(1:22, "X", "Y"))` for exactly that reason, and its
+14,687,330 windows are the 24 without chrM.
+
+*Whole chromosomes are trimmed, named regions are not.* A region that names
+a whole chromosome has its leading and trailing assembly gaps trimmed, since
+a telomeric run of N carries no windows. A region given by coordinate is
+tiled from the start you asked for. Windows containing N are dropped either
+way.
+
+*Overlapping regions are not merged.* They produce windows that appear twice
+in the result, so `tm_profile()` warns rather than double-counting them
+quietly.
+
+## Array probes
 
 Array manifests are not read directly, since their layout is vendor and
-version specific. Take the probe sequences out with the package that
-already understands the manifest, `illuminaio`, `minfi` or `sesame` for
-Infinium arrays, then pass them as a FASTA file or straight to
-`tm_calculate()`.
+version specific. Take the probe sequences out with the package that already
+understands the manifest, `illuminaio`, `minfi` or `sesame` for Infinium
+arrays, then pass them as a FASTA file or straight to `tm_calculate()`.
 
-# Dividing the work
+# How does it divide the work?
 
-A task is the unit a worker owns from start to finish: it opens the source,
-builds its own windows, fetches its own sequence and computes its own Tm.
-Only a name and a coordinate pair cross between processes, so no sequence
-is ever serialized. `unit` decides how the tasks are cut.
+A **task** is the unit one worker owns from start to finish: it opens the
+source, builds its own windows, fetches its own sequence and computes its
+own Tm. Only a name and a coordinate pair cross between processes, so no
+sequence is ever serialized. `unit` decides how tasks are cut.
 
 ```{r unit}
 tm_profile(hg38, unit = "segment", segment_size = 50e6,   # default: 73 tasks
@@ -131,27 +172,28 @@ tm_profile(hg38, unit = "region",                         # 24 tasks
            BPPARAM = SnowParam(workers = 5))
 ```
 
-Segments are the better default. Chromosome 1 is an indivisible task of
-249 Mb, so with one task per chromosome the run cannot finish before
-chromosome 1 does, however many workers are available; and a worker holding
-a 50 Mb segment needs less memory than one holding a whole chromosome.
-Segment boundaries fall on multiples of `slide`, so the window grid, and
-therefore the result, is the same either way.
+**Segments are the better default**, for two reasons. Chromosome 1 is an
+indivisible task of 249 Mb, so with one task per chromosome the run cannot
+finish before chromosome 1 does, however many workers are available. And a
+worker holding a 50 Mb segment needs less memory than one holding a whole
+chromosome. Segment boundaries fall on multiples of `slide`, so the window
+grid, and therefore the result, is identical either way.
 
-Prefer `SnowParam()` to `MulticoreParam()`. Forked workers share the
+**Prefer `SnowParam()` to `MulticoreParam()`.** Forked workers share the
 manager's memory copy-on-write, but R's garbage collector writes to every
 object header it marks, so each worker's collection forces the kernel to
-duplicate the inherited pages; on a genome-scale input that has been
+duplicate the inherited pages. On a genome-scale input that has been
 measured running slower than a single process.
 
-# How many workers
+# How many workers, and how long?
 
-Memory is usually the binding constraint rather than cores, because each
-worker holds the sequences of its own task. Below is the sweep that ships
-with the package: hg38 at 200 bp non-overlapping windows, 14,687,330
-windows, one to six workers, three repetitions per configuration, on a
-six-core 16 GB laptop and on a cluster compute node with six slots and a
-48 GB memory limit.
+Memory, not cores, is usually what limits the worker count, because each
+worker holds the sequences of its own task.
+
+The sweep below ships with the package: hg38 at 200 bp non-overlapping
+windows, 14,687,330 windows, one to six workers, three repetitions per
+configuration, on a six-core 16 GB laptop and on a cluster compute node with
+six slots and a 48 GB memory limit.
 
 ```{r sweep-data, eval=TRUE}
 # Read the shipped sweeps rather than transcribing numbers, so the table
@@ -225,23 +267,25 @@ par(op)
 
 Two things in that table decide a worker count.
 
-The laptop is fastest at five workers, 189 s against 578.5 s in one
-process, and a sixth worker makes the run *slower*. The node, with three
-times the memory, improves all the way to six workers and 127 s. The
-turnover is memory pressure rather than anything in the software, which is
-why the optimum belongs to the machine and not to the package.
+**More workers stop helping, and where depends on memory.** The laptop is
+fastest at five workers, 189 s against 578.5 s in one process, and a sixth
+worker makes the run *slower*. The node, with three times the memory,
+improves all the way to six workers and 127 s. The turnover is memory
+pressure rather than anything in the software, which is why the optimum
+belongs to the machine and not to the package.
 
-Memory per worker falls as the work is spread more widely, from 4.87 GB in
-the one-worker run to 1.86 GB at five workers, because no worker holds more
-than one 50 Mb task at a time. That is what makes more workers affordable
-at all.
+**Memory per worker falls as you add workers**, from 4.87 GB in the
+one-worker run to 1.86 GB at five, because no worker holds more than one
+50 Mb task at a time. That is what makes more workers affordable at all.
 
 A rule that works on both machines:
 
 > workers = min(physical cores - 1, (available GB - 4) / 2)
 
-Then confirm it on your own machine with a short sweep over one chromosome
-rather than the whole genome:
+Confirm it on your own machine with a short sweep over one chromosome rather
+than the whole genome. Note that worker start-up, roughly ten seconds per
+call, is included in every timing, so a run that takes less than a minute
+will understate the speedup:
 
 ```{r sweep-your-machine}
 for (n in 1:6) {
@@ -253,22 +297,39 @@ for (n in 1:6) {
 }
 ```
 
-The sweeps above were produced by `bench_parallel_strategy.R` and
-`bench_parallel_cluster.R` in `system.file("scripts", package =
-"TmCalculator")`, and their output is the two CSV files read here, so
-re-running one on your own hardware means replacing a file.
+The sweeps above were produced by `bench_parallel_strategy.R` on the laptop
+and by `bench_parallel_cluster.R`, with its LSF submission file
+`bench_parallel_cluster.lsf`, on the compute node. All three are in
+`system.file("scripts", package = "TmCalculator")`, and their output is the
+two CSV files read here, `bench_parallel_strategy.csv` and
+`bench_parallel_cluster.csv` in `extdata`, so re-running one on your own
+hardware means replacing a file.
 
-# What comes back, and what to use instead
+`bench_tm_profile.R` in the same directory times `tm_profile()` itself over
+a range of worker counts, with `bench_tm_profile.lsf` to submit it, and is
+the one to reach for when sizing a new machine.
+
+# What comes back
 
 A `GRanges` with `Tm` and `GC` metadata columns in genomic order, ready for
 `integrate_granges()`, `compare_groups()` and the plotting functions, and
-for anything else that takes genomic intervals. The sequence and complement
-columns are dropped by default, since they run to roughly 500 MB per large
-chromosome; pass `keep_sequence = TRUE` if you need them.
+for anything else that takes genomic intervals.
 
-`tm_profile()` starts from coordinates in a source. When the sequences are
-already in hand, as a character vector, a FASTA file or a `GRanges` with a
-`sequence` column, use `tm_calculate()`:
+```{r downstream}
+tm_annot <- integrate_granges(gr_tm = tm, gr_features = atac_peaks,
+                              strategy = "overlap", weight = "overlap")
+compare_groups(tm_annot, value_cols = "Tm", group_col = "class")
+```
+
+The sequence and complement columns are dropped by default, since they run
+to roughly 500 MB per large chromosome; pass `keep_sequence = TRUE` if you
+need them.
+
+# When to use `tm_calculate()` instead
+
+`tm_profile()` starts from coordinates in a source it can open. When the
+sequences are already in hand, and there are few enough that parallelism
+would not pay, use `tm_calculate()`:
 
 ```{r tm-calculate}
 tm_calculate(c("ACGTGCTAGCTAGCTAGC", "GGCCATATATGCGC"),
@@ -277,11 +338,11 @@ tm_calculate(c("ACGTGCTAGCTAGCTAGC", "GGCCATATATGCGC"),
 
 Do not try to parallelise a single `tm_calculate()` call. With the compiled
 core the per-window loop is a minority of a call's cost; window
-construction, sequence retrieval and result assembly run once in the
-calling process, and sending the sequences to workers costs more than the
-loop it divides. Measured on chromosome 1, splitting one call across five
-workers was never faster than the serial call. Parallelism belongs at the
-level of regions, which is what `tm_profile()` does.
+construction, sequence retrieval and result assembly run once in the calling
+process, and sending the sequences to workers costs more than the loop it
+divides. Measured on chromosome 1, splitting one call across five workers
+was never faster than the serial call. Parallelism belongs at the level of
+regions, which is what `tm_profile()` does.
 
 # Session information
 

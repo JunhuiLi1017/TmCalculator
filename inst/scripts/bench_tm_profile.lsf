@@ -9,17 +9,29 @@
 # hardware. Worker counts, memory and repetitions are therefore chosen to
 # match the laptop, not to make use of the node.
 #
-# WHY SIX SLOTS AND 48 GB. The laptop has six physical cores and 16 GB. The
-# memory cannot be matched: LSF enforces resident set size summed over every
-# process in the job, and six PSOCK workers plus their manager occupy about
-# 23 GB at peak, so a 16 GB request is killed with TERM_MEMLIMIT part way
-# through. PSOCK workers are independent processes that each attach the
-# packages and build their own sequences, so that 23 GB is real rather than
-# an artefact of counting shared pages more than once: measured on this
-# workload, summed PSS tracks summed RSS to 1.002x. 48 GB is asked for
-# instead, roughly twice the peak, so that memory does not bind here; the
-# comparison with the laptop rests on peak memory per worker, which is
-# sampled below and does not depend on what the quota was set to.
+# WHY SIX SLOTS AND 16 GB. The laptop has six physical cores and 16 GB, and
+# this run asks for the same, so that the two environments differ in their
+# processors and not in their quota.
+#
+# An earlier attempt at 16 GB, before tm_profile() existed, was killed with
+# TERM_MEMLIMIT: the hand-rolled dispatch it replaced returned each task's
+# GRanges with its sequence and complement columns intact, and six PSOCK
+# workers plus their manager reached about 23 GB. tm_profile() drops those
+# columns in the worker, and the same sweep at 48 GB then peaked at 15.5 GB
+# over thirteen processes. That is what makes 16 GB worth asking for now.
+#
+# LSF enforces resident set size summed over every process in the job, and
+# rusage[mem=] is per slot at this site, so 6 x 2667 MB is the 16 GB total.
+# The margin over the measured peak is about 3%, which is thin: if this job
+# comes back TERM_MEMLIMIT, that is a result rather than a mistake, and the
+# 48 GB configuration in git history is the one to fall back to. Worker
+# counts run downwards below for that reason, so a job that cannot fit dies
+# in its first two minutes rather than in its last hour.
+#
+# PSOCK workers are independent processes that each attach the packages and
+# build their own sequences, so the summed RSS is real rather than an
+# artefact of counting shared pages more than once: measured on this
+# workload, summed PSS tracks summed RSS to 1.002x.
 #
 # WHY THE CPU MODEL IS PINNED. The cluster is heterogeneous, and three
 # repetitions landing on three CPU families would produce a range that
@@ -34,21 +46,21 @@
 # neighbours did not matter; a wide one is a result and belongs in the
 # footnote.
 # ===========================================================================
-#BSUB -J tmprofile_bench
+#BSUB -J tmprofile_bench16
 #BSUB -q long                 # adjust to a queue whose limit exceeds -W
 #BSUB -W 12:00                # 6 worker counts x 3 reps, ~10 min at 1 worker
 #BSUB -n 6                    # matches the laptop's 6 physical cores
 #BSUB -R "span[hosts=1]"      # all slots on one machine (PSOCK is node-local)
 #BSUB -R "select[model=='x6_420X_IntelRXeonRGold6230CPU210GHz']"
-#BSUB -R "rusage[mem=8000]"   # MB per slot; 6 x 8000 = 48 GB. See above.
-#BSUB -o logs/tmprofile.%J.out
-#BSUB -e logs/tmprofile.%J.err
+#BSUB -R "rusage[mem=2667]"   # MB per slot; 6 x 2667 = 16 GB. See above.
+#BSUB -o logs/tmprofile16.%J.out
+#BSUB -e logs/tmprofile16.%J.err
 
 set -euo pipefail
 
 # Everything this job writes goes under the directory bsub was invoked from,
 # stated absolutely so the log says where to look rather than "results/".
-OUTDIR="$(pwd)/results"
+OUTDIR="$(pwd)/results_16g"
 mkdir -p logs "$OUTDIR"
 
 # --- conda environment ---------------------------------------------------
@@ -196,9 +208,14 @@ trap 'kill "$SAMPLER_PID" 2>/dev/null || true; rm -rf "$SCRATCH"' EXIT
 # --workers is given explicitly. Deriving it from the slot count would leave
 # one core for the manager and produce 1-5, silently dropping the 6-worker
 # row that the laptop table has.
+# Worker counts descend so that the heaviest configuration is attempted
+# first: at a 16 GB quota with a 15.5 GB measured peak, a job that does not
+# fit should fail in minutes rather than after the cheap configurations have
+# already consumed an hour. The summary table is reordered by worker count
+# regardless of the order they were run in.
 Rscript "$BENCH_R" \
   --outdir  "$OUTDIR" \
-  --workers 1,2,3,4,5,6 \
+  --workers 6,5,4,3,2,1 \
   --reps    3 \
   --window  200 \
   --slide   200 \

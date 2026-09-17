@@ -2,7 +2,7 @@
 % Please edit documentation in R/tm_profile.R
 \name{tm_profile}
 \alias{tm_profile}
-\title{Melting temperature profile over a genome, a FASTA file, or a set of regions}
+\title{Melting temperature profile over a genome, a FASTA file, or a set of sequences}
 \usage{
 tm_profile(
   seq_source,
@@ -13,36 +13,50 @@ tm_profile(
   segment_size = 5e+07,
   BPPARAM = NULL,
   keep_sequence = FALSE,
+  tmpdir = tempdir(),
   verbose = TRUE,
   ...
 )
 }
 \arguments{
-\item{seq_source}{Where the sequence comes from, as a single string:
-either the name of an installed \pkg{BSgenome} package, e.g.
-\code{"BSgenome.Hsapiens.UCSC.hg38"}, or the path to a FASTA file,
-optionally gzipped. A package name rather than a loaded object, because
-each worker opens the source itself.}
+\item{seq_source}{Where the sequence comes from. One of:
+\itemize{
+  \item the name of an installed \pkg{BSgenome} package, e.g.
+    \code{"BSgenome.Hsapiens.UCSC.hg38"}. A package name rather than a
+    loaded object, because each worker opens the source itself;
+  \item the path to a FASTA file, optionally gzipped;
+  \item a character vector of two or more sequences, which is staged as
+    a temporary FASTA file under \code{tmpdir} and removed on exit. For
+    a single sequence, and for a few thousand short ones, the staging
+    and the worker start-up cost more than the calculation: use
+    \code{\link{tm_calculate}} there.
+}}
 
 \item{regions}{What to tile. Any of:
-\itemize{
-  \item chromosome or record names, or numbers: \code{1:2},
-    \code{c("chr1", "chr2")}, \code{c("contig_7", "contig_9")};
-  \item coordinate strings \code{"name:start-end"}, e.g.
-    \code{c("chr1:1-10000000", "chrX:5,000,000-6,000,000")}. Commas and
-    scientific notation in the numbers are accepted;
-  \item a mixture of the two, \code{c("chr21", "chr1:1-10e6")};
-  \item a \code{GRanges} object, whose ranges are used directly.
-}
-For a BSgenome source the \code{chr} prefix is added or removed as the
-genome requires, so \code{1:2} works on a UCSC genome and
-\code{c("chr1", "chr2")} on an Ensembl one; FASTA record names are
-matched exactly, since they are arbitrary. Default: every standard
-chromosome of the genome, or every record of the FASTA file.}
+  \itemize{
+    \item chromosome or record names, or numbers: \code{1:2},
+      \code{c("chr1", "chr2")}, \code{c("contig_7", "contig_9")};
+    \item coordinate strings \code{"name:start-end"}, e.g.
+      \code{c("chr1:1-10000000", "chrX:5,000,000-6,000,000")}. Commas and
+      scientific notation in the numbers are accepted;
+    \item a mixture of the two, \code{c("chr21", "chr1:1-10e6")};
+    \item a \code{GRanges} object, whose ranges are used directly.
+  }
+  For a BSgenome source the \code{chr} prefix is added or removed as the
+  genome requires, so \code{1:2} works on a UCSC genome and
+  \code{c("chr1", "chr2")} on an Ensembl one; FASTA record names are
+  matched exactly, since they are arbitrary.
+
+  The default is \code{GenomeInfoDb::standardChromosomes()} of the
+  genome, or every record of the FASTA file. For GRCh38 that is the 24
+  assembled chromosomes \emph{and the mitochondrion}, chrM, which is what
+  Bioconductor means by standard; name the chromosomes explicitly if the
+  mitochondrial genome does not belong in the profile.}
 
 \item{window}{Window width in base pairs. \code{NULL} means one window
 per region, which is what short records such as array probes or primers
-call for. Records shorter than \code{window} are returned whole.}
+call for, and is the default when \code{seq_source} is a vector of
+sequences. Records shorter than \code{window} are returned whole.}
 
 \item{slide}{Step between window starts, defaulting to \code{window},
 which gives a non-overlapping tiling. Ignored when \code{window} is
@@ -70,6 +84,10 @@ columns in the result. \code{FALSE} by default: they are roughly 500 MB
 per large chromosome, and returning them from a worker costs more than
 the calculation.}
 
+\item{tmpdir}{Directory for the temporary FASTA file written when
+\code{seq_source} is a vector of sequences. Worth setting on a cluster,
+where the default \code{tempdir()} is often a small partition.}
+
 \item{verbose}{Report the task count and the number of windows.}
 
 \item{...}{Passed to \code{\link{tm_calculate}}: \code{method},
@@ -79,22 +97,30 @@ the calculation.}
 A \code{GRanges} object in genomic order, carrying \code{Tm} and
   \code{GC} metadata columns, with the chromosome or record name in its
   \code{seqnames}.
+
+  When \code{seq_source} is a vector of sequences the result is keyed by
+  input position, \code{seq1}, \code{seq2} and so on, rather than by the
+  caller's names, so that a sequence dropped for containing \code{N} can
+  still be identified; the caller's names, if the vector had any, are
+  returned in a \code{name} column.
 }
 \description{
-Builds a Tm profile from a sequence source that a worker can open for
-itself: a \pkg{BSgenome} package or a FASTA file. The requested regions
-are tiled into windows and a melting temperature is computed for each.
-Use this when the input is a genome or a file plus a set of coordinates;
-use \code{\link{tm_calculate}} when the sequences are already in hand.
+Builds a Tm profile from a sequence source: a \pkg{BSgenome} package, a
+FASTA file, or a vector of sequences. The requested regions are tiled
+into windows and a melting temperature is computed for each. This is the
+batch and parallel entry point of the package;
+\code{\link{tm_calculate}} is the single-call one.
 }
 \details{
-This is the level at which parallelism pays for this package. Each task
-opens the source itself, so only a record name and a coordinate pair
-cross between processes and no sequence is ever serialized. Dividing the
-sequences of a single \code{tm_calculate()} call among workers does the
-opposite and is slower than running it in one process: with the compiled
-core the per-window loop is a minority of a call's cost, and shipping the
-sequence costs more than the loop it divides. See
+Parallelism pays here because a task is self-contained: it opens the
+source itself and builds its own windows, fetches its own sequence and
+assembles its own result, so only a name and a coordinate pair cross
+between processes. A vector of sequences is staged as a temporary FASTA
+file for the same reason, so that the workers read it rather than receive
+it. Dividing the sequences of a single \code{tm_calculate()} call among
+workers is the arrangement that does not pay, because it parallelises the
+inner loop alone and leaves window construction, sequence retrieval and
+result assembly in the calling process. See
 \code{vignette("hg38_performance_parallel", package = "TmCalculator")}.
 }
 \section{Assembly gaps}{
@@ -130,6 +156,9 @@ tm <- tm_profile(hg38, window = 200, slide = 200,
 tm_profile(hg38, regions = 1:2, method = "tm_nn")
 tm_profile(hg38, regions = c("chr1", "chr2"), method = "tm_nn")
 
+# The 24 assembled chromosomes without the mitochondrion
+tm_profile(hg38, regions = paste0("chr", c(1:22, "X", "Y")))
+
 # Explicit regions, and a mixture of regions and whole chromosomes
 tm_profile(hg38, regions = c("chr1:1-10000000", "chrX:5,000,000-6,000,000"))
 tm_profile(hg38, regions = c("chr21", "chr1:1-10e6"))
@@ -143,6 +172,11 @@ tm_profile("contigs.fa.gz", window = 200, slide = 200,
 
 # Short records, one Tm each: array probes, primers, synthetic oligos
 probe_tm <- tm_profile("probes.fa", window = NULL, method = "tm_nn", Na = 50)
+
+# Sequences already in R. Staged to a temporary FASTA so that the workers
+# read them; worth it for large sets, not for a handful.
+tm_profile(oligos, method = "tm_nn", Na = 50,
+           BPPARAM = SnowParam(workers = 5))
 }
 
 }
