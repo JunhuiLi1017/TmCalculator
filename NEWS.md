@@ -123,25 +123,6 @@
 
 ## Performance
 
-* **`coor_to_genomic_ranges(method = "preload_chr")` now loads the span its
-  windows cover, not the chromosome they sit on.** The preload path called
-  `genome[[chr]]`, which decompresses the whole chromosome whatever was
-  asked for, so a request for 200 kb of chr21 read all 46.7 Mb of it. That
-  cost was paid once per task, and a segmented genome-scale run is many
-  tasks per chromosome: five 50 Mb segments of chr1 each decompressed its
-  full 249 Mb, five times over, to cover 249 Mb once. The span is now read
-  in one `getSeq()` call and window coordinates are shifted onto it.
-
-  Windows scattered along a whole chromosome still span it, so the case the
-  preload path was written for is unchanged. A dense run over part of a
-  chromosome, which is what `regions` and `segment_size` produce, reads what
-  it uses. Sequences and Tm values are identical either way;
-  `inst/scripts/test_tm_calculate_merged.R` pins them against `getSeq()` at
-  the same coordinates rather than against another run of this code, since a
-  mistake in the shift would move the whole profile consistently and agree
-  with itself.
-
-
 * **`tm_gc()` is roughly 260× faster.** On the *E. coli* case study (23,208
   windows of 200 bp) it fell from 51.7 s to 0.198 s, and is now faster than
   `tm_nn()` rather than 77× slower. `tm_wallace()` receives the same fix.

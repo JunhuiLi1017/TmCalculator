@@ -112,12 +112,13 @@ seg2 <- safe(prof(PKG, regions = REG, window = 200, slide = 200, unit = "segment
 check("ragged segment_size still aligns to the grid", same(seg2, one))
 
 ## -- 2b. The sequence really is the sequence at those coordinates ----------
-# preload_chr loads the span the windows cover rather than the chromosome
-# they sit on, so every window start is shifted by the span's own start
-# before extraction. Get that wrong and the whole profile slides along the
-# chromosome with nothing internal to contradict it: the segmented and
-# unsegmented runs would agree with each other, both wrong. The only test
-# that catches it compares against the genome itself.
+# Nothing else here would catch a profile that is correct in shape and
+# wrong in position. Every other check compares one run of this code with
+# another, and a coordinate error inside window construction or sequence
+# extraction moves both alike: the segmented and unsegmented runs would
+# agree with each other and both be shifted along the chromosome. This is
+# the only check with an outside witness, so it stays whatever the
+# extraction path does internally.
 cat("\n2b. Window sequences against getSeq at the same coordinates\n")
 
 gobj <- safe(get(sub("^BSgenome\\.([^.]+)\\..*$", "\\1", PKG),
@@ -126,8 +127,8 @@ truth <- function(gr)
   as.character(Biostrings::getSeq(gobj, as.character(seqnames(gr)),
                                   start = start(gr), end = end(gr)))
 
-# Two spans with different starts: an error of the form "always drop the
-# offset" survives one of these only if lo happens to be 1.
+# Two regions with different starts: an off-by-origin error survives one of
+# these only when the region happens to begin at 1.
 for (rg in c("chr21:10200001-10203000", "chr21:31415927-31418927")) {
   w <- safe(prof(PKG, regions = rg, window = 200, slide = 200,
                  keep_sequence = TRUE, verbose = FALSE))
@@ -138,8 +139,8 @@ for (rg in c("chr21:10200001-10203000", "chr21:31415927-31418927")) {
 }
 
 # The same region reached as one task and as three must agree, and both must
-# agree with the genome: this is what makes the offset arithmetic load-bearing
-# rather than merely self-consistent.
+# agree with the genome: agreeing only with each other is what a shifted
+# profile also does.
 s1 <- safe(prof(PKG, regions = "chr21:10200001-10203000", window = 200,
                 slide = 200, unit = "region", keep_sequence = TRUE,
                 verbose = FALSE))
