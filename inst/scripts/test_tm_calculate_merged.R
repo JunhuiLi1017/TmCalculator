@@ -211,6 +211,18 @@ check("regions selects by the caller's name", length(v2) == 1L)
 v3 <- safe(prof(unname(oligos), regions = "3:1-20", verbose = FALSE))
 check("an unnamed vector is addressed by position",
       length(v3) == 1L && width(v3) == 20L)
+check("and comes back keyed by that position",
+      identical(as.character(seqnames(v3)), "3"))
+
+# The direct route and the staged one must label an unnamed input the same
+# way, or the same sequences come back with different seqnames depending on
+# whether a BPPARAM was supplied.
+d0 <- safe(tm_calculate(unname(oligos[1:3]))$gr)
+d1 <- safe(prof(unname(oligos[1:3]), verbose = FALSE))
+check("unnamed sequences are keyed by position, not chr1",
+      identical(as.character(seqnames(d0)), c("1", "2", "3")))
+check("both routes agree on the key",
+      identical(as.character(seqnames(d0)), as.character(seqnames(d1))))
 check("\"3:1-20\" is the third sequence's first 20 bases",
       isTRUE(all.equal(v3$Tm, tm_calculate(substr(oligos[3], 1, 20))$gr$Tm)))
 
@@ -267,14 +279,6 @@ if (!requireNamespace("BiocParallel", quietly = TRUE)) {
   check("staged sequences survive two workers",
         isTRUE(all.equal(sort(pseq$Tm), sort(ref$Tm))))
 }
-
-## -- 6. The deprecated alias ------------------------------------------------
-cat("\n6. tm_profile() still works, once, with a warning\n")
-check("warns", warns(tm_profile(PKG, regions = REG, window = 200,
-                                slide = 200, verbose = FALSE)))
-check("returns a bare GRanges",
-      is(suppressWarnings(tm_profile(PKG, regions = REG, window = 200,
-                                     slide = 200, verbose = FALSE)), "GRanges"))
 
 cat(sprintf("\n%d passed, %d failed\n", ok, bad))
 if (bad > 0L) quit(status = 1L)

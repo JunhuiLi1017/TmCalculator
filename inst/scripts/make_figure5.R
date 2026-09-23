@@ -1,32 +1,49 @@
 #!/usr/bin/env Rscript
 # ===========================================================================
-# make_figure5.R -- publication-resolution export of Figure 5
+# make_figure5.R -- Figure 5: the hg38 worker-count sweep in two environments
 #
-#   (A) speedup against worker count, three task-partitioning strategies
-#   (B) total task time, showing how much work each configuration performed
-#   (C) peak resident set size of the heaviest worker
+#   (A) wall-clock time against worker count, worker start-up included
+#   (B) peak memory of the whole job, summed over manager and workers
 #
-#   Rscript inst/scripts/make_figure5.R
-#   Rscript inst/scripts/make_figure5.R --csv results/bench_parallel_cluster.csv
-#   Rscript inst/scripts/make_figure5.R --common-baseline
+#   Rscript inst/scripts/make_figure5.R                       # shipped CSVs
+#   Rscript inst/scripts/make_figure5.R --outdir figures \
+#       --laptop results_laptop/bench_tm_calculate_summary.csv \
+#       --cluster results_16g/bench_tm_calculate_summary.csv
 #
-# The three panels are one argument, not three measurements. Panel A shows
-# that every strategy turns over well before the cores run out, which invites
-# the usual explanation -- a ragged schedule, one long task holding up the
-# end. Panel B rules that out: the total task time grows with the worker
-# count, so the later configurations are not dividing a fixed amount of work
-# badly, they are doing more of it. Panel C gives the reason and the remedy
-# in the same picture, since the strategy that holds its memory down is the
-# one whose work grows least.
+# WHAT REPLACED WHAT. The earlier Figure 5 compared three task-partitioning
+# strategies, because at that point the question was which one tm_calculate()
+# should use. That was settled: segments, longest first. The strategies are
+# gone from the package, so a figure that still showed three curves would be
+# documenting a choice the software no longer offers. This one asks the
+# question a user actually has, which is how many workers to give it, and
+# answers it on two machines.
 #
-# Speedup is recomputed from the wall clocks rather than read from the CSV's
-# `speedup` column, which is work_s / wall_compute_s. That ratio rewards a
-# strategy for the extra work segmenting creates and so cannot compare the
-# three. See make_table6.R for the same reasoning at more length.
+# ONE VISUAL CHANNEL PER VARIABLE. Line type and marker fill are the
+# environment and nothing else: solid and filled is the laptop, dashed and
+# open is the compute node. Everything is grey, so the figure survives
+# greyscale printing and colour-blind readers without a second encoding.
 #
-# Panel A carries a dashed line of slope one. Without it a curve reaching 3.2
-# looks like a good result on its own terms; against the line it is visibly a
-# third of what the hardware was asked for, which is the point of the panel.
+# WHY THE WHOLE JOB RATHER THAN THE HEAVIEST WORKER IN PANEL B. Both are
+# recorded. The per-worker figure is the noisier of the two, because the
+# sampler wakes every ten seconds and catches whichever moment it catches:
+# across three repetitions at six workers it ranged 1.60 to 2.81 GB on the
+# laptop for identical work. The summed figure is steadier (8.53 to 9.09 GB
+# over the same three runs) and is the one that decides whether a machine can
+# host the run at all; it is also what a cluster scheduler enforces. Pass
+# --panel-b worker to plot the per-worker series instead.
+#
+# THE TWO SERIES IN PANEL B ARE NOT COMPARABLE WITH EACH OTHER. The laptop is
+# sampled with ps and the node with /proc/*/smaps_rollup, and macOS compresses
+# memory, so a difference between the curves may be the tools rather than the
+# software. Each curve against its own machine's limit is the reading that
+# holds; that is why the reference line is drawn and the two are not compared
+# in the caption.
+#
+# WHY WALL CLOCK RATHER THAN COMPUTE TIME. Worker start-up is about nine
+# seconds per call and a user waits through it, so it belongs in the number
+# the figure reports. The sweep also records compute_s with start-up removed;
+# pass --metric compute to plot that instead, which is the right choice only
+# when comparing against a machine whose start-up differs.
 # ===========================================================================
 
 args <- commandArgs(trailingOnly = TRUE)
@@ -34,150 +51,147 @@ argval <- function(flag, default) {
   i <- match(flag, args)
   if (is.na(i) || i == length(args)) default else args[i + 1L]
 }
-has_flag <- function(f) f %in% args
+outdir  <- argval("--outdir", ".")
+metric  <- match.arg(argval("--metric", "wall"), c("wall", "compute"))
+fmt     <- match.arg(argval("--format", "tif"), c("tif", "pdf", "png"))
+dpi     <- as.numeric(argval("--dpi", "600"))
+fig_w   <- as.numeric(argval("--width", "7.2"))
+fig_h   <- as.numeric(argval("--height", "3.4"))
+panel_b <- match.arg(argval("--panel-b", "job"), c("job", "worker"))
+mem_gb  <- as.numeric(argval("--memory-limit", "16"))   # the reference line
 
-csv    <- argval("--csv", system.file("extdata", "parallel_strategy_bench.csv",
-                                      package = "TmCalculator"))
-outdir <- argval("--outdir", "figures")
-dpi    <- as.numeric(argval("--dpi", "600"))
-fig_w  <- as.numeric(argval("--width",  "10.5"))   # three panels, MDPI full width
-fig_h  <- as.numeric(argval("--height", "3.9"))
-per_strategy <- !has_flag("--common-baseline")
-
-if (!nzchar(csv) || !file.exists(csv))
-  stop("benchmark summary not found. Run inst/scripts/bench_parallel_strategy.R ",
-       "(or bench_parallel_cluster.R) and pass its CSV with --csv.")
-dir.create(outdir, showWarnings = FALSE, recursive = TRUE)
-
-S <- utils::read.csv(csv, stringsAsFactors = FALSE)
-need <- c("strategy", "n_workers", "wall_compute_s", "work_s", "max_rss_gb",
-          "n_windows")
-miss <- setdiff(need, names(S))
-if (length(miss))
-  stop("this summary predates the split of start-up from compute; re-run the ",
-       "benchmark. Missing: ", paste(miss, collapse = ", "))
-
-# Configurations that did not cover the same windows are not comparable, and
-# the difference is a boundary or trimming mistake rather than a measurement.
-if (length(unique(S$n_windows)) > 1L)
-  stop("configurations cover different numbers of windows; the timings are ",
-       "not comparable. Inspect n_windows in ", csv)
-
-## -- Median and range over repetitions -------------------------------------
-summ <- function(v) c(med = stats::median(v), lo = min(v), hi = max(v))
-agg <- do.call(rbind, lapply(
-  split(S, list(S$strategy, S$n_workers), drop = TRUE), function(d) {
-    w <- summ(d$wall_compute_s); k <- summ(d$work_s); m <- summ(d$max_rss_gb)
-    data.frame(strategy = d$strategy[1], n_workers = d$n_workers[1],
-               wall_med = w[["med"]], wall_lo = w[["lo"]], wall_hi = w[["hi"]],
-               work_med = k[["med"]], work_lo = k[["lo"]], work_hi = k[["hi"]],
-               rss_med  = m[["med"]], rss_lo  = m[["lo"]], rss_hi  = m[["hi"]],
-               stringsAsFactors = FALSE)
-  }))
-
-ser <- agg[agg$n_workers == 1L, c("strategy", "wall_med")]
-if (!nrow(ser))
-  stop("the sweep contains no one-worker run, so there is no serial baseline ",
-       "to divide by. Re-run with --workers 1,...")
-if (per_strategy) {
-  base <- stats::setNames(ser$wall_med, ser$strategy)[agg$strategy]
-} else {
-  base <- stats::median(ser$wall_med)
+shipped <- function(f) {
+  p <- system.file("extdata", f, package = "TmCalculator")
+  if (nzchar(p)) return(p)
+  q <- file.path("inst", "extdata", f)          # running from a checkout
+  if (file.exists(q)) return(q)
+  stop("cannot find ", f, ": install the package or run from its root")
 }
-# The range bars follow the same division: a longer wall clock is a smaller
-# speedup, so the low and high ends swap.
-agg$sp_med <- base / agg$wall_med
-agg$sp_lo  <- base / agg$wall_hi
-agg$sp_hi  <- base / agg$wall_lo
+lap_csv <- argval("--laptop",  NA_character_)
+clu_csv <- argval("--cluster", NA_character_)
+if (is.na(lap_csv)) lap_csv <- shipped("bench_hg38_laptop.csv")
+if (is.na(clu_csv)) clu_csv <- shipped("bench_hg38_cluster.csv")
 
-ord  <- intersect(c("static", "dynamic", "segment"), unique(agg$strategy))
-agg  <- agg[order(match(agg$strategy, ord), agg$n_workers), ]
-pal  <- stats::setNames(c("#1B5E9C", "#C0392B", "#5C6B73")[seq_along(ord)], ord)
-pchs <- stats::setNames(c(16, 17, 15)[seq_along(ord)], ord)
-
-draw_range <- function(x, lo, hi, col) {
-  v <- is.finite(lo) & is.finite(hi) & hi / pmax(lo, 1e-12) > 1.02
-  if (any(v)) graphics::arrows(x[v], lo[v], x[v], hi[v], code = 3, angle = 90,
-                               length = 0.03, col = col)
+# The columns the figure needs. Checked up front rather than discovered
+# halfway through, so a summary from an older version of the benchmark fails
+# with a message that names the missing column.
+NEED <- c("n_workers", "wall_s", "lo", "hi", "compute_s",
+          if (panel_b == "job") "peak_job_gb" else "peak_worker_gb")
+read_env <- function(path, env) {
+  d <- utils::read.csv(path, stringsAsFactors = FALSE)
+  miss <- setdiff(NEED, names(d))
+  if (length(miss))
+    stop(path, " has no column(s): ", paste(miss, collapse = ", "))
+  d$env <- env
+  d[order(d$n_workers), ]
 }
-series <- function(ymed, ylo, yhi) {
-  for (s in ord) {
-    d <- agg[agg$strategy == s, ]
-    graphics::lines(d$n_workers, d[[ymed]], col = pal[s], lwd = 2)
-    draw_range(d$n_workers, d[[ylo]], d[[yhi]], pal[s])
-    graphics::points(d$n_workers, d[[ymed]], col = pal[s], pch = pchs[s],
-                     cex = 1)
+d <- rbind(read_env(lap_csv,  "Laptop"),
+           read_env(clu_csv, "Compute node"))
+envs <- c("Laptop", "Compute node")
+message("laptop  : ", lap_csv, "  (", sum(d$env == "Laptop"), " worker counts)")
+message("cluster : ", clu_csv, "  (", sum(d$env != "Laptop"), " worker counts)")
+
+# compute_s has no measured range: start-up is calibrated once per worker
+# count, so lo and hi would be the wall-clock range shifted by a constant.
+# Drawing them as though they were measured would overstate what is known.
+d$y  <- if (metric == "wall") d$wall_s else d$compute_s
+d$lo <- if (metric == "wall") d$lo else NA_real_
+d$hi <- if (metric == "wall") d$hi else NA_real_
+
+d$mem <- if (panel_b == "job") d$peak_job_gb else d$peak_worker_gb
+ylab_time <- if (metric == "wall") "Wall clock (s)" else "Compute time (s)"
+# Parenthesised: at top level R closes the `if` at the end of the line and the
+# bare `else` on the next one is a syntax error.
+ylab_mem  <- if (panel_b == "job") "Peak memory, whole job (GB)" else
+             "Peak resident size per worker (GB)"
+GREY <- "grey20"; BAR <- "grey45"
+
+draw <- function() {
+  op <- par(mfrow = c(1, 2), mar = c(4.0, 4.3, 2.0, 0.8),
+            mgp = c(2.5, 0.7, 0), cex.axis = 0.9, cex.lab = 0.95)
+  on.exit(par(op), add = TRUE)
+
+  for (what in c("time", "rss")) {
+    y_all <- if (what == "time") c(d$y, d$lo, d$hi) else c(d$mem, mem_gb)
+    y_all <- y_all[is.finite(y_all)]
+    plot(range(d$n_workers), c(0, max(y_all) * 1.08), type = "n",
+         xlab = "Workers", xaxt = "n", yaxs = "i",
+         ylab = if (what == "time") ylab_time else ylab_mem)
+    axis(1, at = sort(unique(d$n_workers)))
+    # The limit is the point of panel B: a curve is read against it, not
+    # against the other curve.
+    if (what == "rss" && is.finite(mem_gb)) {
+      abline(h = mem_gb, lty = 3, col = "grey55")
+      text(min(d$n_workers), mem_gb, sprintf("%g GB available", mem_gb),
+           adj = c(0, -0.4), cex = 0.75, col = "grey35")
+    }
+    mtext(if (what == "time") "A" else "B", side = 3, line = 0.4,
+          adj = 0, font = 2, cex = 1.1)
+
+    for (e in envs) {
+      s <- d[d$env == e, ]
+      solid <- e == "Laptop"
+      y <- if (what == "time") s$y else s$mem
+      if (what == "time" && any(is.finite(s$lo)))
+        arrows(s$n_workers, s$lo, s$n_workers, s$hi, angle = 90, code = 3,
+               length = 0.03, col = BAR, lwd = 1)
+      lines(s$n_workers, y, lty = if (solid) 1 else 2, col = GREY, lwd = 1.6)
+      points(s$n_workers, y, pch = if (solid) 19 else 1, col = GREY, cex = 1.1)
+    }
+    if (what == "time")
+      legend("topright", envs, lty = c(1, 2), pch = c(19, 1), lwd = 1.6,
+             bty = "n", cex = 0.85, col = GREY)
   }
 }
 
-wk <- sort(unique(agg$n_workers))
-
-draw <- function() {
-  op <- graphics::par(mfrow = c(1, 3), mar = c(4.4, 4.5, 2.2, 0.8), las = 1,
-                      cex = 0.8, mgp = c(2.8, 0.7, 0))
-  on.exit(graphics::par(op), add = TRUE)
-
-  ## ---- A: speedup ------------------------------------------------------
-  plot(NA, xlim = range(wk), ylim = c(0, max(max(agg$sp_hi), max(wk)) * 1.02),
-       bty = "n", xaxt = "n", xlab = "Workers", ylab = "Speedup")
-  graphics::axis(1, at = wk)
-  graphics::abline(a = 0, b = 1, lty = 2, col = "grey55")
-  graphics::text(max(wk), max(wk), "linear", adj = c(1.1, -0.4), cex = 0.75,
-                 col = "grey40")
-  graphics::mtext("A", side = 3, adj = 0, font = 2, line = 0.7, cex = 1.05)
-  series("sp_med", "sp_lo", "sp_hi")
-  graphics::legend("topleft", bty = "n", legend = ord, col = pal[ord],
-                   pch = pchs[ord], lwd = 2, seg.len = 1.3, cex = 0.85)
-
-  ## ---- B: total task time ----------------------------------------------
-  # Drawn on a zero-based axis so that the growth is read as a proportion of
-  # the serial run rather than as a shape floating above a cropped baseline.
-  plot(NA, xlim = range(wk), ylim = c(0, max(agg$work_hi) * 1.05), bty = "n",
-       xaxt = "n", xlab = "Workers", ylab = "Total task time (s)")
-  graphics::axis(1, at = wk)
-  graphics::abline(h = stats::median(agg$work_med[agg$n_workers == 1L]),
-                   lty = 2, col = "grey55")
-  graphics::text(max(wk), stats::median(agg$work_med[agg$n_workers == 1L]),
-                 "serial", adj = c(1.1, -0.5), cex = 0.75, col = "grey40")
-  graphics::mtext("B", side = 3, adj = 0, font = 2, line = 0.7, cex = 1.05)
-  series("work_med", "work_lo", "work_hi")
-
-  ## ---- C: peak memory per worker ---------------------------------------
-  plot(NA, xlim = range(wk), ylim = c(0, max(agg$rss_hi) * 1.05), bty = "n",
-       xaxt = "n", xlab = "Workers",
-       ylab = "Peak resident set size per worker (GB)")
-  graphics::axis(1, at = wk)
-  graphics::mtext("C", side = 3, adj = 0, font = 2, line = 0.7, cex = 1.05)
-  series("rss_med", "rss_lo", "rss_hi")
+## -- Export ----------------------------------------------------------------
+dir.create(outdir, showWarnings = FALSE, recursive = TRUE)
+stem <- file.path(outdir, paste0("figure5_hg38_", metric))
+if (identical(fmt, "tif")) {
+  # On macOS tiff() defaults to type = "quartz", which silently ignores
+  # `compression`. At 600 dpi the uncompressed raster is tens of megabytes,
+  # which journals reject, so the cairo device is requested when the build
+  # has it and LZW is only asked for when it will actually be honoured.
+  a <- list(filename = paste0(stem, ".tif"), width = fig_w, height = fig_h,
+            units = "in", res = dpi)
+  if (isTRUE(unname(capabilities("cairo")))) {
+    a$type <- "cairo"; a$compression <- "lzw"
+  } else {
+    warning("no cairo device; writing an uncompressed TIFF. Convert with ",
+            "`tiffcp -c lzw in.tif out.tif` before submission.", call. = FALSE)
+  }
+  do.call(grDevices::tiff, a)
+} else if (identical(fmt, "pdf")) {
+  grDevices::pdf(paste0(stem, ".pdf"), width = fig_w, height = fig_h)
+} else {
+  grDevices::png(paste0(stem, ".png"), width = fig_w, height = fig_h,
+                 units = "in", res = dpi)
 }
-
-## -- Write -----------------------------------------------------------------
-stem <- file.path(outdir, "figure5_parallel_strategy")
-
-grDevices::pdf(paste0(stem, ".pdf"), width = fig_w, height = fig_h,
-               useDingbats = FALSE)
 draw(); grDevices::dev.off()
+f <- paste0(stem, ".", fmt)
+message("wrote ", f, "  (", round(file.info(f)$size / 1e6, 2), " MB)")
 
-# LZW is lossless. The panels are line work with narrow range bars, which is
-# the first detail JPEG compression inside a TIFF would soften.
-grDevices::tiff(paste0(stem, ".tif"), width = fig_w, height = fig_h,
-                units = "in", res = dpi, compression = "lzw",
-                type = if (capabilities("cairo")) "cairo" else "quartz")
-draw(); grDevices::dev.off()
-
-best <- agg[which.max(agg$sp_med), ]
-cat(sprintf("\nPeak: %s at %d workers, %.0f s, speedup %.2f, %.2f GB per worker\n",
-            best$strategy, best$n_workers, best$wall_med, best$sp_med,
-            best$rss_med))
-cat(sprintf("Work inflation from 1 to %d workers: %.0f s to %.0f s (%.2fx)\n",
-            max(wk), stats::median(agg$work_med[agg$n_workers == 1L]),
-            stats::median(agg$work_med[agg$n_workers == max(wk)]),
-            stats::median(agg$work_med[agg$n_workers == max(wk)]) /
-              stats::median(agg$work_med[agg$n_workers == 1L])))
-
-info <- file.info(paste0(stem, c(".pdf", ".tif")))
-cat("\nWritten:\n")
-for (i in seq_len(nrow(info)))
-  cat(sprintf("  %-44s %6.1f MB\n", rownames(info)[i], info$size[i] / 1e6))
-cat(sprintf("\n%.0f x %.0f pixels at %g dpi (%.1f x %.1f in)\n",
-            fig_w * dpi, fig_h * dpi, dpi, fig_w, fig_h))
+## -- The numbers the caption and Section 3.5 quote --------------------------
+# Printed rather than left to be read off the figure, so that the text and
+# the picture cannot drift apart.
+for (e in envs) {
+  s <- d[d$env == e, ]
+  i <- which.min(s$y)
+  cat(sprintf("\n%s\n", e))
+  cat(sprintf("  serial            : %.1f s\n", s$y[s$n_workers == 1]))
+  cat(sprintf("  fastest           : %.1f s at %d workers (%.2fx)\n",
+              s$y[i], s$n_workers[i], s$y[s$n_workers == 1] / s$y[i]))
+  cat(sprintf("  widest range      : %.1f s at %d workers\n",
+              max(s$hi - s$lo, na.rm = TRUE),
+              s$n_workers[which.max(s$hi - s$lo)]))
+  cat(sprintf("  peak memory       : %.2f GB at %d workers (%.0f%% of %g GB)\n",
+              max(s$mem), s$n_workers[which.max(s$mem)],
+              100 * max(s$mem) / mem_gb, mem_gb))
+  # Amdahl, fitted on 1/n. The constant is the part no worker count removes.
+  fit <- stats::lm(s$y ~ I(1 / s$n_workers))
+  cf <- stats::coef(fit)
+  cat(sprintf(paste0("  Amdahl            : T(n) = %.1f + %.1f/n  ",
+                     "(R2 = %.4f, serial %.1f%%, ceiling %.1fx)\n"),
+              cf[1], cf[2], summary(fit)$r.squared,
+              100 * cf[1] / (cf[1] + cf[2]), (cf[1] + cf[2]) / cf[1]))
+}

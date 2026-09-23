@@ -185,7 +185,10 @@
                     whole = st == 1 & en == as.numeric(lens[idx]),
                     offset = .tm_offsets(idx, src),
                     stringsAsFactors = FALSE)
-  out$name[!nzchar(out$name)] <- sprintf("seq%d", out$idx[!nzchar(out$name)])
+  # Position, matching what to_genomic_ranges() labels an unnamed sequence
+  # on the direct route: the same input must not come back keyed differently
+  # because a BPPARAM was supplied.
+  out$name[!nzchar(out$name)] <- as.character(out$idx[!nzchar(out$name)])
   out <- out[order(out$idx, out$start), , drop = FALSE]
   if (nrow(out) > 1L) {
     same <- out$idx[-1] == out$idx[-nrow(out)]
@@ -375,12 +378,13 @@
   n <- length(seqs); nm <- names(seqs); block <- 1e5L
   # Record names are the caller's own when they are usable, so that
   # regions = "myseq" resolves the way it does for a FASTA or a genome.
-  # Otherwise they are positions, which is also what regions = 3 means.
+  # Otherwise they are positions, which is also what regions = 3 means and
+  # what the direct route labels an unnamed sequence.
   usable <- !is.null(nm) && all(nzchar(nm)) && !anyDuplicated(nm)
   for (from in seq(1L, n, by = block)) {
     ii <- from:min(from + block - 1L, n)
     x  <- Biostrings::BStringSet(unname(seqs[ii]))
-    names(x) <- if (usable) nm[ii] else sprintf("seq%d", ii)
+    names(x) <- if (usable) nm[ii] else as.character(ii)
     Biostrings::writeXStringSet(x, path, append = from > 1L)
   }
   attr(path, "n") <- n; attr(path, "names_in") <- if (usable) NULL else nm
@@ -511,6 +515,17 @@
 #' @return A \code{GRanges}.
 #' @keywords internal
 .tm_finish <- function(gr, keep_sequence, model) {
+  # Every task re-enters tm_calculate(), which means every argument in `model`
+  # counts as supplied there. tm_calculate() warns when salt_method is named
+  # but cannot apply to tm_gc, so leaving it in `model` would repeat that
+  # warning once per task. It is dropped where it would have no effect
+  # anyway: without `userset`, tm_gc() takes the correction published with
+  # the variant whatever this says.
+  # "none" is kept: it is a request to drop the correction, which tm_gc()
+  # honours and does not warn about.
+  if (identical(model$method, "tm_gc") && is.null(model$userset) &&
+      !identical(model$salt_method, "none"))
+    model[["salt_method"]] <- NULL
   out <- do.call(TmCalculator::tm_calculate, c(list(input_seq = gr), model))$gr
   if (!keep_sequence) { out$sequence <- NULL; out$complement <- NULL }
   out

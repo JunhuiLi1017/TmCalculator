@@ -42,7 +42,7 @@ input_seq = c('acgtTGCAATGCCGTAWSDBSY','acgtTGCCCCGGCCGCGCCGTAWSDBSY') #for wall
 gr_seq <- to_genomic_ranges(input_seq)
 out <- tm_wallace(gr_seq, ambiguous = TRUE)
 out
-out$Options
+out$options
 
 }
 \references{

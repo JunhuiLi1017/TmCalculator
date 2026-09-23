@@ -1,12 +1,12 @@
 # TmCalculator roadmap
 
-Candidate items for the next feature release (post-1.1.0), roughly in
+Candidate items for the next feature release (post-1.1.1), roughly in
 order of expected user-visible impact. Background and measurements are in
 `vignettes/hg38_performance_parallel.Rmd`; current baseline on the
 6-core/16 GB reference machine: chr1 pipeline ~52 s single-process.
 
 Whole-genome figures are deliberately omitted here until
-`inst/scripts/bench_parallel_cluster.R` has been run: repeated runs of the
+`inst/scripts/bench_tm_calculate.R` has been run: repeated runs of the
 same worker count on the reference laptop differed by nearly 30% (295 s and
 379 s for five workers), so no single number from that sweep is quotable.
 
@@ -163,34 +163,56 @@ assumed, not checked, and it is wrong; see item 4.)
 
 ## API correctness
 
-8. **`tm_gc(salt_method =)` is documented but inert.** For any built-in
-   `variant` the argument is silently overwritten at `R/tm_gc.R:134` by the
-   variant's own `salt_correct` entry, so a user-supplied value has no effect
-   and produces no warning. It takes effect only when `userset` is given.
-   The documentation is also wrong in two further ways: it states the default
-   is `NULL` (the default is the six-element choice vector, collapsed by
-   `match.arg()` to `"Schildkraut2010"`, and passing `NULL` errors), and it
-   states that `NA` disables the correction (`match.arg(NA)` errors).
+8. ~~**`tm_gc(salt_method =)` is documented but inert.**~~ Resolved in 1.1.2.
+   The salt term is tied to the variant, because each published GC-content
+   formula carries its own, and a value that disagrees is now warned about
+   rather than silently overwritten. The default is `NULL`, which selects the
+   variant's own correction (or `"Schildkraut2010"` with `userset`), and `NA`
+   or `"none"` disables it. The two Owczarzy corrections are no longer
+   offered here at all: they correct the reciprocal of the melting
+   temperature against a 1 M Na+ reference and carry a duplex-length term the
+   GC formulas already have. Note for the manuscript that `salt_method` is
+   user-selectable for `tm_nn` but, by design, not for a built-in `tm_gc`
+   variant.
 
-   Decide which behaviour is intended. Tying the salt term to the variant is
-   defensible, since each published GC formula carries its own; if that is the
-   intent, either drop the argument for the built-in path or warn when a value
-   is supplied and ignored. Then correct the `@param` text. Note that the
-   manuscript describes `salt_method` as user-selectable, which is true of
-   `tm_nn` but not of `tm_gc`.
+9. ~~**An RNA parameter set with the default DNA mismatch table
+   double-counts G·U wobbles.**~~ Resolved in 1.1.2: `nn_table` and
+   `imm_table` are now consulted in order rather than both added, so a stack
+   takes one value. The nearest-neighbor set wins. Still open underneath it:
+   `imm_table` defaults to Peyret 1999, a DNA table, whatever `nn_table` is,
+   so an internal mismatch in an RNA duplex is still scored with DNA
+   parameters. Either ship an RNA mismatch set or default `imm_table` to none
+   for RNA and hybrid sets.
+
+10. ~~**`init_5T/A` is applied asymmetrically.**~~ Resolved in 1.1.2: the
+    penalty is charged once per strand whose 5' end is T, i.e. also when the
+    sequence ends in A. Zero in every shipped set, so nothing computed
+    changed; `test_regressions_1_1_2.R` now proves the symmetry with a table
+    carrying a non-zero value.
+
+11. **`tm_nn()` still contributes zero for a stack no table defines.**
+    The per-base loop raised an error instead, from the first CRAN release
+    until it was vectorised on 2026-05-26. Of the 256 possible
+    dinucleotide stacks, 116 are covered by a DNA nearest-neighbor set plus
+    Peyret 1999 in either orientation; the remaining 140 are stacks with two
+    adjacent mismatches, which no published table covers and which the
+    two-state model does not really describe. Silently treating them as
+    contributing nothing overstates stability. Decide between restoring the
+    error, warning once per call, or returning NA for the sequence, and note
+    that a genome-scale run must not warn per window.
 
 ## Documentation and interoperability
 
-9. **Verify and document a scheduler backend for region-level runs.**
-   With `BPPARAM` removed from the calls, the only parallelism the package
-   is involved in is the region-level pattern of the hg38 vignette, where
-   `BiocParallel` backends are used unchanged. `BatchtoolsParam()` (SLURM,
+12. **Verify and document a scheduler backend for region-level runs.**
+   The only parallelism the package is involved in is the region-level
+   pattern of `tm_calculate(BPPARAM =)`, where `BiocParallel` backends are
+   used unchanged. `BatchtoolsParam()` (SLURM,
    LSF, SGE, Torque) should therefore work for dispatching whole regions,
    but it is untested; while on the LSF cluster, try
    `BatchtoolsParam(cluster = "lsf")` once with the vignette's segment
    dispatch and, if it works, document it there.
 
-10. **A probe and primer vignette: probe Tm against its target-site Tm.**
+13. **A probe and primer vignette: probe Tm against its target-site Tm.**
    `tm_calculate("probes.fa", window = NULL)` already returns one Tm per
    record, and the Introduction motivates the package partly by probe Tm
    harmonisation on microarrays, but nothing in the package demonstrates
@@ -224,21 +246,22 @@ assumed, not checked, and it is wrong; see item 4.)
    matched and the mismatched allele, and a worked example there would
    also exercise the user-supplied-table path added for Comment 1.4.
 
-   Two prerequisites, both of which are why this is not in 1.1.0: a probe
+   Two prerequisites, both of which are why this is not in 1.1.1: a probe
    set has to be chosen that can be redistributed or fetched
    reproducibly, and the hybrid duplex needs deciding on, since an
    Infinium probe binds bisulfite-converted DNA and a whole-genome
    parameter set is not obviously the right one for it.
 
-## Done in 1.1.0 (for reference)
+## Done in 1.1.1 (for reference)
 
 - `tm_calculate()` absorbed `tm_profile()`: one function from any of four
   sources (BSgenome package, FASTA file, sequences, GRanges) plus `regions`
   to a Tm profile, dispatching one region per worker. `window = NULL` gives
   one window per region, which covers short records such as probes and
-  primers. `tm_profile()` remains as a deprecated alias for one cycle.
-- BPPARAM removed from tm_calculate/tm_nn/tm_gc/tm_wallace; BiocParallel
-  moved to Suggests (still used by the hg38 vignette and benchmarks).
+  primers. `tm_profile()` has since been removed.
+- BPPARAM reinstated on `tm_calculate()` alone, dispatching one region per
+  worker; `tm_nn()`, `tm_gc()` and `tm_wallace()` have none, so parallelism
+  is decided in one place. BiocParallel is therefore in `Imports`.
 - `tool_comparison` vignette retired: the cross-tool benchmark belongs to
   the paper, and its script and CSVs ship in `inst/`.
 - Rcpp nearest-neighbor core (~10x serial speedup); sequence cleaning
@@ -246,4 +269,4 @@ assumed, not checked, and it is wrong; see item 4.)
 - Lazy `result$df` via `$.TmCalculator`.
 - `preload_chr` extraction rewritten with `extractAt()`; N-end scan made
   in-memory (chr21's 5 Mb leading gap: 30 s -> ~1 s).
-- hg38 performance vignette + `inst/scripts/benchmark_hg38.R`.
+- hg38 performance vignette + `inst/scripts/bench_tm_calculate.R`.

@@ -136,8 +136,8 @@ R --vanilla -q -e '
       requireNamespace("BSgenome.Hsapiens.UCSC.hg38", quietly = TRUE))
   say("ps (per-task memory)", requireNamespace("ps", quietly = TRUE))
 
-  scripts <- c("bench_parallel_strategy.R", "bench_parallel_cluster.R",
-               "bench_parallel_cluster.lsf")
+  scripts <- c("bench_tm_calculate.R", "bench_tm_calculate.lsf",
+               "bench_tm_calculate_local.sh")
   present <- vapply(scripts, function(f)
     nzchar(system.file("scripts", f, package = "TmCalculator")), logical(1))
   say("benchmark scripts installed", all(present),
@@ -157,13 +157,13 @@ which runs for hours:
 
   bsub -Is -n 4 -R "span[hosts=1]" -W 0:30 -q interactive bash
   conda activate ${ENV_NAME}
-  Rscript "\$(R --vanilla -q -s -e 'cat(system.file("scripts/bench_parallel_cluster.R", package="TmCalculator"))')" \\
+  Rscript "\$(R --vanilla -q -s -e 'cat(system.file("scripts/bench_tm_calculate.R", package="TmCalculator"))')" \\
     --workers 1,2 --reps 1 --outdir smoke_cluster
 
 Two things to check in that output before going further:
   * df -T on the scratch path must report a LOCAL filesystem. nfs, gpfs or
     lustre means staging did nothing, and several workers reading the .2bit
     at once measure storage contention instead of the software.
-  * n_windows must be 14,687,330 for all three strategies. If they differ the
-    segment boundaries are wrong and every timing below it is meaningless.
+  * n_windows must be 14,687,330 at every worker count. If the counts differ
+    the segment boundaries are wrong and every timing below it is meaningless.
 EOF

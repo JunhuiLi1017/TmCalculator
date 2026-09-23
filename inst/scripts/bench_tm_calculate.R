@@ -4,10 +4,10 @@
 #
 #   Rscript bench_tm_calculate.R --outdir results --workers 1,2,3,4,5,6 --reps 3
 #
-# This measures the shipped function rather than a hand-rolled dispatch
-# loop, which is the difference from bench_parallel_strategy.R: that script
-# implemented three partitioning strategies to decide which one tm_calculate()
-# should use, and this one times the result.
+# This measures the shipped function rather than a hand-rolled dispatch loop.
+# An earlier script implemented three partitioning strategies in order to
+# decide which one tm_calculate() should use; that question was settled in
+# favour of segments, longest first, and this script times the result.
 #
 # WHAT IS MEASURED. Wall-clock time of one tm_calculate() call, including
 # worker start-up, since that is what a user waits through. Peak memory per

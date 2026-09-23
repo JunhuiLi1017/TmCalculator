@@ -629,7 +629,7 @@ S$seq_len <- seq_len
 # start-up times belong to a build that no longer exists. Recording the
 # version makes such a mixture visible instead of silently averaged.
 S$pkg_version <- as.character(utils::packageVersion("TmCalculator"))
-csv <- file.path(outdir, "bench_crosstool.csv")
+csv <- file.path(outdir, "crosstool_bench.csv")
 n_new <- nrow(S)
 
 if (has_flag("--fresh") && file.exists(csv)) {
@@ -684,7 +684,7 @@ if (file.exists(ref_f)) {
                pearson_r = stats::cor(v, ref), stringsAsFactors = FALSE)
   }))
   if (!is.null(cons))
-    utils::write.csv(cons, file.path(outdir, "consistency.csv"),
+    utils::write.csv(cons, file.path(outdir, "crosstool_consistency.csv"),
                      row.names = FALSE)
 }
 
@@ -711,7 +711,7 @@ if (any(!usable)) {
                        "runner did not print COMPUTE_SECONDS")
   print(format(bad, digits = 4), row.names = FALSE)
   cat("\nFor these, wall_s still includes start-up and is a valid upper bound\n",
-      "on the total cost. Inspect bench_crosstool.csv and the tm_*.txt files\n",
+      "on the total cost. Inspect crosstool_bench.csv and the tm_*.txt files\n",
       "in the output directory to see how far the run got.\n", sep = "")
 }
 

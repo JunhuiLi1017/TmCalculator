@@ -99,12 +99,17 @@
 #'       \item "Wetmur1991"
 #'       \item "SantaLucia1996"
 #'       \item "SantaLucia1998-1"
-#'       \item "Owczarzy2004"
-#'       \item "Owczarzy2008"
+#'       \item "Owczarzy2004" (\code{method = "tm_nn"} only)
+#'       \item "Owczarzy2008" (\code{method = "tm_nn"} only)
 #'       \item "none" (also selected automatically when \code{nn_table} was
 #'         fitted at the requested \code{Na})
 #'     }
 #' }
+#'
+#' With \code{method = "tm_gc"} the salt term belongs to the published formula
+#' selected by \code{variant}, so naming a different one is ignored there, with
+#' a warning, unless \code{userset} is supplied. \code{"none"} and \code{NA}
+#' drop the correction and are honoured on either path.
 #' 
 #' \strong{Formamide Unit Options:}
 #' \itemize{
@@ -133,16 +138,35 @@
 #'   \item \code{mismatch}: TRUE/FALSE (default: TRUE)
 #' }
 #' 
-#' @param input_seq Input sequence(s) in 5' to 3' direction. Can be provided as either:
-#'   - A character string (e.g., "ATGCG")
-#'   - A path to a FASTA file containing the sequence(s)
-#'   - A GRanges object with sequence and complement metadata should be provided if mismatch is TRUE
-#'   - A character vector where each element is a string in the format "chr:start-end:strand:species" (e.g., "chr1:100-200:+:BSgenome.Hsapiens.UCSC.hg38"). Strand is "+" for positive (default if not provided) or "-" for negative.
-#'     - chr: Chromosome ID
-#'     - start: Start position
-#'     - end: End position
-#'     - strand: positive or negtive strand
-#'     - species:  Species name for reference genome (e.g., "BSgenome.Hsapiens.UCSC.hg38"), see \code{BSgenome::available.genomes()} for all available genomes. please make sure the genome package is installed, otherwise the function will stop.
+#' @param input_seq Where the sequence comes from. One of:
+#'   \itemize{
+#'     \item \strong{Sequences}, as a character vector in 5' to 3' direction,
+#'       e.g. \code{c("ATGCG", "GGCCA")}. Names, when present, become the
+#'       \code{seqnames} of the result; unnamed sequences are keyed by their
+#'       position in the vector.
+#'     \item \strong{An installed BSgenome package}, by name, e.g.
+#'       \code{"BSgenome.Hsapiens.UCSC.hg38"}. It is named rather than passed
+#'       as a loaded object because each worker opens the genome for itself,
+#'       so no sequence crosses between processes. See
+#'       \code{BSgenome::available.genomes()} for what exists, and install the
+#'       package before calling.
+#'     \item \strong{A FASTA file}, by path; gzipped files are read directly.
+#'     \item \strong{A \code{GRanges}} carrying a \code{sequence} metadata
+#'       column. The complement is derived from it when absent.
+#'   }
+#'   \code{regions} selects from any of the four, and means the same thing in
+#'   each: the identifier before the colon is resolved against whatever names
+#'   the source itself offers, and falls back to position. A BSgenome or a
+#'   FASTA file with no \code{regions} is taken whole, which for a genome
+#'   means its standard chromosomes.
+#'
+#'   Also accepted, and unchanged from earlier versions: a character vector of
+#'   coordinate strings \code{"chr:start-end:strand:species"}, for example
+#'   \code{"chr1:100-200:+:BSgenome.Hsapiens.UCSC.hg38"}, where strand
+#'   defaults to \code{"+"}. This form carries its own genome in every
+#'   element, so it is read directly and ignores \code{regions}; to profile
+#'   coordinates against a genome, prefer passing the genome here and the
+#'   coordinates as \code{regions}.
 #' 
 #' @param complement_seq Complementary sequence(s) in 3' to 5' direction. If not provided,
 #'   the function will automatically generate it from input_seq. This is the template/target
@@ -242,7 +266,17 @@
 #'   - "Owczarzy2004": Comprehensive salt correction
 #'   - "Owczarzy2008": Updated comprehensive salt correction
 #'   Default: "Schildkraut2010"
-#' 
+#'
+#'   With \code{method = "tm_gc"} the salt term is part of the published
+#'   formula selected by \code{variant}, so naming a \emph{different} one is
+#'   ignored there, with a warning, unless \code{userset} is supplied.
+#'   \code{"none"} (or \code{NA}) is not a substitution but a request to drop
+#'   the correction, and is honoured on either path without a warning. The two
+#'   Owczarzy corrections are not available to \code{"tm_gc"} at all: they
+#'   apply to the reciprocal of the melting temperature in kelvin, referenced
+#'   to the same duplex in 1 M Na+, and carry a duplex-length term the
+#'   GC-content formulas already have.
+#'
 #' @param DMSO Percent DMSO concentration in the reaction mixture. Default: 0
 #' 
 #' @param formamide_unit Formamide concentration as `list(value, unit)`. Default: list(value = 0, unit = "percent")
@@ -468,13 +502,55 @@ tm_calculate <- function(input_seq,
                         keep_sequence = NULL,
                         tmpdir = tempdir(),
                         verbose = FALSE) {
+  # Read before anything reassigns it: missing() is only reliable while the
+  # argument is untouched, and `salt_method <- match.arg(salt_method)` below
+  # would make it FALSE for every call. NULL counts as not named, because it
+  # is the spelling tm_gc() documents for "use the formula's own"; match.arg()
+  # would otherwise turn it into the first candidate and warn about a method
+  # the caller never asked for.
+  salt_named  <- !missing(salt_method) && !is.null(salt_method)
   method      <- match.arg(method, several.ok = FALSE)
   unit        <- match.arg(unit)
+  # tm_gc() spells "no salt correction" as NA as well as "none"; match.arg()
+  # cannot express NA, so the two are made the same thing here rather than
+  # left as a disagreement between the two entry points.
+  if (length(salt_method) == 1L && is.na(salt_method)) salt_method <- "none"
   # Validated once and passed down as a scalar. Without this the full default
   # candidate vector reached tm_gc(), whose own match.arg() has no "none"
   # choice and failed with "'arg' must be of length 1" for any tm_gc call
-  # relying on defaults.
+  # relying on defaults. Same reasoning for variant.
   salt_method <- match.arg(salt_method)
+  variant     <- match.arg(variant)
+
+  # A GC-content formula carries its own salt term, so salt_method applies to
+  # tm_gc() only when userset is supplied. Saying so here, once, is the only
+  # place it can be said: this function runs in the calling process, whereas
+  # tm_gc() runs once per task under a BPPARAM.
+  if (identical(method, "tm_gc") && salt_named) {
+    if (salt_method %in% c("Owczarzy2004", "Owczarzy2008")) {
+      # Rejected here rather than inside tm_gc() so that the message reaches
+      # the caller instead of surfacing as one worker's error.
+      stop("`salt_method = \"", salt_method, "\"` is not available for ",
+           "method = \"tm_gc\". The Owczarzy corrections apply to the ",
+           "reciprocal of the melting temperature in kelvin, referenced to ",
+           "the same duplex in 1 M Na+, and carry a duplex-length term of ",
+           "their own, which the GC-content formulas already have. Use ",
+           "method = \"tm_nn\" for them.", call. = FALSE)
+    }
+    # "none" is not a substitution but a request to drop the correction, and
+    # tm_gc() honours it on either path, so it is not warned about.
+    if (is.null(userset) && !identical(salt_method, "none")) {
+      own <- get_table("GC_VARTAB")[variant, "salt_correct"]
+      if (!identical(salt_method, own)) {
+        carries <- if (is.na(own)) "no salt term of its own"
+                   else paste0("the '", own, "' salt term")
+        warning("variant '", variant, "' carries ", carries, ", so ",
+                "`salt_method = \"", salt_method, "\"` is ignored by tm_gc(). ",
+                "Supply `userset` to choose the correction yourself.",
+                call. = FALSE)
+      }
+    }
+  }
 
   # Everything that describes the thermodynamic model and nothing that
   # describes where the sequence comes from. Each task hands this back to
@@ -551,9 +627,22 @@ tm_calculate <- function(input_seq,
   gr    <- .tm_run(tasks, src, window, slide, model, BPPARAM,
                    keep_sequence, verbose)
 
+  # What the options report is what was applied, not what was asked for. On
+  # the direct route that is already true, because the returned object is the
+  # one tm_gc() built; here the model is reported instead, and for a built-in
+  # GC variant the salt term it carries is the variant's own rather than
+  # whatever salt_method resolved to. `model` itself is left alone: the
+  # workers have already run against it.
+  opts <- model
+  if (identical(method, "tm_gc"))
+    opts$salt_method <- if (identical(salt_method, "none")) NA_character_
+                        else if (is.null(userset))
+                          get_table("GC_VARTAB")[variant, "salt_correct"]
+                        else salt_method
+
   result <- list(gr = gr,
-                 options = c(model, list(window = window, slide = slide,
-                                         unit = unit, n_tasks = length(tasks))))
+                 options = c(opts, list(window = window, slide = slide,
+                                        unit = unit, n_tasks = length(tasks))))
   class(result) <- c("TmCalculator", "list")
   attr(result, "nonhidden") <- "gr"
 
@@ -642,7 +731,13 @@ tm_calculate <- function(input_seq,
         Tris = Tris,
         Mg = Mg,
         dNTPs = dNTPs,
-        salt_method = salt_method,
+        # NULL lets tm_gc() take the correction published with the variant.
+        # tm_calculate() has already warned if the caller named a different
+        # one; repeating that warning here would repeat it once per task.
+        # "none" is forwarded, because dropping the correction is a request
+        # tm_gc() honours rather than a substitution it refuses.
+        salt_method = if (is.null(userset) && !identical(salt_method, "none"))
+                        NULL else salt_method,
         mismatch = mismatch,
         DMSO = DMSO,
         formamide_unit = formamide_unit,

@@ -536,6 +536,29 @@ tm_nn <- function(gr_seq,
   )
   tm <- chunk_res$Tm
   gc <- chunk_res$GC
+
+  # -- Say why a Tm is missing ----------------------------------------------
+  # An NA used to be returned silently, so a caller who did not test for it
+  # carried it into a mean or a plot without ever being told. The two causes
+  # are reported separately because they call for different fixes: a sequence
+  # the model cannot evaluate is an input problem, an undefined salt
+  # correction is a condition problem.
+  if (isTRUE(chunk_res$n_no_thermo > 0)) {
+    warning(sprintf(paste0(
+      "Tm is NA for %d region(s): fewer than two A/C/G/T/I bases remained ",
+      "after cleaning, or the parameter set lacks an initiation term the ",
+      "sequence requires. GC is still reported for these regions."),
+      chunk_res$n_no_thermo), call. = FALSE)
+  }
+  if (isTRUE(chunk_res$n_no_salt > 0)) {
+    warning(sprintf(paste0(
+      "Tm is NA for %d region(s): the '%s' salt correction is undefined at ",
+      "Na = %s, K = %s, Tris = %s, Mg = %s, dNTPs = %s mM. GC is still ",
+      "reported for these regions."),
+      chunk_res$n_no_salt, salt_fn_eff, Na, K, Tris, Mg, dNTPs),
+      call. = FALSE)
+  }
+
   # One mcols<- assignment rather than two `$<-`: each `$<-` replaces the
   # whole metadata DataFrame and revalidates the GRanges.
   mc_out <- GenomicRanges::mcols(gr_seq)
@@ -707,18 +730,28 @@ tm_nn <- function(gr_seq,
                                formamide_factor = formamide_factor,
                                pt_gc = gc_salt)
 
-  # Reproduce the R core's failure semantics: any sequence whose evaluation
-  # errored (short/missing init rows) or whose salt correction is undefined
-  # (e.g. Owczarzy2008 with sqrt(Mg)/mon >= 6) gets NA for BOTH Tm and GC,
-  # exactly as tryCatch() around .tm_nn_core() did.
-  bad <- !ok
-  if (!is.null(corr_salt)) {
-    bad <- bad | is.na(corr_salt)
-  }
-  tm[bad] <- NA_real_
-  gc_out <- gc_salt
-  gc_out[bad] <- NA_real_
-  list(Tm = unname(tm), GC = unname(gc_out))
+  # A sequence the thermodynamic model cannot evaluate gets NA for Tm. GC does
+  # not follow it: base composition is a property of the sequence rather than
+  # of the model, and it is still the right answer for a sequence that is too
+  # short to melt or whose salt correction is undefined. Only where the
+  # sequence itself carries no countable base is GC NA, which is what
+  # gc_content() reports for the same input.
+  #
+  # The two counts are returned rather than warned about here so that the
+  # message names the arguments the caller actually passed. Under a BPPARAM
+  # each task warns for itself, which is the convention the N-region warning
+  # above already follows.
+  #
+  # A region is attributed to one cause only. A sequence with no countable
+  # base fails the model AND makes the two GC-dependent salt corrections
+  # undefined, and reporting it as a salt problem would be misleading: the
+  # conditions are fine, the sequence is not.
+  no_thermo <- !ok
+  no_salt   <- if (is.null(corr_salt)) rep(FALSE, length(tm)) else is.na(corr_salt)
+  no_salt   <- no_salt & !no_thermo
+  tm[no_thermo | no_salt] <- NA_real_
+  list(Tm = unname(tm), GC = unname(gc_salt),
+       n_no_thermo = sum(no_thermo), n_no_salt = sum(no_salt))
 }
 
 # -- Pure-R chunk worker, kept as reference implementation --------------------
@@ -732,16 +765,22 @@ tm_nn <- function(gr_seq,
   m  <- length(chunk$sequence)
   tm <- rep(NA_real_, m)
   gc <- rep(NA_real_, m)
+  n_no_thermo <- 0L
   for (j in seq_len(m)) {
     seq_str  <- chunk$sequence[j]
     cseq_str <- chunk$complement[j]
     if (is.na(seq_str) || is.na(cseq_str)) {
+      n_no_thermo <- n_no_thermo + 1L
       next
     }
     # Same cleaning as the C++ core: uppercase, keep only A/C/G/T/I
     seq_str  <- gsub("[^ACGTI]", "", toupper(seq_str), perl = TRUE)
     cseq_str <- gsub("[^ACGTI]", "", toupper(cseq_str), perl = TRUE)
+    # GC is recorded before the Tm attempt, and survives its failure, to match
+    # the compiled path.
+    gc[j] <- .gc_vec(seq_str, ambiguous = ambiguous)
     if (nchar(seq_str) < 2L) {
+      n_no_thermo <- n_no_thermo + 1L
       next
     }
     result <- tryCatch(
@@ -751,12 +790,16 @@ tm_nn <- function(gr_seq,
                   dnac_high, dnac_low, self_comp,
                   Na, K, Tris, Mg, dNTPs, salt_fn = salt_fn,
                   DMSO, dmso_factor, formamide_factor, formamide_unit),
-      error = function(e) list(Tm = NA_real_, GC = NA_real_)
+      error = function(e) {
+        n_no_thermo <<- n_no_thermo + 1L
+        list(Tm = NA_real_, GC = gc[j])
+      }
     )
     tm[j] <- result$Tm
     gc[j] <- result$GC
   }
-  list(Tm = unname(tm), GC = unname(gc))
+  list(Tm = unname(tm), GC = unname(gc),
+       n_no_thermo = n_no_thermo, n_no_salt = 0L)
 }
 
 # -- Core single-sequence NN computation --------------------------------------
@@ -801,7 +844,14 @@ tm_nn <- function(gr_seq,
   # substring() is faster than strsplit -> paste for large n
   n     <- nchar(tmp_seq)
   n_int <- n - 1L
-  
+
+  # The compiled core bails here (ok = 0) when padding and trimming have left
+  # fewer than two aligned positions. Without the same guard, substring() with
+  # 1:0 recycles into a pair of nonsense keys instead of none, so the two
+  # implementations would disagree at |shift| >= nchar - 1.
+  if (n_int < 1L || nchar(tmp_cseq) != n)
+    stop("duplex has fewer than two aligned positions after shift", call. = FALSE)
+
   fwd  <- substring(tmp_seq, 1:n_int, 2:(n_int+1))          # forward strand
   #bwd <- substring(paste(rev(strsplit(tmp_seq, "", fixed=TRUE)[[1]]), collapse=""), 1:n_int, 2:(n_int+1))
   cfwd <- substring(tmp_cseq, 1:n_int, 2:(n_int+1))
@@ -815,55 +865,77 @@ tm_nn <- function(gr_seq,
   keys_t_right <- .right_key(tmp_seq, tmp_cseq, n)
   
   #for dang end
-  if(keys_t_left %in% rownames(de_tbl)) {
-    delta_h <- de_tbl[keys_t_left,1] + delta_h
-    delta_s <- de_tbl[keys_t_left,2] + delta_s
+  hit <- .tbl_row(de_tbl, keys_t_left)
+  if (!is.null(hit)) {
+    delta_h <- hit[[1]] + delta_h
+    delta_s <- hit[[2]] + delta_s
     keys_fr <- keys_fr[-1]
     keys_t_left <- keys_fr[1]
     tmp_seq  <- substring(tmp_seq,  2, n)
     tmp_cseq <- substring(tmp_cseq, 2, n)
   }
-  
-  if (keys_t_right %in% rownames(de_tbl)) {
-    delta_h <- de_tbl[keys_t_right, 1] + delta_h
-    delta_s <- de_tbl[keys_t_right, 2] + delta_s
+
+  hit <- .tbl_row(de_tbl, keys_t_right)
+  if (!is.null(hit)) {
+    delta_h <- hit[[1]] + delta_h
+    delta_s <- hit[[2]] + delta_s
     keys_fr <- keys_fr[-length(keys_fr)]
     n <- nchar(tmp_seq) - 1L
     tmp_seq <- substring(tmp_seq, 1, n)
     tmp_cseq <- substring(tmp_cseq, 1, n)
     keys_t_right <- .right_key(tmp_seq, tmp_cseq, n)
   }
-  
-  # for terminal mismatch
-  if(keys_t_left %in% rownames(tmm_tbl)) {
-    delta_h <- tmm_tbl[keys_t_left, 1] + delta_h
-    delta_s <- tmm_tbl[keys_t_left, 2] + delta_s
-    keys_fr <- keys_fr[-1]
-    n <- nchar(tmp_seq)
-    tmp_seq  <- substring(tmp_seq,  2, n)
-    tmp_cseq <- substring(tmp_cseq, 2, n)
+
+  # -- Terminal mismatches -----------------------------------------------
+  # The TMM tables are keyed with the PENULTIMATE pair first and the terminal
+  # pair second ("AA/TA" is a Watson-Crick pair then a mismatch), which is
+  # the orientation read along whichever strand runs 5'->3' towards that end:
+  # the top strand at the right-hand end, so the last key is already in it,
+  # and the bottom strand at the left-hand end, so the key there is the
+  # reversal of the first. Orientation carries meaning, so no reversed retry
+  # (rev_ok = FALSE): a duplex whose terminal pair is Watson-Crick but whose
+  # penultimate pair is not has a terminal-first key of exactly the shape the
+  # table stores, and would otherwise collect a penalty it has not earned.
+  if (length(keys_fr) > 0L) {
+    hit <- .tbl_row(tmm_tbl, .rev_str(keys_fr[1]), rev_ok = FALSE)
+    if (!is.null(hit)) {
+      delta_h <- hit[[1]] + delta_h
+      delta_s <- hit[[2]] + delta_s
+      keys_fr <- keys_fr[-1]
+      n <- nchar(tmp_seq)
+      tmp_seq  <- substring(tmp_seq,  2, n)
+      tmp_cseq <- substring(tmp_cseq, 2, n)
+    }
   }
-  
-  if(keys_t_right %in% rownames(tmm_tbl)) {
-    delta_h <- tmm_tbl[keys_t_right, 1] + delta_h
-    delta_s <- tmm_tbl[keys_t_right, 2] + delta_s
-    #keys_rf <- keys_rf[-1]
-    keys_fr <- keys_fr[-length(keys_fr)]
-    n <- nchar(tmp_seq)-1
-    tmp_seq <- substring(tmp_seq, 1, n)
-    tmp_cseq <- substring(tmp_cseq, 1, n)
+
+  if (length(keys_fr) > 0L) {
+    hit <- .tbl_row(tmm_tbl, keys_fr[length(keys_fr)], rev_ok = FALSE)
+    if (!is.null(hit)) {
+      delta_h <- hit[[1]] + delta_h
+      delta_s <- hit[[2]] + delta_s
+      keys_fr <- keys_fr[-length(keys_fr)]
+      n <- nchar(tmp_seq)-1
+      tmp_seq <- substring(tmp_seq, 1, n)
+      tmp_cseq <- substring(tmp_cseq, 1, n)
+    }
   }
-  
-  # for end effects (Zuber 2022): added, terminal pair NOT consumed
+
+  # for end effects (Zuber 2022): added, terminal pair NOT consumed.
+  # rev_ok = FALSE: this table already lists both orientations of most of its
+  # keys, so a reversed retry could return a different stack's value.
   if (nrow(end_tbl) > 0L) {
-    if (length(keys_fr) > 0L && keys_fr[1] %in% rownames(end_tbl)) {
-      delta_h <- end_tbl[keys_fr[1], 1] + delta_h
-      delta_s <- end_tbl[keys_fr[1], 2] + delta_s
+    if (length(keys_fr) > 0L) {
+      hit <- .tbl_row(end_tbl, keys_fr[1], rev_ok = FALSE)
+      if (!is.null(hit)) {
+        delta_h <- hit[[1]] + delta_h
+        delta_s <- hit[[2]] + delta_s
+      }
     }
     key_e_right <- .right_key(tmp_seq, tmp_cseq, nchar(tmp_seq))
-    if (key_e_right %in% rownames(end_tbl)) {
-      delta_h <- end_tbl[key_e_right, 1] + delta_h
-      delta_s <- end_tbl[key_e_right, 2] + delta_s
+    hit <- .tbl_row(end_tbl, key_e_right, rev_ok = FALSE)
+    if (!is.null(hit)) {
+      delta_h <- hit[[1]] + delta_h
+      delta_s <- hit[[2]] + delta_s
     }
   }
 
@@ -871,14 +943,17 @@ tm_nn <- function(gr_seq,
   delta_h <- nn_tbl['init', 1] + delta_h
   delta_s <- nn_tbl['init', 2] + delta_s
   
-  if(substring(tmp_seq, 1, 1) == 'T'){
-    delta_h <- nn_tbl['init_5T/A', 1] + delta_h
-    delta_s <- nn_tbl['init_5T/A', 2] + delta_s
+  # Once per strand whose 5' end is T. The top strand's is the first base of
+  # the sequence; the bottom strand's is the last base of the complement.
+  # Charging only the first made Tm depend on which strand was handed over.
+  # Biopython tests seq.endswith("A") for the second term, which agrees only
+  # at a Watson-Crick terminus; reading the complement is exact.
+  t5 <- (substring(tmp_seq, 1, 1) == 'T') +
+        (substring(tmp_cseq, nchar(tmp_cseq), nchar(tmp_cseq)) == 'T')
+  if (t5 > 0L) {
+    delta_h <- nn_tbl['init_5T/A', 1] * t5 + delta_h
+    delta_s <- nn_tbl['init_5T/A', 2] * t5 + delta_s
   }
-  #if(substring(tmp_seq, 1, 1) == 'A'){
-  #  delta_h <- nn_tbl['init_5T/A', 1] + delta_h
-  #  delta_s <- nn_tbl['init_5T/A', 2] + delta_s
-  #}
   
   # -- Initiation parameters -------------------------------------------------
   first_base <- substr(tmp_seq, 1, 1)
@@ -900,34 +975,44 @@ tm_nn <- function(gr_seq,
   delta_s <- nn_tbl['init_G/C', 2] * gc_ends + delta_s
   
   # -- Vectorized table lookup -----------------------------------------------
-  # for nn table
-  matched_nn_fr <- keys_fr %in% rownames(nn_tbl)
-  #matched_nn_rf <- keys_rf %in% rownames(nn_tbl)
-  #which_nn_fr <- which(matched_nn_fr)
-  #which_nn_rf <- which(matched_nn_rf)
-  #n_int <- length(keys_fr)
-  #pos_nn_rf <- which_nn_rf[!which_nn_rf %in% (n_int - which_nn_fr + 1)]
+  # Each key is resolved in whichever orientation the table stores it: a key
+  # that misses is retried as its character reversal, which names the same
+  # physical stack. `resolve()` returns the spellings to index the table with,
+  # in order and with multiplicity, dropping the keys it holds neither way.
+  resolve <- function(keys, tbl) {
+    rn  <- rownames(tbl)
+    out <- rep(NA_character_, length(keys))
+    hit <- keys %in% rn
+    out[hit] <- keys[hit]
+    miss <- which(!hit)
+    if (length(miss)) {
+      rk  <- vapply(keys[miss], .rev_str, character(1L), USE.NAMES = FALSE)
+      ok  <- rk %in% rn
+      out[miss[ok]] <- rk[ok]
+    }
+    out
+  }
 
-  delta_h <- sum(nn_tbl[keys_fr[matched_nn_fr], 1]) + delta_h
-  delta_s <- sum(nn_tbl[keys_fr[matched_nn_fr], 2]) + delta_s
-  #delta_h <- sum(nn_tbl[keys_rf[pos_nn_rf], 1]) + delta_h
-  #delta_s <- sum(nn_tbl[keys_rf[pos_nn_rf], 2]) + delta_s
-  
-  # for imm table
-  matched_imm_fr <- keys_fr %in% rownames(imm_tbl)
-  #matched_imm_rf <- keys_rf %in% rownames(imm_tbl)
-  
-  #if(any(c(matched_imm_fr,matched_imm_rf))){
-  if(any(c(matched_imm_fr))){
-    #which_imm_fr <- which(matched_imm_fr)
-    #which_imm_rf <- which(matched_imm_rf)
-    #pos_imm_rf <- which_imm_rf[!which_imm_rf %in% (n_int - which_imm_fr + 1)]
-    
-    delta_h <- sum(imm_tbl[keys_fr[matched_imm_fr], 1]) + delta_h
-    delta_s <- sum(imm_tbl[keys_fr[matched_imm_fr], 2]) + delta_s
-    
-    #delta_h <- sum(imm_tbl[keys_rf[pos_imm_rf], 1]) + delta_h
-    #delta_s <- sum(imm_tbl[keys_rf[pos_imm_rf], 2]) + delta_s
+  # One stack, one parameter: a stack the nn table defines is not also taken
+  # from the mismatch table. The two overlap on the G.U wobble stacks of the
+  # RNA sets, whose spellings occur in the DNA mismatch table (Peyret 1999)
+  # meaning a DNA G.T mismatch; adding both gave such a stack two values. The
+  # nn table wins, being the one chosen for the molecule. No DNA set overlaps
+  # the mismatch table in either orientation, so DNA is unaffected.
+  spell_nn  <- resolve(keys_fr, nn_tbl)
+  spell_imm <- resolve(keys_fr, imm_tbl)
+  spell_imm[!is.na(spell_nn)] <- NA_character_
+
+  use_nn <- spell_nn[!is.na(spell_nn)]
+  if (length(use_nn)) {
+    delta_h <- sum(nn_tbl[use_nn, 1]) + delta_h
+    delta_s <- sum(nn_tbl[use_nn, 2]) + delta_s
+  }
+
+  use_imm <- spell_imm[!is.na(spell_imm)]
+  if (length(use_imm)) {
+    delta_h <- sum(imm_tbl[use_imm, 1]) + delta_h
+    delta_s <- sum(imm_tbl[use_imm, 2]) + delta_s
   }
   
   # -- Symmetry correction ---------------------------------------------------
@@ -1154,6 +1239,33 @@ complement_fast <- function(seq_str, rev = FALSE) {
   }
 }
 
+
+# -- One stack, two spellings -------------------------------------------------
+# A key "XY/WZ" denotes 5'-XY-3' paired with 3'-WZ-5'. Reading the same stack
+# from the other strand reverses the whole key: the bottom strand read 5'->3'
+# is "ZW", the top strand read 3'->5' is "YX". So "XY/WZ" and "ZW/YX" are the
+# same physical stack, and the published tables store only one of the two --
+# the IMM, TMM and DE tables each list every stack in one orientation only.
+# Without this retry, exactly one of the two stacks flanking any mismatch
+# failed to match and contributed zero.
+#
+# `rev_ok = FALSE` is for the two tables where the orientation is not a choice
+# of spelling but part of the meaning: the terminal-mismatch table, whose keys
+# carry the terminal pair second, and the Zuber end-effect table, which
+# already lists both orientations of most of its keys. Their callers build the
+# key in the table's own orientation instead of retrying.
+#
+# `.tbl_row()` returns the row of `tbl` for `key` in whichever orientation the
+# table happens to store it, or NULL.
+#' @keywords internal
+.tbl_row <- function(tbl, key, rev_ok = TRUE) {
+  if (length(key) != 1L || is.na(key) || !nzchar(key)) return(NULL)
+  if (key %in% rownames(tbl)) return(tbl[key, , drop = TRUE])
+  if (!rev_ok) return(NULL)
+  rk <- .rev_str(key)
+  if (rk %in% rownames(tbl)) return(tbl[rk, , drop = TRUE])
+  NULL
+}
 
 .right_key <- function(seq, cseq, len) {
   paste0(

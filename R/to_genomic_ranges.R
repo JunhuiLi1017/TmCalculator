@@ -17,7 +17,27 @@
 #'     - end: End position
 #'     - strand: positive or negative strand
 #'     - species:  Species name for reference genome (e.g., "BSgenome.Hsapiens.UCSC.hg38"), see \code{BSgenome::available.genomes()} for all available genomes. please make sure the genome package is installed, otherwise the function will stop.
-#' @param complement_seq Optional complementary sequences. If NULL, complementary sequences will be auto-generated. otherwise, the complementary sequences will be used as metadata. Can be provided as format of input_seq.
+#' @param complement_seq Optional complementary sequences, in the same formats
+#'   \code{input_seq} accepts. \code{NULL} (default) generates them.
+#'
+#'   Supply the \strong{plain complement}, aligned base for base with
+#'   \code{input_seq}: position \code{i} of \code{complement_seq} is the base
+#'   paired with position \code{i} of \code{input_seq}, so written underneath
+#'   it the complement runs \strong{3' to 5'}. Same length, same order, no
+#'   reversal.
+#'
+#'   \preformatted{
+#'   input_seq       5'-G C A T C G-3'
+#'   complement_seq  3'-C G T A G C-5'
+#'   }
+#'
+#'   The \emph{reverse} complement ("CGATGC" here) is the same strand written
+#'   5' to 3', which is what \code{Biostrings::reverseComplement()} and a
+#'   supplier's order form give you. Passing it pairs every position against
+#'   the wrong base; the call warns when it detects this.
+#'
+#'   A complement that differs from the plain one at some positions is a
+#'   mismatched duplex and is handled as such.
 #' @return A GenomicRanges object with seqnames, ranges, strand, name, sequence, Complement, and Tm as metadata.
 #' @examples
 #' # Using a character vector with auto-generated complementary sequences
@@ -92,6 +112,8 @@ to_genomic_ranges <- function(input_seq, complement_seq = NULL) {
       stop("Complementary sequence must be a character string (e.g., c('ATGCG', 'GCTAG') ), a character vector of genomic coordinate (e.g., 'chr1:100-200:+:BSgenome.Hsapiens.UCSC.hg38'), or a FASTA file")
     }
     input_gr$complement <- input_gr_comp$sequence
+    .warn_if_reverse_complement(as.character(input_gr$sequence),
+                                as.character(input_gr$complement))
   } else {
     # Auto-generate complementary sequences
     comp_vector <- generate_complement(as.character(input_gr$sequence))
@@ -99,6 +121,66 @@ to_genomic_ranges <- function(input_seq, complement_seq = NULL) {
   }
   
   return(input_gr)
+}
+
+# -- The one mistake this argument invites ------------------------------------
+# `complement_seq` wants the plain complement, aligned base for base with the
+# sequence and therefore written 3' to 5'. The reverse complement is the same
+# strand written the conventional way round, and it is what nearly every other
+# tool hands you (Biostrings::reverseComplement, a supplier's order form). Pass
+# it here and every position is paired against the wrong base: the duplex is
+# read as almost entirely mismatched, and the Tm that comes back is a large
+# negative number rather than an error.
+#
+# The test is cheap and unambiguous. If reversing the supplied complement makes
+# it pair better, it was supplied reversed. Nothing is changed -- a caller may
+# legitimately want a heavily mismatched duplex -- only said out loud.
+#
+# Inert for RNA spelled with U, because U is not in the complement map below
+# (the rest of the package spells RNA with T as well); both readings then score
+# about a half and the gate never closes. That is a gap, not a false positive.
+#' @keywords internal
+.warn_if_reverse_complement <- function(seqs, comps) {
+  n <- min(length(seqs), length(comps))
+  if (n == 0L) return(invisible(NULL))
+  # The mistake is made once, for a whole call, so the first few sequences
+  # settle it. Capping keeps this off the critical path of a large input.
+  idx <- seq_len(min(n, 200L))
+  seqs <- seqs[idx]; comps <- comps[idx]; n <- length(idx)
+  pairs <- function(a, b) {
+    if (is.na(a) || is.na(b) || nchar(a) != nchar(b) || nchar(a) == 0L)
+      return(NA_real_)
+    x <- strsplit(toupper(a), "", fixed = TRUE)[[1]]
+    y <- strsplit(chartr("ATGCMKRYWSBVDHNI", "TACGKMYRWSVBHDNI", toupper(b)),
+                  "", fixed = TRUE)[[1]]
+    mean(x == y)
+  }
+  as_is <- rev_ed <- numeric(0)
+  for (i in seq_len(n)) {
+    b <- comps[i]
+    rb <- if (is.na(b)) NA_character_ else
+      paste(rev(strsplit(b, "", fixed = TRUE)[[1]]), collapse = "")
+    as_is  <- c(as_is,  pairs(seqs[i], b))
+    rev_ed <- c(rev_ed, pairs(seqs[i], rb))
+  }
+  keep <- !is.na(as_is) & !is.na(rev_ed)
+  if (!any(keep)) return(invisible(NULL))
+  as_is <- as_is[keep]; rev_ed <- rev_ed[keep]
+  # Only when the reversed reading is both much better and essentially perfect,
+  # so that a genuinely mismatched duplex is never flagged.
+  flagged <- rev_ed >= 0.9 & as_is < 0.5
+  if (any(flagged)) {
+    warning(sprintf(
+      paste0("`complement_seq` looks like a reverse complement for %d of the ",
+             "%d sequence(s) examined: as supplied only %.0f%% of positions ",
+             "pair, but %.0f%% pair once it is reversed. This argument wants ",
+             "the plain complement, aligned base for base with `input_seq` ",
+             "and so written 3' to 5' -- generate_complement(x) or ",
+             "Biostrings::complement(), not reverseComplement()."),
+      sum(flagged), length(as_is), 100 * mean(as_is[flagged]),
+      100 * mean(rev_ed[flagged])), call. = FALSE)
+  }
+  invisible(NULL)
 }
 
 #' Convert sequence strings to GenomicRanges object
@@ -140,8 +222,13 @@ vec_to_genomic_ranges <- function(input_seq) {
   ## milliseconds per sequence and dominated genome-scale runs; the parsing
   ## rules below are unchanged.
 
-  ## Defaults for unnamed sequences, or names that match no pattern
-  chr    <- rep("chr1", n)
+  ## Defaults for unnamed sequences, or names that match no pattern.
+  ## The seqname is the sequence's position in the input. Every unnamed
+  ## sequence used to be labelled "chr1", which named a chromosome that was
+  ## not involved and gave every row the same key, so nothing in the result
+  ## said which input a Tm came from. A position says exactly that, and is
+  ## what `regions = "3:1-20"` already means for an unnamed vector.
+  chr    <- as.character(seq_len(n))
   starts <- rep(1L, n)
   ends   <- as.integer(nchar(input_seq))
   strand <- rep("*", n)

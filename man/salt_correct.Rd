@@ -61,6 +61,17 @@ Different correction methods are available for various experimental conditions:
 - SantaLucia1998-2: Alternative DNA salt correction (requires sequence information)
 - Owczarzy2004: Comprehensive salt correction including effects of divalent cations (requires sequence information)
 - Owczarzy2008: Updated comprehensive salt correction (requires sequence information)
+
+Owczarzy2008 is piecewise. Which of its three forms applies is decided by
+the ratio \eqn{R = \sqrt{[Mg^{2+}]_{free}} / [Mon]}, where \eqn{[Mon]} is
+the total monovalent concentration in molar and the free magnesium is what
+is left after chelation by dNTPs (\eqn{K_a = 3 \times 10^4}
+\eqn{M^{-1}}). Below 0.22 the monovalent term alone applies; between 0.22
+and 6 a competing form whose coefficients are themselves functions of
+\eqn{[Mon]}; at 6 and above the divalent-dominated form, in which
+\eqn{[Mon]} drops out of the expression entirely. A solution with
+magnesium and no monovalent cation at all therefore has a defined
+correction rather than none.
 }
 \examples{
 

@@ -15,8 +15,7 @@ tm_gc(
   Tris = 0,
   Mg = 0,
   dNTPs = 0,
-  salt_method = c("Schildkraut2010", "Wetmur1991", "SantaLucia1996", "SantaLucia1998-1",
-    "Owczarzy2004", "Owczarzy2008"),
+  salt_method = NULL,
   mismatch = TRUE,
   DMSO = 0,
   formamide_unit = list(value = 0, unit = "percent"),
@@ -59,16 +58,30 @@ distributing their contribution to GC content based on their possible nucleotide
 
 \item{dNTPs}{Millimolar concentration of deoxynucleotide triphosphates. Default: 0}
 
-\item{salt_method}{Salt correction method. \code{NULL} (default) uses the
-method associated with \code{variant}. Set to \code{NA} to disable salt
-correction. Options:
-- "Schildkraut2010": Schildkraut & Lifson 1965
-- "Wetmur1991": Wetmur 1991
-- "SantaLucia1996": SantaLucia 1996
-- "SantaLucia1998-1": SantaLucia 1998 (Method 1)
-- "Owczarzy2004": Owczarzy 2004
-- "Owczarzy2008": Owczarzy 2008
-Note: "SantaLucia1998-2" is not available for this function.}
+\item{salt_method}{Salt correction method:
+  - \code{NULL} (default): the correction that belongs to the formula, i.e.
+    the one published with \code{variant}, or \code{"Schildkraut2010"}
+    when \code{userset} is supplied.
+  - \code{NA} or \code{"none"}: no salt correction at all.
+  - "Schildkraut2010": Schildkraut & Lifson 1965
+  - "Wetmur1991": Wetmur 1991
+  - "SantaLucia1996": SantaLucia 1996
+  - "SantaLucia1998-1": SantaLucia 1998 (Method 1)
+
+  With a built-in \code{variant} the salt term is part of the published
+  formula rather than a free choice, so naming a \emph{different} one is
+  ignored with a warning: the result would otherwise be labelled with one
+  method and computed with another. Supply \code{userset} to choose the
+  correction yourself. Dropping it with \code{NA} is not a substitution
+  and is honoured on either path.
+
+  "SantaLucia1998-2", "Owczarzy2004" and "Owczarzy2008" are not available
+  for this function. The first corrects the entropy of a nearest-neighbor
+  model, which a GC-content formula does not have. The other two correct
+  the reciprocal of the melting temperature in kelvin, referenced to the
+  same duplex in 1 M Na+, and carry a duplex-length term of their own,
+  which these formulas already have. All three are available in
+  \code{\link{tm_nn}}.}
 
 \item{mismatch}{Logical. If TRUE (default), every 'X' in the sequence is counted as a mismatch}
 
@@ -100,13 +113,13 @@ input_seq <- c("ATCGTGCGTAGCAGTACGATCAGTAG", "ATCGTGCGTAGCAGTACGATCAGTAG")
 gr_seq <- to_genomic_ranges(input_seq)
 out <- tm_gc(gr_seq, ambiguous = TRUE, variant = "Primer3Plus", Na = 50, mismatch = TRUE)
 out
-out$Options
+out$options
 
 }
 \references{
 Marmur J, Doty P. Determination of the base composition of deoxyribonucleic acid from its thermal denaturation temperature. Journal of Molecular Biology, 1962, 5(1):109-118.
 
-Schildkraut C. Dependence of the melting temperature of DNA on salt concentration. Biopolymers, 2010, 3(2):195-208.
+Schildkraut C, Lifson S. Dependence of the melting temperature of DNA on salt concentration. Biopolymers, 1965, 3(2):195-208.
 
 Wetmur JG. DNA Probes: Applications of the Principles of Nucleic Acid Hybridization. CRC Critical Reviews in Biochemistry, 1991, 26(3-4):33.
 

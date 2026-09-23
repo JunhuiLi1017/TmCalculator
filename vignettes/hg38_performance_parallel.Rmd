@@ -2,7 +2,11 @@
 title: "Genome-Scale Tm Profiling on hg38: Inputs, Parallel Execution and Performance"
 author: "Junhui Li, Lihua Julie Zhu"
 date: "`r Sys.Date()`"
-output: rmarkdown::html_vignette
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 3
+    number_sections: true
 vignette: >
   %\VignetteIndexEntry{Genome-Scale Tm Profiling on hg38: Inputs, Parallel Execution and Performance}
   %\VignetteEngine{knitr::rmarkdown}
@@ -75,10 +79,8 @@ default that quietly decides how many rows come back. Adding workers is one
 more argument:
 
 ```{r quick-start-parallel}
-library(BiocParallel)
-
 tm <- tm_calculate(hg38, window = 200, slide = 200,
-                   BPPARAM = SnowParam(workers = 5))$gr
+                   BPPARAM = BiocParallel::SnowParam(workers = 5))$gr
 ```
 
 Same windows, same Tm values, about a third of the time. How the genome is
@@ -148,7 +150,7 @@ tm_calculate(probes_gr, regions = "chr7:1-1e6")
 ## oligos returns one Tm per record. It is refused for a region over 1 Mb,
 ## where a single Tm would mean nothing.
 tm_calculate("probes.fa", window = NULL)
-tm_calculate(oligos, BPPARAM = SnowParam(5))
+tm_calculate(oligos, BPPARAM = BiocParallel::SnowParam(5))
 ```
 
 Three things are worth knowing before you trust the output.
@@ -186,9 +188,9 @@ sequence is ever serialized. `unit` decides how tasks are cut.
 
 ```{r unit}
 tm_calculate(hg38, window = 200, unit = "segment",   # the default: 73 tasks
-             segment_size = 50e6, BPPARAM = SnowParam(workers = 5))
+             segment_size = 50e6, BPPARAM = BiocParallel::SnowParam(5))
 tm_calculate(hg38, window = 200, unit = "region",    # 24 tasks
-             BPPARAM = SnowParam(workers = 5))
+             BPPARAM = BiocParallel::SnowParam(5))
 ```
 
 The two calls return the same profile, row for row. `regions` and `window`
@@ -210,79 +212,61 @@ measured running slower than a single process.
 
 # How many workers, and how long?
 
-Memory, not cores, is usually what limits the worker count, because each
-worker holds the sequences of its own task.
-
 The sweep below ships with the package: hg38 at 200 bp non-overlapping
 windows, 14,687,330 windows, one to six workers, three repetitions per
-configuration, on a six-core 16 GB laptop and on a cluster compute node with
-six slots and a 48 GB memory limit.
+configuration, on a six-core 16 GB laptop and on a cluster compute node given
+six slots and the same 16 GB, so that the two differ in their processors and
+not in their quota.
 
 ```{r sweep-data, eval=TRUE}
-# Read the shipped sweeps rather than transcribing numbers, so the table
-# cannot drift from the measurements it describes. The two files do not
-# carry the same columns, the cluster sweep also recording the host and CPU
-# model it landed on, so both are cut to the four columns used here before
-# they are stacked.
-cols <- c("strategy", "n_workers", "wall_s", "max_rss_gb")
+# Read the shipped summaries rather than transcribing numbers, so the table
+# cannot drift from the measurements it describes.
 read_sweep <- function(file, env) {
   d <- utils::read.csv(system.file("extdata", file, package = "TmCalculator"),
                        stringsAsFactors = FALSE)
-  d <- d[d$strategy == "segment", cols]      # the default unit of tm_calculate()
-  d$env <- env
+  d$Environment <- env
   d
 }
-raw <- rbind(read_sweep("bench_parallel_strategy.csv", "Laptop"),
-             read_sweep("bench_parallel_cluster.csv",  "Compute node"))
-
-sweep <- do.call(rbind, lapply(
-  split(raw, list(raw$env, raw$n_workers), drop = TRUE),
-  function(d) data.frame(
-    Environment = d$env[1], Workers = d$n_workers[1],
-    wall_s = median(d$wall_s), lo = min(d$wall_s), hi = max(d$wall_s),
-    rss_gb = median(d$max_rss_gb), stringsAsFactors = FALSE)))
-
-serial <- stats::setNames(sweep$wall_s[sweep$Workers == 1L],
-                          sweep$Environment[sweep$Workers == 1L])
-sweep$Speedup <- serial[sweep$Environment] / sweep$wall_s
-sweep <- sweep[order(sweep$Environment != "Laptop", sweep$Workers), ]
+sweep <- rbind(read_sweep("bench_hg38_laptop.csv",  "Laptop"),
+               read_sweep("bench_hg38_cluster.csv", "Compute node"))
+sweep <- sweep[order(sweep$Environment != "Laptop", sweep$n_workers), ]
 ```
 
 ```{r sweep-table, eval=TRUE}
 knitr::kable(
   data.frame(
     Environment = sweep$Environment,
-    Workers     = sweep$Workers,
+    Workers     = sweep$n_workers,
     `Wall time (s)` = sprintf("%.1f [%.1f-%.1f]", sweep$wall_s, sweep$lo, sweep$hi),
-    Speedup     = sprintf("%.2f", sweep$Speedup),
-    `Peak RSS per worker (GB)` = sprintf("%.2f", sweep$rss_gb),
+    Speedup     = sprintf("%.2f", sweep$speedup),
+    `Peak RSS per worker (GB)` = sprintf("%.2f", sweep$peak_worker_gb),
     check.names = FALSE),
   row.names = FALSE,
   caption = paste("Median of three repetitions, observed range in brackets.",
                   "Wall time includes worker start-up."))
 ```
 
-```{r sweep-figure, eval=TRUE, fig.width=8, fig.height=3.6, fig.cap="Wall-clock time and peak memory per worker against worker count, on a six-core 16 GB laptop (solid, filled) and a compute node with a 48 GB limit (dashed, open). Points are medians of three repetitions; bars give the observed range."}
+```{r sweep-figure, eval=TRUE, fig.width=8, fig.height=3.6, fig.cap="Wall-clock time and peak memory per worker against worker count, on a six-core 16 GB laptop (solid, filled) and a compute node given six slots and 16 GB (dashed, open). Points are medians of three repetitions; bars give the observed range."}
 op <- par(mfrow = c(1, 2), mar = c(4.2, 4.4, 2.2, 0.8), mgp = c(2.6, 0.7, 0))
 for (what in c("wall", "rss")) {
-  ys <- if (what == "wall") sweep$wall_s else sweep$rss_gb
-  plot(range(sweep$Workers), range(0, ys * 1.05), type = "n",
+  ys <- if (what == "wall") sweep$wall_s else sweep$peak_worker_gb
+  plot(range(sweep$n_workers), range(0, ys * 1.05), type = "n",
        xlab = "Workers", xaxt = "n", adj = 0,
        ylab = if (what == "wall") "Wall clock (s)" else "Peak resident size per worker (GB)",
        main = if (what == "wall") "A" else "B")
-  axis(1, at = sort(unique(sweep$Workers)))
+  axis(1, at = sort(unique(sweep$n_workers)))
   for (e in unique(sweep$Environment)) {
     d <- sweep[sweep$Environment == e, ]
-    y <- if (what == "wall") d$wall_s else d$rss_gb
+    y <- if (what == "wall") d$wall_s else d$peak_worker_gb
     solid <- e == "Laptop"
     if (what == "wall")
-      arrows(d$Workers, d$lo, d$Workers, d$hi, angle = 90, code = 3,
+      arrows(d$n_workers, d$lo, d$n_workers, d$hi, angle = 90, code = 3,
              length = 0.03, col = "grey40")
-    lines(d$Workers, y, lty = if (solid) 1 else 2, col = "grey20")
-    points(d$Workers, y, pch = if (solid) 19 else 1, col = "grey20")
+    lines(d$n_workers, y, lty = if (solid) 1 else 2, col = "grey20")
+    points(d$n_workers, y, pch = if (solid) 19 else 1, col = "grey20")
   }
   if (what == "wall")
-    legend("topright", c("Laptop, 16 GB", "Compute node, 48 GB"),
+    legend("topright", c("Laptop, 6 cores", "Compute node, 6 slots"),
            lty = c(1, 2), pch = c(19, 1), bty = "n", cex = 0.85, col = "grey20")
 }
 par(op)
@@ -290,23 +274,32 @@ par(op)
 
 Two things in that table decide a worker count.
 
-**More workers stop helping, and where depends on memory.** The laptop is
-fastest at five workers, 189 s against 578.5 s in one process, and a sixth
-worker makes the run *slower*. The node, with three times the memory,
-improves all the way to six workers and 127 s. The turnover is memory
-pressure rather than anything in the software, which is why the optimum
-belongs to the machine and not to the package.
+**More workers stop helping, and where depends on cores.** The laptop is
+fastest at five workers, 179.7 s against 590.3 s in one process, and a sixth
+worker returns the same time with a far wider spread across repetitions
+(176.4 to 214.9 s, against 10.9 s or less at every smaller count). Five
+workers and the process that dispatches them already occupy the laptop's six
+cores, so the sixth has none left. The node, whose six slots sit on a
+forty-core machine, improves all the way to six workers and 114.4 s, its
+repetitions differing by 2.2 s or less throughout.
 
-**Memory per worker falls as you add workers**, from 4.87 GB in the
-one-worker run to 1.86 GB at five, because no worker holds more than one
-50 Mb task at a time. That is what makes more workers affordable at all.
+**Memory was not the limit on either machine.** Peak resident size per worker
+reached 3.5 GB in the one-worker run and stayed between 2.0 and 3.6 GB
+thereafter, because no worker holds more than one 50 Mb task at a time. Both
+sweeps ran well inside 16 GB.
+
+Fitting the wall times to Amdahl's law gives `T(n) = 79.4 + 509.2/n` on the
+laptop and `T(n) = 41.6 + 456.4/n` on the node, both with R-squared of at
+least 0.997. The divisible part is nearly the same on the two machines, as it
+should be for the same work; what differs is the constant, by a factor of
+1.9, and the number of cores available to divide among.
 
 A rule that works on both machines:
 
-> workers = min(physical cores - 1, (available GB - 4) / 2)
+> workers = physical cores - 1
 
 Confirm it on your own machine with a short sweep over one chromosome rather
-than the whole genome. Note that worker start-up, roughly ten seconds per
+than the whole genome. Note that worker start-up, roughly nine seconds per
 call, is included in every timing, so a run that takes less than a minute
 will understate the speedup:
 
@@ -315,18 +308,18 @@ for (n in 1:6) {
   t <- system.time(
     tm_calculate(hg38, regions = "chr21", window = 200, slide = 200,
                  method = "tm_nn", segment_size = 10e6,
-                 BPPARAM = SnowParam(workers = n), verbose = FALSE))
+                 BPPARAM = BiocParallel::SnowParam(n), verbose = FALSE))
   cat(sprintf("%d workers: %.1f s\n", n, t[["elapsed"]]))
 }
 ```
 
-The sweeps above were produced by `bench_parallel_strategy.R` on the laptop
-and by `bench_parallel_cluster.R`, with its LSF submission file
-`bench_parallel_cluster.lsf`, on the compute node. All three are in
-`system.file("scripts", package = "TmCalculator")`, and their output is the
-two CSV files read here, `bench_parallel_strategy.csv` and
-`bench_parallel_cluster.csv` in `extdata`, so re-running one on your own
-hardware means replacing a file.
+The sweeps above were produced by `bench_tm_calculate.R`, driven by
+`bench_tm_calculate_local.sh` on the laptop and by `bench_tm_calculate.lsf`
+on the compute node. All three are in
+`system.file("scripts", package = "TmCalculator")`, and their summaries are
+the two CSV files read here, `bench_hg38_laptop.csv` and
+`bench_hg38_cluster.csv` in `extdata`, so re-running one on your own
+machine produces a file this vignette can read.
 
 `bench_tm_calculate.R` in the same directory times `tm_calculate()` itself over
 a range of worker counts, with `bench_tm_calculate.lsf` to submit it, and is

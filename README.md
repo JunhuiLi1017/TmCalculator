@@ -1,5 +1,5 @@
 # TmCalculator <a href="https://github.com/JunhuiLi1017/TmCalculator"><img src="man/figures/logo.png" align="right" height="138" /></a>
-v1.1.0
+v1.1.1
 
 Genome-wide nucleic acid melting temperature (Tm) profiling and multi-omics
 integration. Results are returned as `GRanges` objects, so Tm can be used

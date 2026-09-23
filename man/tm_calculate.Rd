@@ -56,16 +56,35 @@ tm_calculate(
 )
 }
 \arguments{
-\item{input_seq}{Input sequence(s) in 5' to 3' direction. Can be provided as either:
-- A character string (e.g., "ATGCG")
-- A path to a FASTA file containing the sequence(s)
-- A GRanges object with sequence and complement metadata should be provided if mismatch is TRUE
-- A character vector where each element is a string in the format "chr:start-end:strand:species" (e.g., "chr1:100-200:+:BSgenome.Hsapiens.UCSC.hg38"). Strand is "+" for positive (default if not provided) or "-" for negative.
-  - chr: Chromosome ID
-  - start: Start position
-  - end: End position
-  - strand: positive or negtive strand
-  - species:  Species name for reference genome (e.g., "BSgenome.Hsapiens.UCSC.hg38"), see \code{BSgenome::available.genomes()} for all available genomes. please make sure the genome package is installed, otherwise the function will stop.}
+\item{input_seq}{Where the sequence comes from. One of:
+  \itemize{
+    \item \strong{Sequences}, as a character vector in 5' to 3' direction,
+      e.g. \code{c("ATGCG", "GGCCA")}. Names, when present, become the
+      \code{seqnames} of the result; unnamed sequences are keyed by their
+      position in the vector.
+    \item \strong{An installed BSgenome package}, by name, e.g.
+      \code{"BSgenome.Hsapiens.UCSC.hg38"}. It is named rather than passed
+      as a loaded object because each worker opens the genome for itself,
+      so no sequence crosses between processes. See
+      \code{BSgenome::available.genomes()} for what exists, and install the
+      package before calling.
+    \item \strong{A FASTA file}, by path; gzipped files are read directly.
+    \item \strong{A \code{GRanges}} carrying a \code{sequence} metadata
+      column. The complement is derived from it when absent.
+  }
+  \code{regions} selects from any of the four, and means the same thing in
+  each: the identifier before the colon is resolved against whatever names
+  the source itself offers, and falls back to position. A BSgenome or a
+  FASTA file with no \code{regions} is taken whole, which for a genome
+  means its standard chromosomes.
+
+  Also accepted, and unchanged from earlier versions: a character vector of
+  coordinate strings \code{"chr:start-end:strand:species"}, for example
+  \code{"chr1:100-200:+:BSgenome.Hsapiens.UCSC.hg38"}, where strand
+  defaults to \code{"+"}. This form carries its own genome in every
+  element, so it is read directly and ignores \code{regions}; to profile
+  coordinates against a genome, prefer passing the genome here and the
+  coordinates as \code{regions}.}
 
 \item{method}{Method(s) to use for Tm calculation. Can be one or more of:
 - "tm_nn": Nearest Neighbor thermodynamics (default)
@@ -156,16 +175,26 @@ Usersets override value sets. Default: NULL}
 \item{dNTPs}{Millimolar concentration of deoxynucleotide triphosphates. Default: 0}
 
 \item{salt_method}{Salt correction method for Tm. Default: "Schildkraut2010"
-Available options:
-- "none": Disables salt correction. Also selected automatically when the
-  chosen \code{nn_table} was fitted at the requested \code{Na}.
-- "Schildkraut2010": Updated salt correction method
-- "Wetmur1991": Classic salt correction method
-- "SantaLucia1996": DNA-specific salt correction
-- "SantaLucia1998-1": Improved DNA salt correction
-- "Owczarzy2004": Comprehensive salt correction
-- "Owczarzy2008": Updated comprehensive salt correction
-Default: "Schildkraut2010"}
+  Available options:
+  - "none": Disables salt correction. Also selected automatically when the
+    chosen \code{nn_table} was fitted at the requested \code{Na}.
+  - "Schildkraut2010": Updated salt correction method
+  - "Wetmur1991": Classic salt correction method
+  - "SantaLucia1996": DNA-specific salt correction
+  - "SantaLucia1998-1": Improved DNA salt correction
+  - "Owczarzy2004": Comprehensive salt correction
+  - "Owczarzy2008": Updated comprehensive salt correction
+  Default: "Schildkraut2010"
+
+  With \code{method = "tm_gc"} the salt term is part of the published
+  formula selected by \code{variant}, so naming a \emph{different} one is
+  ignored there, with a warning, unless \code{userset} is supplied.
+  \code{"none"} (or \code{NA}) is not a substitution but a request to drop
+  the correction, and is honoured on either path without a warning. The two
+  Owczarzy corrections are not available to \code{"tm_gc"} at all: they
+  apply to the reciprocal of the melting temperature in kelvin, referenced
+  to the same duplex in 1 M Na+, and carry a duplex-length term the
+  GC-content formulas already have.}
 
 \item{DMSO}{Percent DMSO concentration in the reaction mixture. Default: 0}
 
@@ -377,12 +406,17 @@ details.
       \item "Wetmur1991"
       \item "SantaLucia1996"
       \item "SantaLucia1998-1"
-      \item "Owczarzy2004"
-      \item "Owczarzy2008"
+      \item "Owczarzy2004" (\code{method = "tm_nn"} only)
+      \item "Owczarzy2008" (\code{method = "tm_nn"} only)
       \item "none" (also selected automatically when \code{nn_table} was
         fitted at the requested \code{Na})
     }
 }
+
+With \code{method = "tm_gc"} the salt term belongs to the published formula
+selected by \code{variant}, so naming a different one is ignored there, with
+a warning, unless \code{userset} is supplied. \code{"none"} and \code{NA}
+drop the correction and are honoured on either path.
 
 \strong{Formamide Unit Options:}
 \itemize{

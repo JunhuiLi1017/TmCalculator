@@ -2,7 +2,11 @@
 title: "Genome-wide Melting Temperature Profiling: An E. coli Case Study"
 author: "Junhui Li, Lihua Julie Zhu"
 date: "`r Sys.Date()`"
-output: rmarkdown::html_vignette
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 3
+    number_sections: true
 vignette: >
   %\VignetteIndexEntry{Genome-wide Melting Temperature Profiling: An E. coli Case Study}
   %\VignetteEngine{knitr::rmarkdown}
@@ -30,48 +34,56 @@ knitr::opts_chunk$set(
 
 # Introduction
 
-Hasenauer FC, Barreto HC, Lotton C, Matic I (2025). Genome-wide mapping of
-spontaneous DNA replication error-hotspots using mismatch repair proteins in
-rapidly proliferating *Escherichia coli*. *Nucleic Acids Research*
-**53**(2): gkae1196. <doi:10.1093/nar/gkae1196>.
+Spontaneous replication errors are not distributed uniformly along the
+*Escherichia coli* chromosome. Hasenauer *et al.* (2025) located them
+genome-wide by tagging the mismatch-repair protein MutL in rapidly
+proliferating *mutH*-deficient cells, in which a mismatch is recognised but
+cannot be corrected, so that MutL accumulates where errors arise. The
+resulting ChIP-seq peaks, termed MutL-associated regions (MutL-AR), are
+enriched for mononucleotide repeats, cruciform-forming DNA, single-stranded
+DNA and sequences of low thermal stability, and are depleted for GATC
+methylation sites.
 
-Spontaneous DNA replication errors are not randomly distributed along the
-*Escherichia coli* chromosome. Hasenauer *et al.* (2025) mapped these
-hotspots genome-wide by tagging the mismatch-repair protein MutL in rapidly
-proliferating *mutH*-deficient cells, where mismatches can be detected but
-not corrected. MutL ChIP-seq peaks (MutL-associated regions, MutL-AR) are
-enriched for sequences of lower thermal stability, mononucleotide repeats
-(microsatellites), cruciform-forming DNA, and single-stranded DNA, and are
-depleted for GATC methylation sites. These associations motivate a direct
-comparison between replication-error hotspots and local DNA melting
-temperature (Tm).
+The last of those associations is the one pursued here. Low thermal
+stability was inferred in that study from sequence composition; melting
+temperature (Tm) measures it directly, as the temperature at which half the
+duplex is dissociated, computed from nearest-neighbour stacking
+thermodynamics rather than from base content alone. Asking whether MutL-AR
+windows melt at a lower temperature than the rest of the chromosome is
+therefore a test of the proposed mechanism on its own terms, and one that
+needs no new experiment: the genome sequence and the published peak
+coordinates are sufficient.
 
-This vignette uses **TmCalculator** to compute Tm across the *E. coli* K-12
-MG1655 genome (NCBI assembly GCF\_000005845.2 / ASM584v2) for every
-non-overlapping 200 bp window -- the bin size used by Hasenauer *et al.*
-themselves -- then overlays their
-annotation tracks (shipped as `ecoli_rep_hotspots`) to ask whether MutL-AR
-windows differ in Tm and GC content from the rest of the chromosome.
-Because any window-based Tm profile depends on the chosen bandwidth, we
-complement the primary 200 bp analysis with a window-size sensitivity
-analysis (50, 100, 200 and 500 bp windows). Briefly, absolute Tm scales
-with window length as expected from duplex thermodynamics, but the
-spatial landscape is invariant (cross-scale correlations >= 0.975) and
-the MutL-AR association -- about 1 degree C lower median Tm and ~2.7
-percentage points lower GC inside peaks -- is reproduced at every window
-size (all p < 1e-12), so the conclusions do not hinge on the 200 bp
-choice.
+This vignette computes Tm with **TmCalculator** across the *E. coli* K-12
+MG1655 chromosome (NCBI assembly GCF\_000005845.2 / ASM584v2) for every
+non-overlapping 200 bp window, the bin size used by Hasenauer *et al.*
+themselves, and overlays their annotation tracks, which ship with this
+package as `ecoli_rep_hotspots`. Thermodynamic parameters are those of
+Breslauer *et al.* (1986) at 50 mM Na+, again matching the published
+Methods, so that any difference between the two analyses is attributable to
+what is being compared rather than to how Tm was obtained.
 
-The workflow covers four steps:
+Any window-based profile depends on the bandwidth chosen, and 200 bp is a
+choice inherited rather than derived. The primary analysis is therefore
+accompanied by a sensitivity analysis over 50, 100, 200 and 500 bp windows,
+reported in full in `vignette("window_size_sensitivity")`. Absolute Tm
+scales with window length, as duplex thermodynamics requires, but the
+spatial landscape does not: cross-scale correlations are at least 0.975,
+and the MutL-AR association, about 1 degree C lower median Tm and about 2.7
+percentage points lower GC inside peaks, is reproduced at every window size
+tested (all *p* < 1e-12). The conclusions below do not rest on the 200 bp
+bin.
 
-1. **Get a reference genome** as a BSgenome package: use the one Bioconductor
-   ships for your assembly, or forge one when there is none.
+The analysis proceeds in four steps:
+
+1. **Obtain a reference genome** as a BSgenome package: use the one
+   Bioconductor ships for the assembly, or forge one when none exists.
 2. **Compute the Tm profile** for every window with `tm_calculate()`, which
    tiles the genome, retrieves the sequence and computes Tm in one call.
-3. **Visualise** the profile with `plot_genome_track()`: circular plots,
-   linear plots, zoom views, and multi-omics overlays.
+3. **Visualise** the profile with `plot_genome_track()`: circular and linear
+   plots, zoomed views, and multi-omics overlays.
 4. **Test** whether Tm inside MutL-AR peaks differs from the rest of the
-   genome, with `compare_groups()`.
+   chromosome, with `compare_groups()`.
 
 ---
 
@@ -85,7 +97,7 @@ library(BSgenome)
 library(GenomicRanges)
 ```
 
-# Step 1 — The reference genome {#build-bsgenome}
+# The reference genome {#build-bsgenome}
 
 `tm_calculate()` retrieves sequence from a BSgenome package when you give
 it one, so the first
@@ -95,7 +107,8 @@ question is whether one already exists for your assembly.
 lists them, and the common references are all there:
 `BSgenome.Hsapiens.UCSC.hg38`, `BSgenome.Mmusculus.UCSC.mm39`,
 `BSgenome.Scerevisiae.UCSC.sacCer3` and so on. Install it and go straight to
-Step 2; nothing in this vignette needs the genome to have been built by hand.
+the next section; nothing in this vignette needs the genome to
+have been built by hand.
 
 ```{r available-genomes, eval=FALSE}
 BSgenome::available.genomes()          # is your assembly already packaged?
@@ -197,7 +210,7 @@ cat("Length:    ", format(chr_length, big.mark = ","), "bp\n")
 
 ---
 
-# Step 2 — Compute the genome-wide Tm profile
+# Compute the genome-wide Tm profile
 
 `tm_calculate()` does the whole of it in one call: it tiles the requested
 regions, retrieves the sequence for each window, and computes a melting
@@ -257,7 +270,7 @@ tm_calculate(c("ACGTGCTAGCTAGCTAGC", "GGCCATATATGCGC"), method = "tm_nn", Na = 5
 
 ---
 
-# Step 3 — Visualise with `plot_genome_track()`
+# Visualise with `plot_genome_track()`
 
 `plot_genome_track()` is the unified plotting function in TmCalculator. It
 supports both **linear** (karyoploteR-based) and **circular** (base R graphics)
@@ -523,11 +536,11 @@ on where either scale is anchored.
 The distribution above says the effect holds across the genome. Seeing it in
 a single place takes a search: score every 20 kb locus by how far apart its
 equal-GC windows are in Tm, and take the best one. That search, and the
-three-panel figure it feeds (Figure 2 of the manuscript), are in
-`inst/scripts/make_figure2.R`, which is shipped with the package:
+three-panel figure it feeds (Figure 3 of the manuscript), are in
+`inst/scripts/make_figure3.R`, which is shipped with the package:
 
-```{r make-figure2, eval=FALSE}
-script <- system.file("scripts", "make_figure2.R", package = "TmCalculator")
+```{r make-figure3, eval=FALSE}
+script <- system.file("scripts", "make_figure3.R", package = "TmCalculator")
 file.edit(script)      # --locus-kb, --n-groups, --pairs-in-peaks, --dpi
 ```
 
@@ -541,12 +554,12 @@ cost of a smaller effect.
 
 ---
 
-# Step 4 — Statistical Testing
+# Statistical testing
 
 We test whether Tm values inside MutL-AR peaks differ significantly from the
 rest of the genome.
 
-### Build MutL-AR peak GRanges
+## Build MutL-AR peak GRanges
 
 ```{r build-mutH-peaks}
 mutH_peaks <- GRanges(
@@ -557,7 +570,7 @@ mutH_peaks <- GRanges(
 seqlevels(mutH_peaks) <- "U00096.3"
 ```
 
-### Annotate Tm tiles with peak membership
+## Annotate Tm tiles with peak membership
 
 ```{r annotate-mutH-peaks}
 mutH_peaks$peak_id <- paste0("mutH_", seq_along(mutH_peaks))
@@ -574,7 +587,7 @@ tm_annot$in_mutH <- ifelse(is.na(tm_annot$peak_id), "non_peak", "peak")
 table(tm_annot$in_mutH)
 ```
 
-### Wilcoxon test on Tm and GC
+## Wilcoxon test on Tm and GC
 
 ```{r wilcoxon}
 res <- compare_groups(
@@ -619,6 +632,19 @@ On a standard desktop computer (single core, R 4.4, compiled Rcpp nearest-neighb
 The same call on the human genome, where there are 14.7 million windows
 rather than 23,208, takes about ten minutes in one process and about three
 minutes over five workers; see `vignette("hg38_performance_parallel")`.
+
+---
+
+# References
+
+Breslauer KJ, Frank R, Blocker H, Marky LA (1986). Predicting DNA duplex
+stability from the base sequence. *Proceedings of the National Academy of
+Sciences USA* **83**(11): 3746-3750. <doi:10.1073/pnas.83.11.3746>
+
+Hasenauer FC, Barreto HC, Lotton C, Matic I (2025). Genome-wide mapping of
+spontaneous DNA replication error-hotspots using mismatch repair proteins in
+rapidly proliferating *Escherichia coli*. *Nucleic Acids Research*
+**53**(2): gkae1196. <doi:10.1093/nar/gkae1196>
 
 ---
 

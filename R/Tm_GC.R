@@ -37,17 +37,31 @@
 #' 
 #' @param dNTPs Millimolar concentration of deoxynucleotide triphosphates. Default: 0
 #' 
-#' @param salt_method Salt correction method. \code{NULL} (default) uses the
-#'   method associated with \code{variant}. Set to \code{NA} to disable salt
-#'   correction. Options:
+#' @param salt_method Salt correction method:
+#'   - \code{NULL} (default): the correction that belongs to the formula, i.e.
+#'     the one published with \code{variant}, or \code{"Schildkraut2010"}
+#'     when \code{userset} is supplied.
+#'   - \code{NA} or \code{"none"}: no salt correction at all.
 #'   - "Schildkraut2010": Schildkraut & Lifson 1965
 #'   - "Wetmur1991": Wetmur 1991
 #'   - "SantaLucia1996": SantaLucia 1996
 #'   - "SantaLucia1998-1": SantaLucia 1998 (Method 1)
-#'   - "Owczarzy2004": Owczarzy 2004
-#'   - "Owczarzy2008": Owczarzy 2008
-#'   Note: "SantaLucia1998-2" is not available for this function.
-#'   
+#'
+#'   With a built-in \code{variant} the salt term is part of the published
+#'   formula rather than a free choice, so naming a \emph{different} one is
+#'   ignored with a warning: the result would otherwise be labelled with one
+#'   method and computed with another. Supply \code{userset} to choose the
+#'   correction yourself. Dropping it with \code{NA} is not a substitution
+#'   and is honoured on either path.
+#'
+#'   "SantaLucia1998-2", "Owczarzy2004" and "Owczarzy2008" are not available
+#'   for this function. The first corrects the entropy of a nearest-neighbor
+#'   model, which a GC-content formula does not have. The other two correct
+#'   the reciprocal of the melting temperature in kelvin, referenced to the
+#'   same duplex in 1 M Na+, and carry a duplex-length term of their own,
+#'   which these formulas already have. All three are available in
+#'   \code{\link{tm_nn}}.
+#'
 #' @param mismatch Logical. If TRUE (default), every 'X' in the sequence is counted as a mismatch
 #' 
 #' @param DMSO Percent DMSO concentration in the reaction mixture. Default: 0
@@ -70,7 +84,7 @@
 #' 
 #' Marmur J, Doty P. Determination of the base composition of deoxyribonucleic acid from its thermal denaturation temperature. Journal of Molecular Biology, 1962, 5(1):109-118.
 #' 
-#' Schildkraut C. Dependence of the melting temperature of DNA on salt concentration. Biopolymers, 2010, 3(2):195-208.
+#' Schildkraut C, Lifson S. Dependence of the melting temperature of DNA on salt concentration. Biopolymers, 1965, 3(2):195-208.
 #' 
 #' Wetmur JG. DNA Probes: Applications of the Principles of Nucleic Acid Hybridization. CRC Critical Reviews in Biochemistry, 1991, 26(3-4):33.
 #' 
@@ -87,7 +101,7 @@
 #' gr_seq <- to_genomic_ranges(input_seq)
 #' out <- tm_gc(gr_seq, ambiguous = TRUE, variant = "Primer3Plus", Na = 50, mismatch = TRUE)
 #' out
-#' out$Options
+#' out$options
 #' 
 #' @export tm_gc
 tm_gc <- function(gr_seq,
@@ -106,49 +120,85 @@ tm_gc <- function(gr_seq,
                   Tris = 0,
                   Mg = 0,
                   dNTPs = 0,
-                  salt_method = c("Schildkraut2010",
-                                    "Wetmur1991",
-                                    "SantaLucia1996",
-                                    "SantaLucia1998-1",
-                                    "Owczarzy2004",
-                                    "Owczarzy2008"),
+                  salt_method = NULL,
                   mismatch = TRUE,
                   DMSO = 0,
                   formamide_unit = list(value = 0, unit = "percent"),
                   dmso_factor = 0.75,
                   formamide_factor = 0.65) {
   variant <- match.arg(variant)
-  salt_method <- match.arg(salt_method)
-  
+
+  # Which corrections a GC-content formula can take. The two Owczarzy
+  # corrections are deliberately absent. They are corrections to 1/Tm in
+  # kelvin, referenced to the melting temperature of the same duplex in 1 M
+  # Na+, and they carry a 1/(2(N-1)) duplex-length term of their own; these
+  # formulas are on neither footing and already have a length term of their
+  # own, so combining the two double-counts length even after the reciprocal
+  # arithmetic is done right. tm_nn() is where they belong.
+  GC_SALT <- c("Schildkraut2010", "Wetmur1991", "SantaLucia1996",
+               "SantaLucia1998-1")
+  named <- !is.null(salt_method)          # did the caller name one at all
+  if (named) {
+    if (length(salt_method) != 1L)
+      stop("`salt_method` must be a single method name, NA to disable the ",
+           "correction, or NULL to use the one that belongs to the formula.",
+           call. = FALSE)
+    if (is.na(salt_method)) {
+      salt_method <- NA_character_        # explicit "no salt correction"
+    } else if (identical(as.character(salt_method), "none")) {
+      salt_method <- NA_character_        # the spelling tm_calculate() uses
+    } else {
+      salt_method <- as.character(salt_method)
+      if (salt_method %in% c("Owczarzy2004", "Owczarzy2008")) {
+        stop("`salt_method = \"", salt_method, "\"` is not available for ",
+             "tm_gc(). The Owczarzy corrections apply to the reciprocal of ",
+             "the melting temperature in kelvin, referenced to the same ",
+             "duplex in 1 M Na+, and carry a duplex-length term of their ",
+             "own, which the GC-content formulas already have. Use tm_nn() ",
+             "for them.", call. = FALSE)
+      }
+      salt_method <- match.arg(salt_method, GC_SALT)
+    }
+  }
+
   if (is.null(userset)) {
     if (!variant %in% rownames(get_table("GC_VARTAB"))) {
       stop("only Chester1993, QuikChange, Schildkraut1965, Wetmur1991_MELTING, Wetmur1991_RNA, Wetmur1991_RNA/DNA, Primer3Plus and vonAhsen2001 are allowed in variant")
+    }
+    gc_coef <- get_table("GC_VARTAB")[variant, ]
+    # Each published variant carries its own salt term, so the correction is
+    # a property of the formula rather than a free choice; NA_character_
+    # means the formula has none (Chester1993, QuikChange). Substituting a
+    # different term would hand back a result labelled with one method and
+    # computed with another, so it is refused; dropping the term altogether
+    # is not a substitution and is honoured, with $options reporting the
+    # result as uncorrected.
+    own <- get_table("GC_VARTAB")[variant, "salt_correct"]
+    if (named && is.na(salt_method)) {
+      salt_method_eff <- NA_character_
     } else {
-      gc_coef <- get_table("GC_VARTAB")[variant,]
-      salt_method <- get_table("GC_VARTAB")[variant,"salt_correct"]
+      salt_method_eff <- own
+      if (named && !identical(salt_method, own)) {
+        carries <- if (is.na(own)) "no salt term of its own"
+                   else paste0("the '", own, "' salt term")
+        warning("variant '", variant, "' carries ", carries, ", so ",
+                "`salt_method = \"", salt_method, "\"` is ignored. Use ",
+                "`salt_method = NA` to drop the correction altogether, or ",
+                "`userset` to choose a different one.", call. = FALSE)
+      }
     }
   } else {
     gc_coef <- as.numeric(userset)
-    salt_method <- salt_method
+    # A user-supplied coefficient set says nothing about which salt term it
+    # was fitted with, so the method has to be named; the default is the one
+    # this function has always applied in that case.
+    salt_method_eff <- if (named) salt_method else "Schildkraut2010"
   }
+  # What $options reports is what was actually applied.
+  salt_method <- salt_method_eff
 
   # Filter sequence
   gr_seq$sequence <- check_filter_seq(gr_seq$sequence, method = 'tm_gc')
-
-  # Resolve the effective salt-correction method once (loop-invariant):
-  # NA_character_ means no salt correction (Chester1993, QuikChange).
-  if (!is.null(userset)) {
-    salt_method_eff <- salt_method
-  } else {
-    salt_method_eff <- switch(variant,
-      "Schildkraut1965"    = "Schildkraut2010",
-      "Wetmur1991_MELTING" = "Wetmur1991",
-      "Wetmur1991_RNA"     = "Wetmur1991",
-      "Wetmur1991_RNA/DNA" = "Wetmur1991",
-      "Primer3Plus"        = "Schildkraut2010",
-      "vonAhsen2001"       = "SantaLucia1998-1",
-      NA_character_)
-  }
 
   # Normalize gc_coef to a plain numeric vector of the four coefficients
   # (when userset is NULL it is a 1-row data.frame from GC_VARTAB)

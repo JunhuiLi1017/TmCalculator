@@ -4,7 +4,7 @@
 #
 #   Rscript inst/scripts/plot_crosstool.R --indir bench200
 #
-# Reads bench_crosstool.csv written by bench_crosstool.R and produces
+# Reads crosstool_bench.csv written by bench_crosstool.R and produces
 #
 #   (A) compute time against input size, log-log, with a slope-1 reference.
 #       A tool with no fixed cost lies on that slope throughout; a tool whose
@@ -37,7 +37,7 @@ indir  <- argval("--indir", "bench200")
 outdir <- argval("--outdir", indir)
 device <- argval("--device", "pdf")          # pdf, png or svg
 
-csv <- file.path(indir, "bench_crosstool.csv")
+csv <- file.path(indir, "crosstool_bench.csv")
 if (!file.exists(csv)) stop("not found: ", csv)
 S <- utils::read.csv(csv, stringsAsFactors = FALSE)
 S <- S[S$ok & !is.na(S$compute_s), , drop = FALSE]
@@ -50,7 +50,7 @@ if (!nrow(S)) stop("no usable rows in ", csv)
 if ("pkg_version" %in% names(S)) {
   vs <- sort(unique(stats::na.omit(S$pkg_version)))
   if (length(vs) > 1L)
-    stop("bench_crosstool.csv mixes TmCalculator versions (",
+    stop("crosstool_bench.csv mixes TmCalculator versions (",
          paste(vs, collapse = ", "), "). Re-run the benchmark with --fresh, ",
          "or keep one version with --version.")
   keep_v <- argval("--version", NA)

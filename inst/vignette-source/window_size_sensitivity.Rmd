@@ -2,7 +2,11 @@
 title: "Window-Size Sensitivity of Genome-Wide Tm Profiles"
 author: "Junhui Li, Lihua Julie Zhu"
 date: "`r Sys.Date()`"
-output: rmarkdown::html_vignette
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 3
+    number_sections: true
 vignette: >
   %\VignetteIndexEntry{Window-Size Sensitivity of Genome-Wide Tm Profiles}
   %\VignetteEngine{knitr::rmarkdown}
@@ -156,7 +160,7 @@ sens <- lapply(window_sizes, function(w) {
 names(sens) <- paste0("w", window_sizes)
 ```
 
-### Distributional stability
+## Distributional stability
 
 ```{r sensitivity-distribution}
 dist_tbl <- do.call(rbind, lapply(seq_along(window_sizes), function(i) {
@@ -227,7 +231,7 @@ smoothing bandwidth. The mean GC is invariant
 (`r sprintf("%.3f", mean(dist_tbl$GC_mean))` throughout), confirming that
 the composition landscape itself does not depend on the tiling.
 
-### Cross-scale agreement
+## Cross-scale agreement
 
 Every profile is aggregated onto one common grid (mean Tm per bin) and the
 resulting series are correlated.
@@ -269,7 +273,7 @@ approaches the grid, which is what averaging fewer windows per bin should
 do, and is the behaviour the 500 bp grid obscured. Window size rescales and
 smooths the profile but preserves the spatial landscape.
 
-### Robustness of the MutL-AR association
+## Robustness of the MutL-AR association
 
 Finally, the vignette's biological conclusion -- that Tm and GC differ
 between MutL-AR peak windows and the genomic background -- is re-tested
@@ -294,7 +298,7 @@ test_summary <- do.call(rbind, lapply(seq_along(window_sizes), function(i) {
 test_summary
 ```
 
-### One table for the whole analysis
+## One table for the whole analysis
 
 Both questions are answered by the same four rows, so they are assembled
 into a single table: the first four columns say what window size does to the
@@ -344,7 +348,7 @@ also contains flanking sequence that does not, and averaging over it dilutes
 the contrast, whereas a 50 bp window resolves the peak more sharply. The
 three coarser tilings agree within 0.1 degrees C.
 
-### Multi-scale tracks alongside the multi-omics layers
+## Multi-scale tracks alongside the multi-omics layers
 
 Because every track keeps its native resolution, the four Tm/GC profiles
 can be drawn as concentric layers of one integrated figure, together

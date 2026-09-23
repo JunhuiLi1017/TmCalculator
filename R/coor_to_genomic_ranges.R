@@ -159,6 +159,9 @@ coor_to_genomic_ranges <- function(
     }
     comp_gr <- coor_to_genomic_ranges(comp_input, method = method)
     S4Vectors::mcols(gr_out)$complement <- S4Vectors::mcols(comp_gr)$sequence
+    .warn_if_reverse_complement(
+      as.character(S4Vectors::mcols(gr_out)$sequence),
+      as.character(S4Vectors::mcols(gr_out)$complement))
   } else {
     S4Vectors::mcols(gr_out)$complement <- Biostrings::complement(seqs)
   }
@@ -454,6 +457,9 @@ to_genomic_ranges_fast <- function(
   if (!is.null(complement_seq)) {
     comp_gr <- to_genomic_ranges_fast(complement_seq, method = method)
     S4Vectors::mcols(input_gr)$complement <- S4Vectors::mcols(comp_gr)$sequence
+    .warn_if_reverse_complement(
+      as.character(S4Vectors::mcols(input_gr)$sequence),
+      as.character(S4Vectors::mcols(input_gr)$complement))
   } else if (!"complement" %in% names(S4Vectors::mcols(input_gr))) {
     S4Vectors::mcols(input_gr)$complement <- Biostrings::complement(
       S4Vectors::mcols(input_gr)$sequence
