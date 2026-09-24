@@ -123,6 +123,28 @@ to_genomic_ranges <- function(input_seq, complement_seq = NULL) {
   return(input_gr)
 }
 
+# -- Accept what the user typed -----------------------------------------------
+# tm_nn(), tm_gc() and tm_wallace() take the GRanges that to_genomic_ranges()
+# produces. Handed a bare character vector they used to reach
+# GenomicRanges::mcols() and fail on S4 dispatch, with a message that named
+# neither the argument nor the fix. Since the only thing missing is a call
+# this package can make itself, it makes it: anything to_genomic_ranges()
+# accepts -- sequences, a FASTA path, coordinate strings -- is converted, and
+# anything else gets an error that says what the argument wants.
+#
+# Supplying a complement still needs the explicit form, because there is
+# nowhere in tm_nn(seq) to put one:
+#     tm_nn(to_genomic_ranges(seq, complement_seq = cmp))
+#' @keywords internal
+.as_gr_seq <- function(x, arg = "gr_seq") {
+  if (inherits(x, "GRanges")) return(x)
+  if (is.character(x)) return(to_genomic_ranges(x))
+  stop("`", arg, "` must be a GRanges from to_genomic_ranges(), or a ",
+       "character vector of sequences, a path to a FASTA file, or genomic ",
+       "coordinate strings, which are converted for you. Got ",
+       class(x)[1L], ".", call. = FALSE)
+}
+
 # -- The one mistake this argument invites ------------------------------------
 # `complement_seq` wants the plain complement, aligned base for base with the
 # sequence and therefore written 3' to 5'. The reverse complement is the same

@@ -24,8 +24,12 @@ tm_gc(
 )
 }
 \arguments{
-\item{gr_seq}{Pre-processed sequence(s) in 5' to 3' direction. This should be the output from
-to_genomic_ranges() function.}
+\item{gr_seq}{Sequence(s) in 5' to 3' direction, as the \code{GRanges} that
+\code{\link{to_genomic_ranges}} returns. A character vector of
+sequences, a path to a FASTA file, or genomic coordinate strings are also
+accepted and converted for you. To pair a sequence with a complement of
+your own, build the object explicitly:
+\code{to_genomic_ranges(seq, complement_seq = cmp)}.}
 
 \item{ambiguous}{Logical. If TRUE, ambiguous bases are taken into account when computing the G and C content.
 The function handles various ambiguous bases (S, W, M, K, R, Y, V, H, D, B) by proportionally

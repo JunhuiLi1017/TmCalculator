@@ -17,8 +17,12 @@
 #' knowingly apply it outside its calibrated range should not be blocked;
 #' wrap the call in \code{suppressWarnings()} in that case.
 #'
-#' @param gr_seq Pre-processed sequence(s) in 5' to 3' direction. This should be the output from
-#'   to_genomic_ranges() function.
+#' @param gr_seq Sequence(s) in 5' to 3' direction, as the \code{GRanges} that
+#'   \code{\link{to_genomic_ranges}} returns. A character vector of
+#'   sequences, a path to a FASTA file, or genomic coordinate strings are also
+#'   accepted and converted for you. To pair a sequence with a complement of
+#'   your own, build the object explicitly:
+#'   \code{to_genomic_ranges(seq, complement_seq = cmp)}.
 #'    
 #' @param ambiguous Ambiguous bases are taken into account to compute the G and C content when ambiguous is TRUE.
 #'
@@ -46,6 +50,7 @@
 #' @export tm_wallace
 
 tm_wallace <- function(gr_seq, ambiguous = FALSE) {
+  gr_seq <- .as_gr_seq(gr_seq)
   # Filter sequence
   gr_seq$sequence <- check_filter_seq(gr_seq$sequence, method = "tm_wallace")
 

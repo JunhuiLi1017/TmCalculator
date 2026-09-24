@@ -146,6 +146,24 @@ was wrong in both the old and the new form.
   pre-vectorisation code had its own version of the fault, testing the first
   base for `A` where it meant the last.)
 
+## Smaller things
+
+* **`tm_nn()`, `tm_gc()` and `tm_wallace()` now take a character vector.**
+  They documented and accepted only the `GRanges` that
+  `to_genomic_ranges()` returns; handed the sequence a user naturally reaches
+  for, they got as far as `GenomicRanges::mcols()` and failed on S4 dispatch
+  with a message that named neither the argument nor the fix. Anything
+  `to_genomic_ranges()` accepts — sequences, a FASTA path, coordinate strings
+  — is now converted first, and anything else is refused by name.
+
+  ```r
+  tm_nn("CGTAGCATCCGATCGA", nn_table = "DNA_NN_Allawi_1998")   # now works
+  ```
+
+  Pairing a sequence with a complement of your own still needs the explicit
+  form, since there is nowhere in `tm_nn(seq)` to put one:
+  `tm_nn(to_genomic_ranges(seq, complement_seq = cmp))`.
+
 ## Strand direction, which is what invites the mistake
 
 * **`generate_complement()`'s `reverse` argument had its two directions

@@ -605,12 +605,53 @@ test_that("a reverse complement passed as complement_seq is called out", {
     regexp = NA)
 })
 
+# ---------------------------------------------------------------------------
+# 12. tm_nn(), tm_gc() and tm_wallace() took only a GRanges.
+#
+# Handed the character vector a user naturally reaches for, they got as far as
+# GenomicRanges::mcols() and failed on S4 dispatch, with a message naming
+# neither the argument nor the fix. Anything to_genomic_ranges() accepts is
+# now converted first.
+# ---------------------------------------------------------------------------
+
+test_that("the three methods take a character vector as well as a GRanges", {
+  gr <- TmCalculator::to_genomic_ranges(SEQ)
+  expect_equal(TmCalculator::tm_nn(SEQ, nn_table = "DNA_NN_Allawi_1998",
+                                   dnac_high = 250, dnac_low = 0,
+                                   salt_method = "none")$gr,
+               TmCalculator::tm_nn(gr, nn_table = "DNA_NN_Allawi_1998",
+                                   dnac_high = 250, dnac_low = 0,
+                                   salt_method = "none")$gr)
+  expect_equal(TmCalculator::tm_gc(SEQ)$gr,  TmCalculator::tm_gc(gr)$gr)
+  expect_warning(a <- TmCalculator::tm_wallace(SEQ), regexp = NA)
+  expect_warning(b <- TmCalculator::tm_wallace(gr),  regexp = NA)
+  expect_equal(a$gr, b$gr)
+
+  # a vector of sequences works too, and the value is the documented one
+  expect_equal(as.numeric(GenomicRanges::mcols(
+                 TmCalculator::tm_nn(c(SEQ, SEQ),
+                                     nn_table = "DNA_NN_Allawi_1998",
+                                     dnac_high = 250, dnac_low = 0,
+                                     salt_method = "none")$gr)$Tm),
+               c(66.5968, 66.5968), tolerance = 1e-4)
+
+  # and anything else is refused by name rather than by S4 dispatch
+  expect_error(TmCalculator::tm_nn(42), "must be a GRanges")
+  expect_error(TmCalculator::tm_gc(list(SEQ)), "must be a GRanges")
+})
+
 test_that("generate_complement's two directions are what the docs claim", {
-  # reverse = FALSE pairs position by position; reverse = TRUE is its reversal
-  expect_equal(TmCalculator::generate_complement("ATGCG"), "TACGC")
-  expect_equal(TmCalculator::generate_complement("ATGCG", reverse = TRUE),
+  # reverse = FALSE pairs position by position; reverse = TRUE is its reversal.
+  # The result is named after the input sequence -- deliberate, and kept for
+  # backward compatibility -- so compare the values only.
+  expect_equal(unname(TmCalculator::generate_complement("ATGCG")), "TACGC")
+  expect_equal(unname(TmCalculator::generate_complement("ATGCG",
+                                                        reverse = TRUE)),
                "CGCAT")
-  expect_equal(TmCalculator::generate_complement(SEQ), PERF)
-  expect_equal(TmCalculator::generate_complement(SEQ, reverse = TRUE),
+  expect_equal(unname(TmCalculator::generate_complement(SEQ)), PERF)
+  expect_equal(unname(TmCalculator::generate_complement(SEQ, reverse = TRUE)),
                flip(PERF))
+  # and the naming itself is part of the contract
+  expect_named(TmCalculator::generate_complement(c("ATGCG", "GCTAG")),
+               c("ATGCG", "GCTAG"))
 })

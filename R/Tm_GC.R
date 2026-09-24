@@ -3,8 +3,12 @@
 #' Calculate the melting temperature using empirical formulas based on GC content with different options.
 #' The function returns a list of sequences with updated Tm attributes and calculation options.
 #' 
-#' @param gr_seq Pre-processed sequence(s) in 5' to 3' direction. This should be the output from
-#'   to_genomic_ranges() function.
+#' @param gr_seq Sequence(s) in 5' to 3' direction, as the \code{GRanges} that
+#'   \code{\link{to_genomic_ranges}} returns. A character vector of
+#'   sequences, a path to a FASTA file, or genomic coordinate strings are also
+#'   accepted and converted for you. To pair a sequence with a complement of
+#'   your own, build the object explicitly:
+#'   \code{to_genomic_ranges(seq, complement_seq = cmp)}.
 #' 
 #' @param ambiguous Logical. If TRUE, ambiguous bases are taken into account when computing the G and C content.
 #'   The function handles various ambiguous bases (S, W, M, K, R, Y, V, H, D, B) by proportionally
@@ -126,6 +130,7 @@ tm_gc <- function(gr_seq,
                   formamide_unit = list(value = 0, unit = "percent"),
                   dmso_factor = 0.75,
                   formamide_factor = 0.65) {
+  gr_seq  <- .as_gr_seq(gr_seq)
   variant <- match.arg(variant)
 
   # Which corrections a GC-content formula can take. The two Owczarzy

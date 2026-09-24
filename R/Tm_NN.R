@@ -32,8 +32,12 @@
 #' As a rule of thumb, pick the set whose fitted salt is closest to your
 #' experimental condition rather than correcting a distant one.
 #' 
-#' @param gr_seq Pre-processed sequence(s) in 5' to 3' direction. This should be the output from
-#'   to_genomic_ranges() function.
+#' @param gr_seq Sequence(s) in 5' to 3' direction, as the \code{GRanges} that
+#'   \code{\link{to_genomic_ranges}} returns. A character vector of
+#'   sequences, a path to a FASTA file, or genomic coordinate strings are also
+#'   accepted and converted for you. To pair a sequence with a complement of
+#'   your own, build the object explicitly:
+#'   \code{to_genomic_ranges(seq, complement_seq = cmp)}.
 #' 
 #' @param ambiguous Logical value controlling how ambiguous bases are handled:
 #'   - TRUE: Ambiguous bases (e.g., N, R, Y) are included in calculations
@@ -439,6 +443,8 @@ tm_nn <- function(gr_seq,
                   formamide_unit = list(value = 0, unit = "percent"),
                   dmso_factor    = 0.75,
                   formamide_factor     = 0.65) {
+
+  gr_seq <- .as_gr_seq(gr_seq)
 
   # -- Validate args once ----------------------------------------------------
   # Each table argument is either a built-in name or a user-supplied matrix.
