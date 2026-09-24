@@ -38,7 +38,7 @@ tm_calculate(
   Mg = 0,
   dNTPs = 0,
   salt_method = c("Schildkraut2010", "Wetmur1991", "SantaLucia1996", "SantaLucia1998-1",
-    "Owczarzy2004", "Owczarzy2008", "none"),
+    "SantaLucia1998-2", "Owczarzy2004", "Owczarzy2008", "none"),
   DMSO = 0,
   formamide_unit = list(value = 0, unit = "percent"),
   dmso_factor = 0.75,
@@ -181,7 +181,9 @@ Usersets override value sets. Default: NULL}
   - "Schildkraut2010": Updated salt correction method
   - "Wetmur1991": Classic salt correction method
   - "SantaLucia1996": DNA-specific salt correction
-  - "SantaLucia1998-1": Improved DNA salt correction
+  - "SantaLucia1998-1": Improved DNA salt correction, applied to Tm
+  - "SantaLucia1998-2": the same correction applied to the entropy of the
+    nearest-neighbor model rather than to Tm
   - "Owczarzy2004": Comprehensive salt correction
   - "Owczarzy2008": Updated comprehensive salt correction
   Default: "Schildkraut2010"
@@ -406,6 +408,7 @@ details.
       \item "Wetmur1991"
       \item "SantaLucia1996"
       \item "SantaLucia1998-1"
+      \item "SantaLucia1998-2" (\code{method = "tm_nn"} only)
       \item "Owczarzy2004" (\code{method = "tm_nn"} only)
       \item "Owczarzy2008" (\code{method = "tm_nn"} only)
       \item "none" (also selected automatically when \code{nn_table} was

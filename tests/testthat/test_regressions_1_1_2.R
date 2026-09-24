@@ -655,3 +655,268 @@ test_that("generate_complement's two directions are what the docs claim", {
   expect_named(TmCalculator::generate_complement(c("ATGCG", "GCTAG")),
                c("ATGCG", "GCTAG"))
 })
+
+# ---------------------------------------------------------------------------
+# 13. 'init_allA/T' was chosen from the two terminal bases instead of from
+#     the whole duplex.
+#
+#     The row means "this duplex contains no G.C pair at all". Up to 1.1.1 the
+#     branch tested gc_ends, so ATGCGCGCAT/TACGCGCGTA -- 60 percent G+C, but
+#     closed by A.T at both ends -- was charged init_allA/T. Only
+#     DNA_NN_Breslauer_1986 gives the two rows different values, so this was
+#     the one parameter set that could show it, and there it cost 4 degrees C.
+#
+#     Rather than freeze a number, poison one row at a time and see which
+#     branch reacts: a duplex must move when its own row is perturbed and must
+#     not move when the other one is.
+# ---------------------------------------------------------------------------
+
+brz_table <- function(key = NULL, delta = 0) {
+  tbl <- TmCalculator:::.TM_CONSTANTS[["DNA_NN_Breslauer_1986"]]
+  if (!is.null(key)) tbl[key, 2] <- tbl[key, 2] + delta
+  attr(tbl, "reference") <- "DNA_NN_Breslauer_1986"
+  tbl
+}
+
+brz_tm <- function(s, cmp, tbl) {
+  gr <- TmCalculator::to_genomic_ranges(s, complement_seq = cmp)
+  r  <- TmCalculator::tm_nn(gr, nn_table = tbl, dnac_high = 250, dnac_low = 0,
+                            salt_method = "none")
+  as.numeric(GenomicRanges::mcols(r$gr)$Tm)
+}
+
+test_that("a G/C-rich duplex closed by A.T is not an all-A/T duplex", {
+  s <- "ATGCGCGCAT"; cmp <- chartr("ACGT", "TGCA", s)   # A/T ends, G.C inside
+  base <- brz_tm(s, cmp, brz_table())
+  # perturbing init_allA/T must not move it: this duplex does not take that row
+  expect_equal(brz_tm(s, cmp, brz_table("init_allA/T", 10)), base)
+  # perturbing init_oneG/C must move it: that is the row it does take
+  expect_false(isTRUE(all.equal(brz_tm(s, cmp, brz_table("init_oneG/C", 10)),
+                                base)))
+})
+
+test_that("a genuinely all-A/T duplex still takes init_allA/T", {
+  s <- "ATATATATAT"; cmp <- chartr("ACGT", "TGCA", s)
+  base <- brz_tm(s, cmp, brz_table())
+  expect_false(isTRUE(all.equal(brz_tm(s, cmp, brz_table("init_allA/T", 10)),
+                                base)))
+  expect_equal(brz_tm(s, cmp, brz_table("init_oneG/C", 10)), base)
+})
+
+test_that("a G or C that only sits in a mismatch does not close a G.C pair", {
+  #  s  A T G T A T A T A T
+  #  c  T A T A T A T A T A
+  #         ^ G.T, the only non-WC position and the only G in the duplex
+  # Neither terminal stack is in the TMM table, so nothing is trimmed, and
+  # every stack resolves, so the Tm is finite rather than NA. Assert that
+  # first: two NAs compare equal and would make the real assertion vacuous,
+  # which is exactly how an earlier version of this test passed for the
+  # wrong reason.
+  s <- "ATGTATATAT"; cmp <- "TATATATATA"
+  base <- brz_tm(s, cmp, brz_table())
+  expect_true(is.finite(base))
+  expect_false(isTRUE(all.equal(brz_tm(s, cmp, brz_table("init_allA/T", 10)),
+                                base)))
+  expect_equal(brz_tm(s, cmp, brz_table("init_oneG/C", 10)), base)
+})
+
+test_that("the choice does not depend on which strand is handed over", {
+  s <- "ATGCGCGCAT"; cmp <- chartr("ACGT", "TGCA", s)
+  expect_equal(brz_tm(s, cmp, brz_table()),
+               brz_tm(flip(cmp), flip(s), brz_table()))
+})
+
+# ---------------------------------------------------------------------------
+# 14. RNA_DNA_NN_Sugimoto_1995 was stored with every non-palindromic key
+#     reversed, i.e. DNA on the top strand.
+#
+#     Sugimoto et al. (1995) Biochemistry 34:11211-11216 index the table with
+#     the RNA strand on top read 5' to 3' and the DNA strand below read 3' to
+#     5', which is this package's own key convention. The values below are the
+#     published ones; the last block is the worked example given in the
+#     source, dG37(rAGGUC/dTCCAG) = 3.1 - 1.8 - 2.9 - 1.1 - 1.5 = -4.2.
+# ---------------------------------------------------------------------------
+
+test_that("the Sugimoto 1995 hybrid table is in the published orientation", {
+  sug <- TmCalculator:::.TM_CONSTANTS[["RNA_DNA_NN_Sugimoto_1995"]]
+  dg  <- function(k) sug[k, 1] - 310.15 * sug[k, 2] / 1000
+
+  expect_equal(round(dg("AA/TT"), 1), -1.0)   # rAA/dTT
+  expect_equal(round(dg("TT/AA"), 1), -0.2)   # rUU/dAA
+  expect_equal(round(dg("GG/CC"), 1), -2.9)   # rGG/dCC
+  expect_equal(round(dg("AG/TC"), 1), -1.8)   # rAG/dTC
+  expect_equal(round(dg("GT/CA"), 1), -1.1)   # rGU/dCA
+  expect_equal(round(dg("TC/AG"), 1), -1.5)   # rUC/dAG
+
+  expect_equal(round(3.1 + sum(vapply(c("AG/TC", "GG/CC", "GT/CA", "TC/AG"),
+                                      dg, numeric(1))), 1),
+               -4.2)
+})
+
+test_that("hybrid tables are not reversal-symmetric and must not be completed", {
+  # Reversing a hybrid key swaps which strand carries the ribose, so a key and
+  # its reversal are different stacks. If .complete_nn_rc() is ever applied to
+  # a hybrid set, or the reversal retry is re-enabled for one, this fails.
+  for (nm in c("RNA_DNA_NN_Sugimoto_1995", "RNA_DNA_NN_Banerjee_2020")) {
+    tbl <- TmCalculator:::.TM_CONSTANTS[[nm]]
+    expect_false(isTRUE(all.equal(unname(tbl["AA/TT", ]),
+                                  unname(tbl["TT/AA", ]))), info = nm)
+    expect_false(isTRUE(all.equal(unname(tbl["GG/CC", ]),
+                                  unname(tbl["CC/GG", ]))), info = nm)
+  }
+})
+
+test_that("the three Weber 2019 hybrid sets are in this package's orientation", {
+  # Basilio Barbosa et al. (2019) Biophys Chem 251:106189, Table 1. That paper
+  # writes keys DNA-first (section 2.2: "will always use the notation starting
+  # with the deoxy base"), so dXrY-dWrZ maps to "ZY/WX" here. Up to 1.1.1 all
+  # three sets were stored in the paper's orientation instead of ours.
+  sig3 <- function(x) signif(x, 3)
+  #                            dArU-dArU -> TT/AA        dTrA-dTrA -> AA/TT
+  expect_equal(sig3(TmCalculator:::.TM_CONSTANTS[["RNA_DNA_NN_Weber_2019_FT"]]["TT/AA", ]),
+               c(left = -8.27, right = -25.2))
+  expect_equal(sig3(TmCalculator:::.TM_CONSTANTS[["RNA_DNA_NN_Weber_2019_FT"]]["AA/TT", ]),
+               c(left = -10.3, right = -29.9))
+  expect_equal(sig3(TmCalculator:::.TM_CONSTANTS[["RNA_DNA_NN_Weber_2019_VH"]]["TT/AA", ]),
+               c(left = -7.72, right = -23.9))
+  expect_equal(sig3(TmCalculator:::.TM_CONSTANTS[["RNA_DNA_NN_Weber_2019_LS"]]["TT/AA", ]),
+               c(left = -10.9, right = -35.9))
+  # dCrG-dGrC -> CG/GC is a palindrome and was therefore never wrong
+  expect_equal(sig3(TmCalculator:::.TM_CONSTANTS[["RNA_DNA_NN_Weber_2019_FT"]]["CG/GC", ]),
+               c(left = -12.6, right = -33.7))
+})
+
+test_that("a purine-rich RNA strand binds DNA more tightly than a pyrimidine-rich one", {
+  # The most robust qualitative fact about RNA/DNA hybrids, and the property
+  # that a reversed table violates. All five shipped hybrid sets are now
+  # confirmed against their primary sources and must all satisfy it.
+  for (nm in c("RNA_DNA_NN_Sugimoto_1995", "RNA_DNA_NN_Banerjee_2020",
+               "RNA_DNA_NN_Weber_2019_FT", "RNA_DNA_NN_Weber_2019_VH",
+               "RNA_DNA_NN_Weber_2019_LS")) {
+    tbl <- TmCalculator:::.TM_CONSTANTS[[nm]]
+    dg  <- function(k) tbl[k, 1] - 310.15 * tbl[k, 2] / 1000
+    expect_lt(dg("AA/TT"), dg("TT/AA"))       # rAA/dTT vs rUU/dAA
+    expect_lt(dg("GG/CC"), dg("CC/GG"))       # rGG/dCC vs rCC/dGG
+    expect_lt(dg("AG/TC"), dg("CT/GA"))       # rAG/dTC vs rCU/dAG
+  }
+})
+
+# ---------------------------------------------------------------------------
+# 15. Initiation is charged on the duplex that actually closes.
+#
+#     Not a regression -- a deliberate divergence from Biopython, pinned here
+#     so it cannot drift back silently. Biopython consumes the terminal
+#     mismatch and the dangling end, then indexes all four initiation terms on
+#     the ORIGINAL sequence anyway; we index them on what is left. SantaLucia &
+#     Hicks (2004) define the terminal penalty as a property of the closing
+#     base pair -- "applied for each end of a duplex that has a terminal AT" --
+#     and a mismatch is neither an AT nor a GC pair, so it cannot carry one.
+#
+#     The probe is the same as in block 13: poison one row and see which
+#     duplexes react. If initiation ever goes back to reading the untrimmed
+#     input, the second block below stops reacting to init_G/C.
+# ---------------------------------------------------------------------------
+
+poisoned <- function(name, key = NULL, delta = 0) {
+  tbl <- TmCalculator:::.TM_CONSTANTS[[name]]
+  if (!is.null(key)) tbl[key, 2] <- tbl[key, 2] + delta
+  attr(tbl, "reference") <- name
+  tbl
+}
+
+tm_tbl <- function(s, cmp, tbl) {
+  gr <- TmCalculator::to_genomic_ranges(s, complement_seq = cmp)
+  r  <- TmCalculator::tm_nn(gr, nn_table = tbl, dnac_high = 250, dnac_low = 0,
+                            salt_method = "none")
+  as.numeric(GenomicRanges::mcols(r$gr)$Tm)
+}
+
+# DNA_NN_Allawi_1998 is used because both init_A/T and init_G/C are non-zero
+# there, so either row moves the answer when it is charged.
+ALW  <- "DNA_NN_Allawi_1998"
+MSEQ <- "AGCGCGCGCA"
+MPRF <- chartr("ACGT", "TGCA", MSEQ)                     # TCGCGCGCGT, A.T ends
+MMM5 <- paste0("C", substring(MPRF, 2L))                 # CCGCGCGCGT, 5' A.C
+
+test_that("a perfect duplex with A.T ends is charged init_A/T twice", {
+  base <- tm_tbl(MSEQ, MPRF, poisoned(ALW))
+  expect_true(is.finite(base))
+  expect_false(isTRUE(all.equal(tm_tbl(MSEQ, MPRF, poisoned(ALW, "init_A/T", 10)),
+                                base)))
+  expect_equal(tm_tbl(MSEQ, MPRF, poisoned(ALW, "init_G/C", 10)), base)
+})
+
+test_that("a 5' terminal mismatch moves the closing pair to the G.C underneath", {
+  # 5'-A GCGCGCGC A-3'   the A.C at the left is consumed as a terminal
+  # 3'-C CGCGCGCG T-5'   mismatch, so the duplex now closes on G.C ... A.T
+  base <- tm_tbl(MSEQ, MMM5, poisoned(ALW))
+  expect_true(is.finite(base))
+  # both rows are now charged once, so both must move the answer
+  expect_false(isTRUE(all.equal(tm_tbl(MSEQ, MMM5, poisoned(ALW, "init_G/C", 10)),
+                                base)))
+  expect_false(isTRUE(all.equal(tm_tbl(MSEQ, MMM5, poisoned(ALW, "init_A/T", 10)),
+                                base)))
+  # and it is a different duplex from the perfect one
+  expect_false(isTRUE(all.equal(base, tm_tbl(MSEQ, MPRF, poisoned(ALW)))))
+})
+
+test_that("the trimmed-duplex convention is strand-symmetric", {
+  expect_equal(tm_tbl(MSEQ, MMM5, poisoned(ALW)),
+               tm_tbl(flip(MMM5), flip(MSEQ), poisoned(ALW)))
+})
+
+# ---------------------------------------------------------------------------
+# 16. Reference strings.
+#
+#     RNA_DNA_NN_Sugimoto_1995 carried 10.1016/S0048-9697(98)00088-6, which is
+#     a Science of the Total Environment paper, not Biochemistry 34:11211.
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# 17. salt_method = "SantaLucia1998-2" was unreachable from tm_nn().
+#
+#     salt_correct() implements it, both Tm paths in tm_nn.R apply it to
+#     delta_s, and ?tm_gc says it is "available in tm_nn". But it was missing
+#     from the salt_method default vector of tm_nn() and tm_calculate(), so
+#     match.arg() rejected the name before any of that ran. Found by the
+#     Biopython parity harness, where every case using it came back NA.
+# ---------------------------------------------------------------------------
+
+test_that("every method salt_correct() implements is reachable from tm_nn()", {
+  implemented <- eval(formals(TmCalculator::salt_correct)$method)
+  offered     <- eval(formals(TmCalculator::tm_nn)$salt_method)
+  expect_setequal(implemented, setdiff(offered, "none"))
+  expect_setequal(implemented,
+                  setdiff(eval(formals(TmCalculator::tm_calculate)$salt_method),
+                          "none"))
+})
+
+test_that("SantaLucia1998-2 corrects the entropy rather than Tm", {
+  tm_of_salt <- function(m) {
+    out <- TmCalculator::tm_nn(SEQ, nn_table = "DNA_NN_Allawi_1998",
+                               dnac_high = 250, dnac_low = 0, Na = 50,
+                               salt_method = m)
+    as.numeric(GenomicRanges::mcols(out$gr)$Tm)
+  }
+  sl2 <- tm_of_salt("SantaLucia1998-2")
+  expect_true(is.finite(sl2))
+  # it is a real correction, so it moves the answer off the uncorrected one,
+  # and it is not the same number as the Tm-side form of the same correction
+  expect_false(isTRUE(all.equal(sl2, tm_of_salt("none"))))
+  expect_false(isTRUE(all.equal(sl2, tm_of_salt("SantaLucia1998-1"))))
+})
+
+test_that("SantaLucia1998-2 is refused for method = 'tm_gc' with a reason", {
+  expect_error(
+    TmCalculator::tm_calculate(SEQ, method = "tm_gc",
+                               salt_method = "SantaLucia1998-2"),
+    "entropy of a")
+})
+
+test_that("the Sugimoto 1995 reference points at the right paper", {
+  out <- TmCalculator::tm_nn(SEQ, nn_table = "RNA_DNA_NN_Sugimoto_1995",
+                             salt_method = "none")
+  ref <- out$options[["Thermodynamic NN values"]]
+  expect_match(ref, "10.1021/bi00035a029", fixed = TRUE)
+  expect_false(grepl("S0048-9697", ref, fixed = TRUE))
+})

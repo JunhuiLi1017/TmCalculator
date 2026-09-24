@@ -99,6 +99,7 @@
 #'       \item "Wetmur1991"
 #'       \item "SantaLucia1996"
 #'       \item "SantaLucia1998-1"
+#'       \item "SantaLucia1998-2" (\code{method = "tm_nn"} only)
 #'       \item "Owczarzy2004" (\code{method = "tm_nn"} only)
 #'       \item "Owczarzy2008" (\code{method = "tm_nn"} only)
 #'       \item "none" (also selected automatically when \code{nn_table} was
@@ -262,7 +263,9 @@
 #'   - "Schildkraut2010": Updated salt correction method
 #'   - "Wetmur1991": Classic salt correction method
 #'   - "SantaLucia1996": DNA-specific salt correction
-#'   - "SantaLucia1998-1": Improved DNA salt correction
+#'   - "SantaLucia1998-1": Improved DNA salt correction, applied to Tm
+#'   - "SantaLucia1998-2": the same correction applied to the entropy of the
+#'     nearest-neighbor model rather than to Tm
 #'   - "Owczarzy2004": Comprehensive salt correction
 #'   - "Owczarzy2008": Updated comprehensive salt correction
 #'   Default: "Schildkraut2010"
@@ -485,6 +488,7 @@ tm_calculate <- function(input_seq,
                                             "Wetmur1991",
                                             "SantaLucia1996",
                                             "SantaLucia1998-1",
+                                            "SantaLucia1998-2",
                                             "Owczarzy2004",
                                             "Owczarzy2008",
                                             "none"),
@@ -536,6 +540,14 @@ tm_calculate <- function(input_seq,
            "the same duplex in 1 M Na+, and carry a duplex-length term of ",
            "their own, which the GC-content formulas already have. Use ",
            "method = \"tm_nn\" for them.", call. = FALSE)
+    }
+    if (identical(salt_method, "SantaLucia1998-2")) {
+      stop("`salt_method = \"SantaLucia1998-2\"` is not available for ",
+           "method = \"tm_gc\". It corrects the entropy of a ",
+           "nearest-neighbor model, which a GC-content formula does not ",
+           "have. Use method = \"tm_nn\" for it, or ",
+           "\"SantaLucia1998-1\", which is the same correction applied to ",
+           "Tm instead.", call. = FALSE)
     }
     # "none" is not a substitution but a request to drop the correction, and
     # tm_gc() honours it on either path, so it is not warned about.

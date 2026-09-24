@@ -161,9 +161,21 @@
                 "GT/TG","GG/TT","AG/TT","TG/AT","TT/AG","TG/GT",
                 "AT/TG","CG/GT","CT/GG","GG/CT","GT/CG"))
   
-  # -- RNA/DNA Hybrid - already complete (22 rows including all RC pairs) ------
-  # RNA_DNA_NN_Sugimoto_1995 was published with the full symmetric set.
-  # .complete_nn_rc() will find nothing to add (returns tbl unchanged).
+  # -- RNA/DNA Hybrid - all 16 stacks, no RC completion --------------------------
+  # Hybrid parameters are NOT invariant under reversing a key: reversing swaps
+  # which strand carries the ribose, so "AA/TT" (rAA/dTT) and "TT/AA" (rUU/dAA)
+  # are physically different stacks. All 16 are measured and listed, so there is
+  # nothing to complete; .complete_nn_rc() must not be applied here.
+  #
+  # Orientation, per Sugimoto et al. (1995) Biochemistry 34:11211-11216: the top
+  # strand is RNA read 5'-3' and the bottom strand is DNA read 3'-5', which is
+  # this package's key convention unchanged. So "AG/TC" is 5'-rAG-3'/3'-dTC-5'.
+  # Fixed in 1.1.2: the table had been entered with every non-palindromic key
+  # reversed, i.e. DNA on top. Checked against the worked example in the source,
+  # dG37(rAGGUC/dTCCAG) = 3.1 - 1.8 - 2.9 - 1.1 - 1.5 = -4.2 kcal/mol, and
+  # independently against the P-SG95 column of Table 1 in Basilio Barbosa et
+  # al. (2019) (see the DNA/RNA hybrid block below), which reproduces this set
+  # in full: all 16 stacks agree.
   hybrid_rows <- c("init","init_A/T","init_G/C","init_oneG/C","init_allA/T",
                    "init_5T/A","sym",
                    "AA/TT","AC/TG","AG/TC","AT/TA",
@@ -172,12 +184,11 @@
                    "TA/AT","TC/AG","TG/AC","TT/AA")
   RNA_DNA_NN_Sugimoto_1995 <- matrix(c(
     1.9,-3.9,  0,0,  0,0,  0,0,  0,0,  0,0,  0,0,
-    -11.5,-36.4,  -7.8,-21.6,  -7.0,-19.7,  -8.3,-23.9,
-    -10.4,-28.4,  -12.8,-31.9,  -16.3,-47.1,  -9.1,-23.5,
-    -8.6,-22.9,   -8.0,-17.1,   -9.3,-23.2,  -5.9,-12.3,
-    -7.8,-23.2,  -5.5,-13.5,  -9.0,-26.1,  -7.8,-21.9
+    -7.8,-21.9,  -5.9,-12.3,  -9.1,-23.5,  -8.3,-23.9,
+    -9.0,-26.1,  -9.3,-23.2,  -16.3,-47.1,  -7.0,-19.7,
+    -5.5,-13.5,  -8.0,-17.1,  -12.8,-31.9,  -7.8,-21.6,
+    -7.8,-23.2,  -8.6,-22.9,  -10.4,-28.4,  -11.5,-36.4
   ), ncol=2, byrow=TRUE, dimnames=list(hybrid_rows, nn_col))
-  # No .complete_nn_rc() needed - already has all 16 unique pairs
   
   # -- IMM, TMM, DE tables (unchanged) -----------------------------------------
   imm_rows <- c(
@@ -476,15 +487,32 @@
   attr(RNA_NN_Weber_FIF_1021, "salt_mM") <- 1021
 
   # ---- DNA/RNA hybrid ----
+  # Basilio Barbosa V, de Oliveira Martins E, Weber G (2019) Biophys Chem
+  # 251:106189, doi:10.1016/j.bpc.2019.106189, Table 1.
+  #
+  # Orientation. Section 2.2 of that paper states: "Note that dTrA-dArU is
+  # same as rUdA-rAdT, therefore for simplicity, in this work will always use
+  # the notation starting with the deoxy base." Their keys therefore put the
+  # DNA strand first, the opposite of this package's hybrid convention (RNA
+  # top strand 5'->3' / DNA bottom strand 3'->5'). A paper key dXrY-dWrZ maps
+  # to "ZY/WX" here, e.g. dArU-dArU -> "TT/AA" and dTrA-dTrA -> "AA/TT".
+  #
+  # Fixed in 1.1.2: these three tables were imported from the .par files in
+  # the paper's own orientation, so every non-palindromic key was reversed.
+  # All 16 stacks of all three sets now reproduce Table 1 exactly; the
+  # initiation row was never affected. The same defect and the same fix apply
+  # to RNA_DNA_NN_Sugimoto_1995 above, whose published values are Table 1's
+  # P-SG95 column.
+  #
   # AOP-DRFT, curve fitting (recommended high salt)
   # source: AOP-DRFT.par
   RNA_DNA_NN_Weber_2019_FT <- matrix(c(
          1.4943,  -8.5131,     0.0000,   0.0000,     0.0000,   0.0000,     0.0000,   0.0000,
-         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,   0.0000,    -8.2694, -25.2054,
-        -9.3923, -25.2281,   -10.8693, -31.0383,    -9.8990, -28.5875,    -9.7935, -26.2840,
-       -11.9087, -28.2205,   -12.6023, -33.6818,   -12.2978, -33.1193,   -11.5436, -33.0019,
-       -13.4801, -34.4699,   -12.4230, -32.8537,   -11.7433, -31.0498,    -9.5595, -28.8683,
-        -9.7656, -25.4503,   -11.4676, -32.1090,   -10.2758, -29.8576
+         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,   0.0000,
+       -10.2758, -29.8576,   -11.7433, -31.0498,   -12.2978, -33.1193,    -9.8990, -28.5875,
+       -11.4676, -32.1090,   -12.4230, -32.8537,   -12.6023, -33.6818,   -10.8693, -31.0383,
+        -9.7656, -25.4503,   -13.4801, -34.4699,   -11.9087, -28.2205,    -9.3923, -25.2281,
+        -9.5595, -28.8683,   -11.5436, -33.0019,    -9.7935, -26.2840,    -8.2694, -25.2054
   ), ncol=2, byrow=TRUE, dimnames=list(hybrid_rows, nn_col))
   attr(RNA_DNA_NN_Weber_2019_FT, "salt_mM") <- 1000
 
@@ -492,11 +520,11 @@
   # source: AOP-DRVH.par
   RNA_DNA_NN_Weber_2019_VH <- matrix(c(
          1.5947,  -8.6455,     0.0000,   0.0000,     0.0000,   0.0000,     0.0000,   0.0000,
-         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,   0.0000,    -7.7206, -23.8767,
-       -11.4595, -31.6731,   -10.5706, -30.0225,    -9.8591, -28.5101,   -10.6942, -29.0233,
-       -11.3728, -26.5422,   -13.0108, -35.1695,   -12.1751, -32.9612,   -11.6522, -32.9572,
-       -14.0583, -35.7112,   -12.4383, -32.9497,   -10.5935, -27.3484,   -10.2428, -30.8614,
-        -9.5993, -24.4245,   -10.7358, -29.8654,    -9.9268, -28.6058
+         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,   0.0000,
+        -9.9268, -28.6058,   -10.5935, -27.3484,   -12.1751, -32.9612,    -9.8591, -28.5101,
+       -10.7358, -29.8654,   -12.4383, -32.9497,   -13.0108, -35.1695,   -10.5706, -30.0225,
+        -9.5993, -24.4245,   -14.0583, -35.7112,   -11.3728, -26.5422,   -11.4595, -31.6731,
+       -10.2428, -30.8614,   -11.6522, -32.9572,   -10.6942, -29.0233,    -7.7206, -23.8767
   ), ncol=2, byrow=TRUE, dimnames=list(hybrid_rows, nn_col))
   attr(RNA_DNA_NN_Weber_2019_VH, "salt_mM") <- 1000
 
@@ -504,11 +532,11 @@
   # source: AOP-DRLS.par
   RNA_DNA_NN_Weber_2019_LS <- matrix(c(
          0.9630,  -6.5119,     0.0000,   0.0000,     0.0000,   0.0000,     0.0000,   0.0000,
-         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,   0.0000,   -10.8561, -35.9011,
-       -10.2316, -29.0019,    -8.6009, -22.9547,    -9.4736, -30.5491,    -9.5454, -25.1770,
-       -11.8223, -30.8244,   -11.9288, -29.9238,   -12.2281, -33.2457,    -8.7011, -25.6312,
-        -8.4153, -22.4119,    -7.4720, -19.3490,   -12.7010, -37.8656,    -9.9307, -30.7749,
-       -12.2396, -33.9475,   -13.8697, -37.9789,   -10.6987, -32.0137
+         0.0000,   0.0000,     0.0000,   0.0000,     0.0000,   0.0000,
+       -10.6987, -32.0137,   -12.7010, -37.8656,   -12.2281, -33.2457,    -9.4736, -30.5491,
+       -13.8697, -37.9789,    -7.4720, -19.3490,   -11.9288, -29.9238,    -8.6009, -22.9547,
+       -12.2396, -33.9475,    -8.4153, -22.4119,   -11.8223, -30.8244,   -10.2316, -29.0019,
+        -9.9307, -30.7749,    -8.7011, -25.6312,    -9.5454, -25.1770,   -10.8561, -35.9011
   ), ncol=2, byrow=TRUE, dimnames=list(hybrid_rows, nn_col))
   attr(RNA_DNA_NN_Weber_2019_LS, "salt_mM") <- 100
 

@@ -32,7 +32,7 @@ tm_nn(
   Mg = 0,
   dNTPs = 0,
   salt_method = c("Schildkraut2010", "Wetmur1991", "SantaLucia1996", "SantaLucia1998-1",
-    "Owczarzy2004", "Owczarzy2008", "none"),
+    "SantaLucia1998-2", "Owczarzy2004", "Owczarzy2008", "none"),
   DMSO = 0,
   formamide_unit = list(value = 0, unit = "percent"),
   dmso_factor = 0.75,
@@ -119,6 +119,19 @@ your own, build the object explicitly:
   - "RNA_DNA_NN_Banerjee_2020": improved hybrid parameters fitted at a
     physiological condition (100 mM NaCl), Banerjee et al. (2020)
 
+  For every hybrid set the sequence you supply must be the \strong{RNA}
+  strand, written 5' to 3' and spelled with T in place of U; its complement
+  is then the DNA strand, read 3' to 5'. The published keys are indexed the
+  same way, RNA on top: \code{"AG/TC"} means 5'-rAG-3' paired with
+  3'-dTC-5'. Unlike DNA/DNA and RNA/RNA parameters, hybrid parameters are
+  \emph{not} invariant under reversing a key, because reversing it swaps
+  which strand carries the ribose. Supplying the DNA strand therefore does
+  not give the same answer: it silently reports the melting temperature of
+  the opposite hybrid. The asymmetry is large, since a purine-rich RNA
+  strand binds DNA more tightly than a pyrimidine-rich one (for example
+  5'-rAA-3'/3'-dTT-5' and 5'-rUU-3'/3'-dAA-5' differ by about
+  0.8 kcal/mol in delta G at 37 degrees C).
+
 
   Alternatively, supply a matrix or data.frame of parameters directly. This
   is the route for parameter sets the package does not ship, in particular
@@ -185,7 +198,10 @@ Available options:
 - "Schildkraut2010": Updated salt correction method
 - "Wetmur1991": Classic salt correction method
 - "SantaLucia1996": DNA-specific salt correction
-- "SantaLucia1998-1": Improved DNA salt correction
+- "SantaLucia1998-1": Improved DNA salt correction, applied to Tm
+- "SantaLucia1998-2": the same correction applied to the entropy of the
+  nearest-neighbor model rather than to Tm, which is why it is available
+  here and not in \code{\link{tm_gc}}
 - "Owczarzy2004": Comprehensive salt correction
 - "Owczarzy2008": Updated comprehensive salt correction
 - "none": Disables salt correction entirely
@@ -248,7 +264,7 @@ DNA_NN_Breslauer_1986: Breslauer K J (1986) <doi:10.1073/pnas.83.11.3746>
  
  RNA_NN_Chen_2012: Chen JL (2012) <doi:10.1021/bi3002709>
  
- RNA_DNA_NN_Sugimoto_1995: Sugimoto N (1995)<doi:10.1016/S0048-9697(98)00088-6>
+ RNA_DNA_NN_Sugimoto_1995: Sugimoto N (1995)<doi:10.1021/bi00035a029>
 
  The following sets were derived by melting-temperature optimization and are
  fitted at the sodium concentration given in parentheses. They are not

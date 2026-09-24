@@ -117,7 +117,7 @@ SantaLucia J (2004) <doi:10.1146/annurev.biophys.32.110601.141800>
 Freier S (1986) <doi:10.1073/pnas.83.24.9373>
 Xia T (1998) <doi:10.1021/bi9809425>
 Chen JL (2012) <doi:10.1021/bi3002709>
-Sugimoto N (1995) <doi:10.1016/S0048-9697(98)00088-6>
+Sugimoto N (1995) <doi:10.1021/bi00035a029>
 Bommarito S (2000) <doi:10.1093/nar/28.9.1929>
 Peyret N (1999) <doi:10.1021/bi9825091>
 Allawi H T & SantaLucia J (1997) <doi:10.1021/bi962590c>

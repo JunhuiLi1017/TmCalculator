@@ -110,7 +110,20 @@
 #'   - "RNA_DNA_NN_Weber_2019_LS": low salt, 100 mM
 #'   - "RNA_DNA_NN_Banerjee_2020": improved hybrid parameters fitted at a
 #'     physiological condition (100 mM NaCl), Banerjee et al. (2020)
-#' 
+#'
+#'   For every hybrid set the sequence you supply must be the \strong{RNA}
+#'   strand, written 5' to 3' and spelled with T in place of U; its complement
+#'   is then the DNA strand, read 3' to 5'. The published keys are indexed the
+#'   same way, RNA on top: \code{"AG/TC"} means 5'-rAG-3' paired with
+#'   3'-dTC-5'. Unlike DNA/DNA and RNA/RNA parameters, hybrid parameters are
+#'   \emph{not} invariant under reversing a key, because reversing it swaps
+#'   which strand carries the ribose. Supplying the DNA strand therefore does
+#'   not give the same answer: it silently reports the melting temperature of
+#'   the opposite hybrid. The asymmetry is large, since a purine-rich RNA
+#'   strand binds DNA more tightly than a pyrimidine-rich one (for example
+#'   5'-rAA-3'/3'-dTT-5' and 5'-rUU-3'/3'-dAA-5' differ by about
+#'   0.8 kcal/mol in delta G at 37 degrees C).
+#'
 #'
 #'   Alternatively, supply a matrix or data.frame of parameters directly. This
 #'   is the route for parameter sets the package does not ship, in particular
@@ -176,7 +189,10 @@
 #'   - "Schildkraut2010": Updated salt correction method
 #'   - "Wetmur1991": Classic salt correction method
 #'   - "SantaLucia1996": DNA-specific salt correction
-#'   - "SantaLucia1998-1": Improved DNA salt correction
+#'   - "SantaLucia1998-1": Improved DNA salt correction, applied to Tm
+#'   - "SantaLucia1998-2": the same correction applied to the entropy of the
+#'     nearest-neighbor model rather than to Tm, which is why it is available
+#'     here and not in \code{\link{tm_gc}}
 #'   - "Owczarzy2004": Comprehensive salt correction
 #'   - "Owczarzy2008": Updated comprehensive salt correction
 #'   - "none": Disables salt correction entirely
@@ -219,7 +235,7 @@
 #'  
 #'  RNA_NN_Chen_2012: Chen JL (2012) <doi:10.1021/bi3002709>
 #'  
-#'  RNA_DNA_NN_Sugimoto_1995: Sugimoto N (1995)<doi:10.1016/S0048-9697(98)00088-6>
+#'  RNA_DNA_NN_Sugimoto_1995: Sugimoto N (1995)<doi:10.1021/bi00035a029>
 #'
 #'  The following sets were derived by melting-temperature optimization and are
 #'  fitted at the sodium concentration given in parentheses. They are not
@@ -436,6 +452,7 @@ tm_nn <- function(gr_seq,
                                         "Wetmur1991",
                                         "SantaLucia1996",
                                         "SantaLucia1998-1",
+                                        "SantaLucia1998-2",
                                         "Owczarzy2004",
                                         "Owczarzy2008",
                                         "none"),
@@ -590,7 +607,7 @@ tm_nn <- function(gr_seq,
                         "RNA_NN_Freier_1986" = "Freier S (1986) <doi:10.1073/pnas.83.24.9373>",
                         "RNA_NN_Xia_1998" = "Xia T (1998) <doi:10.1021/bi9809425>",
                         "RNA_NN_Chen_2012" = "Chen JL (2012) <doi:10.1021/bi3002709>",
-                        "RNA_DNA_NN_Sugimoto_1995" = "Sugimoto N (1995)<doi:10.1016/S0048-9697(98)00088-6>",
+                        "RNA_DNA_NN_Sugimoto_1995" = "Sugimoto N (1995)<doi:10.1021/bi00035a029>",
                         "DNA_TMM_Bommarito_2000" = "Bommarito S (2000)  <doi:10.1093/nar/28.9.1929>",
                         "DNA_IMM_Peyret_1999" = "Peyret N (1999) <doi:10.1021/bi9825091> & Allawi H T (1997) <doi:10.1021/bi962590c> & Santalucia N (2005) <doi:10.1093/nar/gki918>",
                         "DNA_DE_Bommarito_2000" = "Bommarito S (2000) <doi:10.1093/nar/28.9.1929>",
@@ -983,7 +1000,19 @@ tm_nn <- function(gr_seq,
   gc_ends    <- sum(c(first_base, last_base) %in% c("G","C"))
   at_ends    <- 2L - gc_ends
   
-  if(gc_ends == 0){
+  # 'init_allA/T' and 'init_oneG/C' ask about the WHOLE duplex -- does it hold
+  # any G.C pair at all -- not about its two ends. Up to 1.1.1 this branch
+  # reused gc_ends, so a duplex closed by A.T at both ends took init_allA/T no
+  # matter how much G+C sat in the middle. The test is over base PAIRS, so a G
+  # or C appearing only in a mismatch does not count; for a perfect duplex this
+  # agrees with Biopython's gc_fraction(seq) == 0. See the matching comment in
+  # src/tm_nn_core.cpp; the two paths must stay identical.
+  top_bases   <- strsplit(tmp_seq,  "", fixed = TRUE)[[1L]]
+  bot_bases   <- strsplit(tmp_cseq, "", fixed = TRUE)[[1L]]
+  any_gc_pair <- any((top_bases == "G" & bot_bases == "C") |
+                     (top_bases == "C" & bot_bases == "G"))
+
+  if(!any_gc_pair){
     delta_h <- nn_tbl['init_allA/T', 1] + delta_h
     delta_s <- nn_tbl['init_allA/T', 2] + delta_s
   }else{

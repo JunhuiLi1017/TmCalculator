@@ -320,7 +320,27 @@ NumericMatrix cpp_tm_nn_dhds(CharacterVector seqs, CharacterVector cseqs,
     if (last_base == 'G' || last_base == 'C') ++gc_ends;
     const int at_ends = 2 - gc_ends;
 
-    if (gc_ends == 0) {
+    // 'init_allA/T' and 'init_oneG/C' ask a question about the WHOLE duplex --
+    // does it contain any G.C pair at all -- not about its two ends. Up to
+    // 1.1.1 this branch reused gc_ends, so a duplex closed by A.T at both ends
+    // was charged init_allA/T no matter how much G+C sat in the middle:
+    // ATGCGCGCAT/TACGCGCGTA was treated as an all-A/T duplex. Only
+    // DNA_NN_Breslauer_1986 gives the two rows different values (dS -20.1 vs
+    // -16.8), which is why no other parameter set could expose the mistake;
+    // there the error reached 4 degrees C. The test below is over base PAIRS,
+    // so a G or C that only appears in a mismatch does not make the duplex a
+    // G/C-containing one; for a perfect duplex it agrees with Biopython's
+    // gc_fraction(seq) == 0. Like every other initiation term it reads the
+    // trimmed duplex, i.e. what is left after dangling ends and terminal
+    // mismatches have been consumed.
+    bool any_gc_pair = false;
+    for (size_t i = 0; i < s.size() && i < c.size(); ++i) {
+      if ((s[i] == 'G' && c[i] == 'C') || (s[i] == 'C' && c[i] == 'G')) {
+        any_gc_pair = true;
+        break;
+      }
+    }
+    if (!any_gc_pair) {
       if (nn_t.get("init_allA/T", th, ts)) { dh += th; ds += ts; }
       else ok = false;
     } else {

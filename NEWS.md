@@ -146,7 +146,80 @@ was wrong in both the old and the new form.
   pre-vectorisation code had its own version of the fault, testing the first
   base for `A` where it meant the last.)
 
+## Bug fix affecting every RNA/DNA hybrid Tm
+
+* **Four of the five hybrid parameter sets were stored with the DNA strand on
+  top.** `RNA_DNA_NN_Sugimoto_1995`, `RNA_DNA_NN_Weber_2019_FT`, `..._VH` and
+  `..._LS` had every non-palindromic key reversed. Unlike DNA/DNA and RNA/RNA
+  parameters, hybrid parameters are **not** invariant under reversing a key,
+  because reversing swaps which strand carries the ribose: `"AA/TT"` is
+  rAA·dTT and `"TT/AA"` is rUU·dAA, and those differ by about 0.8 kcal/mol in
+  ΔG°37. Every hybrid Tm from these four sets was therefore the Tm of the
+  opposite hybrid. `RNA_DNA_NN_Banerjee_2020` was correct and is unchanged.
+
+  Both sources index their tables the other way round from this package.
+  Sugimoto et al. (1995) Biochemistry 34:11211 put the RNA strand on top, as
+  we do; the table had simply been entered reversed. Basílio Barbosa et al.
+  (2019) Biophys Chem 251:106189 §2.2 say they "always use the notation
+  starting with the deoxy base", so their `dXrY-dWrZ` is our `"ZY/WX"`, and
+  the three Weber sets had been imported in the paper's orientation.
+
+  All four sets now reproduce Table 1 of Basílio Barbosa et al. (2019) exactly,
+  16 stacks each, including its `P-SG95` column which is the Sugimoto set. The
+  Sugimoto fix also reproduces the worked example in its own source,
+  ΔG°37(rAGGUC/dTCCAG) = 3.1 − 1.8 − 2.9 − 1.1 − 1.5 = −4.2 kcal/mol.
+  Initiation rows were never affected.
+
+  Affected releases are 1.0.9 to 1.1.1 for the Weber sets, which were added in
+  1.0.9, and every release to date for `RNA_DNA_NN_Sugimoto_1995`.
+
+* **Hybrid duplexes must be given the RNA strand as the sequence.** This was
+  always the intent and is now stated in `?tm_nn` under `nn_table`: supply the
+  RNA strand, 5' to 3', spelled with T in place of U; the complement is then
+  the DNA strand, 3' to 5'. Handing over the DNA strand does not raise an
+  error, it silently answers for the other hybrid.
+
+* **The Sugimoto (1995) DOI was wrong** in `?tm_nn`, `?thermodynamic_nn_params`
+  and the per-table reference strings. It pointed at
+  `10.1016/S0048-9697(98)00088-6`, a Science of the Total Environment paper.
+  Corrected to `10.1021/bi00035a029`.
+
+## Bug fix affecting `DNA_NN_Breslauer_1986`
+
+* **`init_allA/T` was chosen from the two terminal bases instead of from the
+  whole duplex.** That row means "this duplex contains no G·C pair at all",
+  but the branch reused the `gc_ends` count, so any duplex closed by A·T at
+  both ends took it no matter how much G+C sat in the middle. `ATGCGCGCAT`
+  paired with its complement is 60 % G+C and was charged as an all-A/T duplex,
+  an error of 4.07 °C. No terminal mismatch is needed to trigger it.
+
+  `DNA_NN_Breslauer_1986` is the only shipped set that gives `init_allA/T` and
+  `init_oneG/C` different values (ΔS −20.1 vs −16.8); in the other 35 the two
+  branches return the same numbers, which is why nothing else could expose it.
+  The test is now over base *pairs*, so a G or C appearing only in a mismatch
+  does not make the duplex a G/C-containing one, and for a perfect duplex it
+  agrees with Biopython.
+
 ## Smaller things
+
+* **`salt_method = "SantaLucia1998-2"` was unreachable.** `salt_correct()`
+  implements it, both melting-temperature paths in `tm_nn()` apply it to the
+  entropy, and `?tm_gc` says it is available in `tm_nn()` — but it was missing
+  from the `salt_method` default vector of `tm_nn()` and `tm_calculate()`, so
+  `match.arg()` rejected the name before any of that could run. It is now
+  offered by both, and refused for `method = "tm_gc"` with the reason, next to
+  the two Owczarzy methods that were already refused there. A test now asserts
+  that the set of methods `salt_correct()` implements and the set `tm_nn()`
+  offers are the same set, so the two cannot drift apart again.
+
+* **New: a Biopython parity harness**, `tools/biopython_parity/`. It crosses
+  every parameter the two implementations share — 8 shared parameter sets, all
+  8 salt methods, 6 ionic conditions, 3 strand-concentration regimes,
+  self-complementarity, and 13 duplex shapes — and requires exact agreement on
+  perfect duplexes and on duplexes whose only defect is an internal mismatch.
+  Terminal mismatches and dangling ends are expected to differ, for the
+  documented initiation-convention reason, and are reported without failing.
+  See its README.
 
 * **`tm_nn()`, `tm_gc()` and `tm_wallace()` now take a character vector.**
   They documented and accepted only the `GRanges` that

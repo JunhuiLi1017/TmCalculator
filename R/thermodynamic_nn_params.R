@@ -96,7 +96,7 @@
 #' Freier S (1986) <doi:10.1073/pnas.83.24.9373>
 #' Xia T (1998) <doi:10.1021/bi9809425>
 #' Chen JL (2012) <doi:10.1021/bi3002709>
-#' Sugimoto N (1995) <doi:10.1016/S0048-9697(98)00088-6>
+#' Sugimoto N (1995) <doi:10.1021/bi00035a029>
 #' Bommarito S (2000) <doi:10.1093/nar/28.9.1929>
 #' Peyret N (1999) <doi:10.1021/bi9825091>
 #' Allawi H T & SantaLucia J (1997) <doi:10.1021/bi962590c>
@@ -178,9 +178,13 @@ rownames(RNA_NN_Chen_2012) <- c("init","init_A/T","init_G/C","init_oneG/C","init
 colnames(RNA_NN_Chen_2012) <- c("left","right")
 
 # ---- RNA/DNA Nearest Neighbor Parameters ------------------------------------
-RNA_DNA_NN_Sugimoto_1995 <- matrix(c(1.9,-3.9,0,0,0,0,0,0,0,0,0,0,0,0,-11.5,-36.4,-7.8,-21.6,-7,-19.7,-8.3,-23.9,-10.4,-28.4,
-                        -12.8,-31.9,-16.3,-47.1,-9.1,-23.5,-8.6,-22.9,-8,-17.1,-9.3,-23.2,-5.9,-12.3,-7.8,-23.2,
-                        -5.5,-13.5,-9,-26.1,-7.8,-21.9),ncol=2,byrow = TRUE)
+# Orientation: top strand RNA 5'-3', bottom strand DNA 3'-5', as published in
+# Sugimoto et al. (1995). Hybrid keys are not reversal-symmetric, so "AA/TT"
+# (rAA/dTT) and "TT/AA" (rUU/dAA) are different stacks. Corrected in 1.1.2,
+# where the table had been stored with every non-palindromic key reversed.
+RNA_DNA_NN_Sugimoto_1995 <- matrix(c(1.9,-3.9,0,0,0,0,0,0,0,0,0,0,0,0,-7.8,-21.9,-5.9,-12.3,-9.1,-23.5,-8.3,-23.9,-9,-26.1,
+                        -9.3,-23.2,-16.3,-47.1,-7,-19.7,-5.5,-13.5,-8,-17.1,-12.8,-31.9,-7.8,-21.6,-7.8,-23.2,
+                        -8.6,-22.9,-10.4,-28.4,-11.5,-36.4),ncol=2,byrow = TRUE)
 rownames(RNA_DNA_NN_Sugimoto_1995) <- c("init","init_A/T","init_G/C","init_oneG/C","init_allA/T","init_5T/A","sym","AA/TT",
                            "AC/TG","AG/TC","AT/TA","CA/GT","CC/GG","CG/GC","CT/GA","GA/CT","GC/CG","GG/CC",
                            "GT/CA","TA/AT","TC/AG","TG/AC","TT/AA")
