@@ -11,10 +11,10 @@
 // Semantics preserved from the R implementation:
 //  * A key present in both the NN and IMM tables is taken from the NN table
 //    only; a stack has one delta_H and delta_S.
-//  * Keys not found in any table are silently skipped. A key is looked up in
-//    both orientations first (see rev_key below), because a stack and its
-//    character reversal are the same physical stack and the published tables
-//    store only one of the two.
+//  * A stack key is looked up in both orientations (see rev_key below),
+//    because a stack and its character reversal are the same physical stack
+//    and the published tables store only one of the two. A key neither table
+//    holds marks the sequence (nostack = 1) rather than contributing zero.
 //  * A missing initiation row ('init', 'init_5T/A', ...) marks the sequence
 //    as failed (ok = 0), matching the R behavior where the subscript
 //    error/NA was converted to NA by tryCatch.
@@ -122,14 +122,19 @@ NumericMatrix cpp_tm_nn_dhds(CharacterVector seqs, CharacterVector cseqs,
   // Empty for all reference-salt sets. No reversed retry: see Tbl::rev_ok.
   const Tbl end_t = make_tbl(end, false);
 
-  // columns: dh, ds, nA, nC, nG, nT, len, ok
-  NumericMatrix out(nseq, 8);
+  // columns: dh, ds, nA, nC, nG, nT, len, ok, nostack
+  NumericMatrix out(nseq, 9);
   colnames(out) = CharacterVector::create("dh", "ds", "nA", "nC", "nG", "nT",
-                                          "len", "ok");
+                                          "len", "ok", "nostack");
 
   for (R_xlen_t si = 0; si < nseq; ++si) {
     double dh = 0.0, ds = 0.0;
     bool ok = true;
+    // A stack that no table defines, as opposed to a missing initiation row
+    // or a sequence too short to stack. Reported separately because it means
+    // something different: the duplex is outside the model rather than
+    // outside the parameter set.
+    bool nostack = false;
 
     if (CharacterVector::is_na(seqs[si]) || CharacterVector::is_na(cseqs[si])) {
       out(si, 7) = 0.0;
@@ -336,9 +341,20 @@ NumericMatrix cpp_tm_nn_dhds(CharacterVector seqs, CharacterVector cseqs,
     // a DNA G.T mismatch. The nearest-neighbor set wins because it is the one
     // chosen for the molecule. No DNA set overlaps the mismatch table in
     // either orientation, so this changes nothing for DNA.
+    // A stack neither table defines is not treated as contributing zero. Of
+    // the 256 dinucleotide stacks over A/C/G/T, 116 have parameters and the
+    // remaining 140 all carry two adjacent mismatches, which the two-state
+    // nearest-neighbor model does not describe: the published sets measure a
+    // mismatch flanked by Watson-Crick pairs. Only the three tandem G.T
+    // stacks (GG/TT, GT/TG, TG/GT, from Allawi and SantaLucia 1997) have
+    // measured values, which is the same coverage MELTING 5 reports for DNA.
+    // Scoring the rest as zero overstates stability silently; the sequence is
+    // marked instead and reported as NA with a warning, which is what MELTING
+    // and Biopython do at whole-call granularity.
     for (size_t i = lo; i < hi; ++i) {
       if (nn_t.get(keys[i], th, ts))       { dh += th; ds += ts; }
       else if (imm_t.get(keys[i], th, ts)) { dh += th; ds += ts; }
+      else { ok = false; nostack = true; }
     }
 
     // -- Symmetry correction (flag precomputed in R) ------------------------
@@ -350,6 +366,7 @@ NumericMatrix cpp_tm_nn_dhds(CharacterVector seqs, CharacterVector cseqs,
     out(si, 0) = dh;
     out(si, 1) = ds;
     out(si, 7) = ok ? 1.0 : 0.0;
+    out(si, 8) = nostack ? 1.0 : 0.0;
   }
 
   return out;

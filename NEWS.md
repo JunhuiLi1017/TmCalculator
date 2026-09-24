@@ -1,22 +1,62 @@
 # TmCalculator 1.1.2
 
+## Which releases returned wrong melting temperatures, and who needs to act
+
+`tm_nn()` scored **duplexes that are not perfectly paired** incorrectly in
+every release from **1.0.5 (2026-06-04) through 1.1.1 (2026-09-21)** —
+1.0.5, 1.0.6, 1.0.7, 1.0.8, 1.0.9, 1.1.0 and 1.1.1. Versions up to and
+including **1.0.4 are correct**, and so is 1.1.2: on the duplex from issue
+#8 both give 59.973 °C, while the affected releases give 62.92 or 61.63
+depending on which strand was passed.
+
+**You are affected only if** you supplied `complement_seq` to
+`to_genomic_ranges()` or `tm_calculate()`, or a non-zero `shift` to
+`tm_nn()`. Those are the only ways a mismatch or a dangling end reaches the
+calculation.
+
+**You are not affected if** the complement was generated for you, which is
+what happens for every sequence, FASTA, `BSgenome` and `GRanges` input where
+you did not pass one yourself. Those duplexes are perfectly paired, every
+value is identical to 1.1.1, and nothing needs recomputing.
+
+To check an object you already have:
+
+```r
+mc <- GenomicRanges::mcols(gr)
+sum(as.character(mc$complement) !=
+      generate_complement(as.character(mc$sequence)))
+#  0 -> every duplex is perfectly paired; your results are unaffected
+#  >0 -> that many duplexes carry a mismatch; recompute them with 1.1.2
+```
+
+How far off the affected releases were, over 400 random 18-24-mers: up to
+about **4 °C** for one internal mismatch, about **16 °C** for a terminal
+mismatch, and about **6 °C** for two mismatches. The error is not a constant
+offset and does not average out: the same molecule gave two different answers
+depending on which strand was passed as `sequence`, differing by up to about
+3 °C.
+
 ## Bug fix affecting every mismatched duplex
 
-Perfect duplexes are **not affected**: all of them return exactly the value
-they did in 1.1.1, so the vignettes, the shipped benchmarks and the
-cross-tool comparison are unchanged. What changes is `tm_nn()` on a duplex
-whose `complement` is not the exact complement of its `sequence`, which is
-reached only by supplying `complement_seq` or a non-zero `shift`.
+This is a **regression, not an original defect**. Up to 1.0.4 the stacking
+loop was an explicit `if key / else if reversed key / else if other table /
+else stop()` chain: it retried the reversed spelling of a key, took one table
+or the other rather than both, and refused to guess at a stack no table
+defined.
 
-This is a **regression, not an original defect**. From the first CRAN
-release in 2022 the stacking loop was an explicit
-`if key / else if reversed key / else if other table / else stop()` chain:
-it retried the reversal, took one table or the other, and refused to guess at
-a stack no table defined. All three properties were lost in a single commit
-on 2026-05-26, when that per-base loop was vectorised, and 1.1.0 and 1.1.1
-shipped without them. This release restores the first two and records the
-third in `ROADMAP.md` item 11. The terminal-key orientation was wrong in both
-forms and is corrected here for the first time.
+All three properties were lost in a single commit on 2026-05-26, which
+vectorised that per-base loop and, in the same change, replaced the retry with
+a completed parameter table — `.complete_nn_rc()`, which fills in the six
+reverse-orientation rows the published nearest-neighbor tables omit. **The
+completion was applied to the nearest-neighbor tables only.** The
+internal-mismatch, terminal-mismatch and dangling-end tables were left in one
+orientation with nothing left to look up the other, which is why perfectly
+paired duplexes came through untouched and every mismatch did not — and why
+the fault survived seven releases, since every existing test used perfectly
+paired duplexes.
+
+1.1.2 restores all three, and corrects the terminal-key orientation, which
+was wrong in both the old and the new form.
 
 * **A stack and its character reversal are the same stack, and the lookup did
   not know it.** A key `"XY/WZ"` means 5'-XY-3' paired with 3'-WZ-5'; read
@@ -30,7 +70,7 @@ forms and is corrected here for the first time.
   - **Internal mismatches lost one of their two flanking stacks.** Exactly one
     of the two needs the reversed spelling, so no internal mismatch was ever
     scored completely. The penalty came out about 45% too small on the
-    example from issue #10: a T·C mismatch in a 16-mer read as 62.93 °C
+    example from issue #8: a T·C mismatch in a 16-mer read as 62.93 °C
     against a perfect 66.60 °C, where the full penalty gives 59.97 °C.
 
   - **The terminal mismatch table was consulted in the wrong orientation,
@@ -58,7 +98,7 @@ forms and is corrected here for the first time.
   would also have caught the table transposition fixed in 1.1.0.
 
   Reported by \@haraldn in
-  [#10](https://github.com/JunhuiLi1017/TmCalculator/issues/10).
+  [#8](https://github.com/JunhuiLi1017/TmCalculator/issues/8).
 
 * **Dangling ends and the Zuber 2022 end-effect table were already correct**
   and are unchanged. `.right_key()` already rewrites the right-hand terminal
@@ -77,6 +117,24 @@ forms and is corrected here for the first time.
   orientation, so **no DNA result moves**; RNA duplexes carrying wobbles move
   by up to about 2.4 °C. (The pre-vectorisation loop already took one table
   or the other; the additive form arrived with the vectorisation.)
+
+* **A stack no parameter set defines returns NA with a warning, instead of
+  being scored as contributing nothing.** Of the 256 dinucleotide stacks over
+  A/C/G/T, 116 have parameters. The other 140 all carry two adjacent
+  mismatches, which the two-state nearest-neighbor model does not describe:
+  the published sets measure a mismatch flanked by Watson-Crick pairs. Only
+  the three tandem G·T stacks — `GG/TT`, `GT/TG` and `TG/GT`, from Allawi and
+  SantaLucia (1997) — have measured values, which is the same coverage
+  MELTING 5 reports for DNA, and those are computed as before. Treating the
+  rest as zero overstated stability with nothing to show for it; MELTING quits
+  with a warning and Biopython raises, and up to 1.0.4 this package raised too.
+  Reporting per sequence rather than per call keeps a genome-scale run going.
+
+  Nothing that was already computable changes: a single mismatch, a single
+  inosine paired with C, a dangling end and every perfectly paired duplex are
+  all fully covered. This restores the explicit report promised in
+  [#1](https://github.com/JunhuiLi1017/TmCalculator/issues/1), and closes
+  `ROADMAP.md` item 11.
 
 * **The 5'-T initiation penalty is charged per strand rather than per
   sequence.** `init_5T/A` is due once for each strand whose 5' end is T: the

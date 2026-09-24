@@ -190,16 +190,21 @@ assumed, not checked, and it is wrong; see item 4.)
     changed; `test_regressions_1_1_2.R` now proves the symmetry with a table
     carrying a non-zero value.
 
-11. **`tm_nn()` still contributes zero for a stack no table defines.**
-    The per-base loop raised an error instead, from the first CRAN release
-    until it was vectorised on 2026-05-26. Of the 256 possible
-    dinucleotide stacks, 116 are covered by a DNA nearest-neighbor set plus
-    Peyret 1999 in either orientation; the remaining 140 are stacks with two
-    adjacent mismatches, which no published table covers and which the
-    two-state model does not really describe. Silently treating them as
-    contributing nothing overstates stability. Decide between restoring the
-    error, warning once per call, or returning NA for the sequence, and note
-    that a genome-scale run must not warn per window.
+11. ~~**`tm_nn()` contributes zero for a stack no table defines.**~~ Resolved
+    in 1.1.2: such a sequence returns NA with a warning naming the cause.
+    Of the 256 stacks over A/C/G/T, 116 have parameters and the other 140 all
+    carry two adjacent mismatches, which the two-state model does not
+    describe; only the three tandem G.T stacks have measured values, matching
+    MELTING 5's DNA coverage. Reported per sequence rather than per call, so a
+    genome-scale run is not aborted by one window.
+
+    Still open: RNA tandem mismatches and internal loops. Mathews (1999) and
+    Lu, Turner and Mathews (2006) provide measured symmetric and asymmetric
+    2x2 models, which MELTING 5 implements as `tur99` and `turmat`; this
+    package has neither parameter set. Acquiring them is a several-hundred
+    value transcription and must be cross-checked against two sources before
+    it is trusted, given that this package has twice shipped a transposed
+    table.
 
 ## Documentation and interoperability
 

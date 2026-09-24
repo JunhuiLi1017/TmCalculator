@@ -550,6 +550,17 @@ tm_nn <- function(gr_seq,
       "sequence requires. GC is still reported for these regions."),
       chunk_res$n_no_thermo), call. = FALSE)
   }
+  if (isTRUE(chunk_res$n_no_stack > 0)) {
+    warning(sprintf(paste0(
+      "Tm is NA for %d region(s) containing a dinucleotide stack that no ",
+      "parameter set defines. The published sets measure a mismatch flanked ",
+      "by Watson-Crick pairs; two adjacent mismatches are outside the ",
+      "nearest-neighbor model, and only the three tandem G.T stacks have ",
+      "measured values. Scoring such a stack as contributing nothing would ",
+      "overstate stability, so the melting temperature is not reported. GC ",
+      "is still reported for these regions."),
+      chunk_res$n_no_stack), call. = FALSE)
+  }
   if (isTRUE(chunk_res$n_no_salt > 0)) {
     warning(sprintf(paste0(
       "Tm is NA for %d region(s): the '%s' salt correction is undefined at ",
@@ -746,12 +757,14 @@ tm_nn <- function(gr_seq,
   # base fails the model AND makes the two GC-dependent salt corrections
   # undefined, and reporting it as a salt problem would be misleading: the
   # conditions are fine, the sequence is not.
-  no_thermo <- !ok
+  no_stack  <- res[, "nostack"] > 0
+  no_thermo <- !ok & !no_stack
   no_salt   <- if (is.null(corr_salt)) rep(FALSE, length(tm)) else is.na(corr_salt)
-  no_salt   <- no_salt & !no_thermo
-  tm[no_thermo | no_salt] <- NA_real_
+  no_salt   <- no_salt & !no_thermo & !no_stack
+  tm[no_thermo | no_stack | no_salt] <- NA_real_
   list(Tm = unname(tm), GC = unname(gc_salt),
-       n_no_thermo = sum(no_thermo), n_no_salt = sum(no_salt))
+       n_no_thermo = sum(no_thermo), n_no_stack = sum(no_stack),
+       n_no_salt = sum(no_salt))
 }
 
 # -- Pure-R chunk worker, kept as reference implementation --------------------
@@ -798,8 +811,11 @@ tm_nn <- function(gr_seq,
     tm[j] <- result$Tm
     gc[j] <- result$GC
   }
+  # n_no_stack and n_no_salt are always 0 here: this reference implementation
+  # does not separate the causes the way the compiled path does, and only $Tm
+  # and $GC are compared between the two.
   list(Tm = unname(tm), GC = unname(gc),
-       n_no_thermo = n_no_thermo, n_no_salt = 0L)
+       n_no_thermo = n_no_thermo, n_no_stack = 0L, n_no_salt = 0L)
 }
 
 # -- Core single-sequence NN computation --------------------------------------
@@ -1002,6 +1018,19 @@ tm_nn <- function(gr_seq,
   spell_nn  <- resolve(keys_fr, nn_tbl)
   spell_imm <- resolve(keys_fr, imm_tbl)
   spell_imm[!is.na(spell_nn)] <- NA_character_
+
+  # A stack neither table defines is not scored as zero: of the 256 stacks
+  # over A/C/G/T, the 140 without parameters all carry two adjacent
+  # mismatches, which the two-state model does not describe. See the matching
+  # comment in src/tm_nn_core.cpp. `.tm_nn_chunk_r()` turns this into NA via
+  # its tryCatch, and reports it under n_no_thermo rather than n_no_stack --
+  # the compiled path distinguishes the two, this reference implementation
+  # does not, and only $Tm and $GC are compared between them.
+  gap <- is.na(spell_nn) & is.na(spell_imm)
+  if (any(gap))
+    stop("no thermodynamic parameters for the stack(s) ",
+         paste(utils::head(unique(keys_fr[gap]), 4L), collapse = ", "),
+         if (sum(gap) > 4L) ", ..." else "", call. = FALSE)
 
   use_nn <- spell_nn[!is.na(spell_nn)]
   if (length(use_nn)) {

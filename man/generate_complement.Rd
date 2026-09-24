@@ -11,24 +11,24 @@ generate_complement(input_seq, reverse = FALSE)
 - A character string (e.g., c("ATGCG", "GCTAG"))}
 
 \item{reverse}{Logical, controlling which of the two ways of writing the
-opposite strand is returned.
+  opposite strand is returned.
 
-\code{FALSE} (default) gives the plain complement: base \code{i} of the
-result pairs with base \code{i} of the input, so written underneath the
-input it runs \strong{3' to 5'}. This is the form
-\code{\link{to_genomic_ranges}} expects for \code{complement_seq}, and the
-form its auto-generated complements take.
+  \code{FALSE} (default) gives the plain complement: base \code{i} of the
+  result pairs with base \code{i} of the input, so written underneath the
+  input it runs \strong{3' to 5'}. This is the form
+  \code{\link{to_genomic_ranges}} expects for \code{complement_seq}, and the
+  form its auto-generated complements take.
 
-\code{TRUE} gives the reverse complement: the same strand written the
-conventional way round, \strong{5' to 3'}. It is what you would order from
-a supplier, and it is \emph{not} what \code{complement_seq} wants --
-passing it there pairs every position against the wrong base.
+  \code{TRUE} gives the reverse complement: the same strand written the
+  conventional way round, \strong{5' to 3'}. It is what you would order from
+  a supplier, and it is \emph{not} what \code{complement_seq} wants --
+  passing it there pairs every position against the wrong base.
 
-\preformatted{
-input                 5'-A T G C G-3'
-reverse = FALSE          T A C G C     (3' to 5', pairs position by position)
-reverse = TRUE        5'-C G C A T-3'  (the same strand, written 5' to 3')
-}}
+  \preformatted{
+  input                 5'-A T G C G-3'
+  reverse = FALSE          T A C G C     (3' to 5', pairs position by position)
+  reverse = TRUE        5'-C G C A T-3'  (the same strand, written 5' to 3')
+  }}
 }
 \value{
 Returns the complementary sequence(s) in the specified direction.

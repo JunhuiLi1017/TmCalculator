@@ -248,7 +248,7 @@ test_that("both stacks flanking an internal mismatch are counted", {
   expect_lt(mm, perfect)
 })
 
-test_that("the four calls reported in issue #10 agree with each other", {
+test_that("the four calls reported in issue #8 agree with each other", {
   # Verbatim from the report, including its arguments. The first two describe
   # one duplex with a T.C mismatch at position 12, read from either strand;
   # the last two are the same duplex without the mismatch. The report observed
@@ -419,6 +419,63 @@ test_that("a stack the nn table defines is not taken from the mismatch table", {
   # the RNA set defines these stacks, so the DNA mismatch table must not be
   # consulted for them and bending it must change nothing
   expect_equal(run("DNA_IMM_Peyret_1999"), run(bent))
+})
+
+# ---------------------------------------------------------------------------
+# 8b. A stack no parameter set defines was scored as contributing zero.
+#
+# Of the 256 dinucleotide stacks over A/C/G/T, 116 have parameters; the other
+# 140 all carry two adjacent mismatches, which the two-state nearest-neighbor
+# model does not describe -- the published sets measure a mismatch flanked by
+# Watson-Crick pairs. Only the three tandem G.T stacks (GG/TT, GT/TG, TG/GT,
+# Allawi and SantaLucia 1997) have measured values, which is the same coverage
+# MELTING 5 reports for DNA. Scoring the rest as zero overstated stability
+# silently; up to 1.0.4 the walk raised an error instead.
+# ---------------------------------------------------------------------------
+
+test_that("an uncovered stack gives NA with a warning, not a number", {
+  # cbird808's duplex from issue #1: position 9 is AG/GT, two
+  # adjacent mismatches, in no table
+  s   <- "GTGCCAGCAGCCGCGGTCAAAC"
+  cmp <- chartr("ACGT", "TGCA", "GTGCCAGCCACCGCGGTTATAC")
+  gr  <- TmCalculator::to_genomic_ranges(s, complement_seq = cmp)
+  expect_warning(r <- TmCalculator::tm_nn(gr, Na = 0, K = 50, Tris = 0),
+                 "no parameter set defines")
+  expect_true(is.na(GenomicRanges::mcols(r$gr)$Tm))
+  expect_false(is.na(GenomicRanges::mcols(r$gr)$GC))   # composition survives
+})
+
+test_that("the three tandem G.T stacks are still computed", {
+  # These have measured parameters (Allawi and SantaLucia 1997), so they must
+  # not be caught by the rule above. Watson-Crick flanks on both sides, long
+  # enough that the duplex melts above room temperature and the numbers mean
+  # something.
+  flank <- function(mid) paste0("GCATCG", mid, "CGATGC")
+  cflank <- function(mid) paste0("CGTAGC", mid, "GCTACG")
+  for (k in c("GG/TT", "GT/TG", "TG/GT")) {
+    expect_warning(v <- tm_of(flank(substring(k, 1, 2)),
+                              cflank(substring(k, 4, 5))),
+                   regexp = NA, info = k)
+    expect_true(is.finite(v), info = k)
+    expect_gt(v, 40)
+  }
+  # the same position with an uncovered tandem is NA, and the perfectly
+  # paired version of the same duplex is higher than any of them
+  expect_warning(bad <- tm_of(flank("AG"), cflank("GT")),
+                 "no parameter set defines")
+  expect_true(is.na(bad))
+  expect_gt(tm_of(flank("AT"), cflank("TA")),
+            tm_of(flank("GG"), cflank("TT")))
+})
+
+test_that("a single mismatch and a single inosine are unaffected", {
+  # every stack flanking one mismatch, or one inosine paired with C, is in the
+  # tables; this is what issue #1 was originally about
+  expect_true(is.finite(tm_of(SEQ, "CGTAGCATCCGCTCGA")))
+  ino <- TmCalculator::to_genomic_ranges("ACGTIACGT",
+                                         complement_seq = "TGCAGTGCA")
+  expect_warning(r <- TmCalculator::tm_nn(ino), regexp = NA)
+  expect_true(is.finite(as.numeric(GenomicRanges::mcols(r$gr)$Tm)))
 })
 
 # ---------------------------------------------------------------------------

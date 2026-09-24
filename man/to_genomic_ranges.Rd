@@ -26,26 +26,26 @@ to_genomic_ranges(input_seq, complement_seq = NULL)
   - species:  Species name for reference genome (e.g., "BSgenome.Hsapiens.UCSC.hg38"), see \code{BSgenome::available.genomes()} for all available genomes. please make sure the genome package is installed, otherwise the function will stop.}
 
 \item{complement_seq}{Optional complementary sequences, in the same formats
-\code{input_seq} accepts. \code{NULL} (default) generates them.
+  \code{input_seq} accepts. \code{NULL} (default) generates them.
 
-Supply the \strong{plain complement}, aligned base for base with
-\code{input_seq}: position \code{i} of \code{complement_seq} is the base
-paired with position \code{i} of \code{input_seq}, so written underneath
-it the complement runs \strong{3' to 5'}. Same length, same order, no
-reversal.
+  Supply the \strong{plain complement}, aligned base for base with
+  \code{input_seq}: position \code{i} of \code{complement_seq} is the base
+  paired with position \code{i} of \code{input_seq}, so written underneath
+  it the complement runs \strong{3' to 5'}. Same length, same order, no
+  reversal.
 
-\preformatted{
-input_seq       5'-G C A T C G-3'
-complement_seq  3'-C G T A G C-5'
-}
+  \preformatted{
+  input_seq       5'-G C A T C G-3'
+  complement_seq  3'-C G T A G C-5'
+  }
 
-The \emph{reverse} complement ("CGATGC" here) is the same strand written
-5' to 3', which is what \code{Biostrings::reverseComplement()} and a
-supplier's order form give you. Passing it pairs every position against
-the wrong base; the call warns when it detects this.
+  The \emph{reverse} complement ("CGATGC" here) is the same strand written
+  5' to 3', which is what \code{Biostrings::reverseComplement()} and a
+  supplier's order form give you. Passing it pairs every position against
+  the wrong base; the call warns when it detects this.
 
-A complement that differs from the plain one at some positions is a
-mismatched duplex and is handled as such.}
+  A complement that differs from the plain one at some positions is a
+  mismatched duplex and is handled as such.}
 
 \item{method}{Sequence extraction method passed to
 \code{\link{coor_to_genomic_ranges}}. One of \code{"vectorized"} (default)

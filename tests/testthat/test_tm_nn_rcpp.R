@@ -54,10 +54,36 @@ test_that("Rcpp core matches R core with internal mismatches", {
 })
 
 test_that("Rcpp core matches R core with shift / dangling ends", {
+  # The complement is the true complement with bases removed from or added to
+  # its 5' side, and `shift` realigns it, so the overhang is a dangling end
+  # and every paired position still pairs. The previous construction used two
+  # unrelated random sequences, which is a wall of adjacent mismatches: that
+  # now returns NA on both paths -- equal, but vacuous, since a stack no table
+  # defines is no longer scored as zero.
   seqs <- .rand_seqs(20, 25, 3)
-  cseqs <- complement_fast(.rand_seqs(20, 27, 4))
+  comp <- complement_fast(seqs)
   for (sh in c(-2, -1, 0, 1, 2)) {
+    cseqs <- if (sh < 0) substring(comp, 1 - sh)
+             else if (sh > 0) paste0(substr(comp, 1, sh), comp)
+             else comp
     .compare_chunk(seqs, cseqs, shift = sh)
+    # and the comparison is not vacuous
+    got <- do.call(TmCalculator:::.tm_nn_chunk,
+                   c(list(list(sequence = seqs, complement = cseqs)),
+                     utils::modifyList(
+                       list(ambiguous = FALSE, shift = sh,
+                            nn_tbl = TmCalculator:::get_table("DNA_NN_SantaLucia_2004"),
+                            tmm_tbl = TmCalculator:::get_table("DNA_TMM_Bommarito_2000"),
+                            imm_tbl = TmCalculator:::get_table("DNA_IMM_Peyret_1999"),
+                            de_tbl = TmCalculator:::get_table("DNA_DE_Bommarito_2000"),
+                            end_tbl = matrix(numeric(0), nrow = 0, ncol = 2),
+                            dnac_high = 25, dnac_low = 25, self_comp = FALSE,
+                            Na = 50, K = 0, Tris = 0, Mg = 0, dNTPs = 0,
+                            salt_fn = "Schildkraut2010", DMSO = 0,
+                            formamide_unit = list(value = 0, unit = "percent"),
+                            dmso_factor = 0.75, formamide_factor = 0.65),
+                       list())))
+    expect_true(all(is.finite(got$Tm)), info = paste("shift", sh))
   }
 })
 
