@@ -123,6 +123,7 @@
     -6.6,-16.4,  -8.8,-23.5,  -11.8,-29.0,  -10.5,-26.4,  -10.9,-28.4
   ), ncol=2, byrow=TRUE, dimnames=list(nn_row_std, nn_col)))
   
+  # Legacy identifier: Allawi & SantaLucia (1997), Table 1, doi:10.1021/bi962590c.
   DNA_NN_Allawi_1998 <- .complete_nn_rc(matrix(c(
     0,0,  2.3,4.1,  0.1,-2.8,  0,0,  0,0,  0,0,  0,-1.4,
     -7.9,-22.2,  -7.2,-20.4,  -7.2,-21.3,  -8.5,-22.7,  -8.4,-22.4,
@@ -233,6 +234,9 @@
     "AA/TG","AG/TA","CA/GG","CG/GA","GA/CG","GG/CA","TA/AG","TG/AA",
     "AG/TT","AT/TG","CG/GT","CT/GG","GG/CT","GT/CG","TG/AT","TT/AG"
   )
+  # Legacy identifier: SantaLucia & Peyret (2001), WO2001094611A2, Tables 2-3.
+  # GG/CG (-0.7, -19.2) matches the patent but conflicts with its printed dG37.
+  # See inst/extdata/tm_nn_reference_audit.md; no inferred correction applied.
   DNA_TMM_Bommarito_2000 <- matrix(c(
     -3.1,-7.8,  -2.5,-6.3,  -4.3,-10.7,  -8.0,-22.5,  -0.1,0.5,
     -0.7,-1.3,  -2.1,-5.1,  -3.9,-10.6,  -1.1,-2.1,   -1.1,-2.7,
@@ -301,7 +305,7 @@
   )
   
   # -- Weber group (UFMG) parameter sets, from VarGibbs 5.0 -----------------
-  # Generated from the shipped .par files, full precision. Mapping verified:
+  # Generated from the shipped .par files, rounded to four decimals. Mapping verified:
   # P-SL98/P-SG96/P-XIA98/P-FR86 reproduce the tables above exactly, and
   # P-PY99+P-AL97+P-AL98{,B,C}+P-WT05 reproduce all 87 IMM rows exactly.
   # Each table carries attr 'salt_mM'; do not salt-correct a set twice.
@@ -546,8 +550,9 @@
   # Nucleic Acids Res 48:12042, doi:10.1093/nar/gkaa572, Table 2.
   # Row keys follow the package hybrid convention (RNA top strand in
   # T-alphabet / DNA bottom strand 3'->5'): paper rAC/dGT -> "AC/TG", etc.
-  # Initiation: per-end terms only (init_G/C for rG-dC/rC-dG ends,
-  # init_A/T for rA-dT/rU-dA ends); no global init term in this model.
+  # Known discrepancy: Table 2 footnotes b/c define one initiation per duplex,
+  # selected by whether either end is GC, whereas these keys are charged per end.
+  # Retained pending a model correction; see inst/extdata/tm_nn_reference_audit.md.
   RNA_DNA_NN_Banerjee_2020 <- matrix(c(
        0.0,    0.0,       0.0,   -7.0,       0.0,   -4.9,       0.0,    0.0,
        0.0,    0.0,       0.0,    0.0,       0.0,    0.0,      -7.8,  -22.9,

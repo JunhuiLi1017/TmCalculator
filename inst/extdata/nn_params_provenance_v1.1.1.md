@@ -48,11 +48,14 @@ writes the bottom strand 3'→5', so `rAC/dGT` → `AC/TG`.
 | init. rG−dC / rC−dG | init_G/C | 0 | −4.9 |
 | init. rA−dT / rU−dA | init_A/T | 0 | −7.0 |
 
-Model notes. Initiation is expressed **per duplex end** only: there is no
-global initiation term, so `init`, `init_oneG/C`, `init_allA/T`,
-`init_5T/A` and `sym` are all zero. The package core already applies
-`init_A/T × (number of AT ends)` and `init_G/C × (number of GC ends)`,
-which reproduces the published model exactly.
+**Audit correction (2026-09-28).** The stored stack values match Table 2,
+but the initiation mapping does **not** reproduce the published conditions.
+Footnote b specifies one initiation for a duplex with at least one GC end;
+footnote c specifies the alternative when both ends are AT. The package
+currently applies the listed values at each end. Thus two GC ends contribute
+−9.8 entropy units instead of −4.9; a mixed pair of ends contributes −11.9
+instead of −4.9; two AT ends contribute −14.0 instead of −7.0. Numerical
+behavior is unchanged in this citation audit; a model correction remains open.
 
 Consistency check. For the sixteen stacks, ΔH − 310.15·ΔS/1000 reproduces
 the paper's tabulated ΔG°37 to the printed precision (e.g. rGG/dCC:
@@ -169,17 +172,15 @@ These eleven stacks are the same eleven GU rows carried by
 existing row set. The four GU end terms are held in
 `RNA_NN_Zuber_2022_END` alongside the AU ones.
 
-### 2C. Deliberately omitted: the GGUC/CUGG motif
+### 2C. No special GGUC/CUGG correction in the updated model
 
-Table 1B also lists a `GGUC/CUGG` term (−32.49, −92.57). This is a
-four-nucleotide motif correction, not a nearest-neighbor stack, and a
-dinucleotide model cannot represent it: the correction is a property of
-the tetramer as a whole and is not decomposable into the two stacks that
-overlap it. It is therefore not implemented, and duplexes containing
-this motif will be predicted slightly less stable than the full Zuber
-model would give. This is a structural limitation of the nearest-neighbor
-formalism used throughout the package, not an omission from the
-transcription.
+Zuber et al. explicitly find that the improved end effects make the special
+non-nearest-neighbor treatment unnecessary. The parenthetical −32.49/−92.57
+row describes an alternative fit including a separate motif term; it is not
+an obligatory extra contribution to the implemented model. The earlier
+statement that omitting it necessarily understabilizes this motif was wrong.
+The older Chen (2012) model does treat this motif separately; see the full
+[reference audit](tm_nn_reference_audit.md).
 
 ---
 
@@ -251,8 +252,10 @@ and S8 (entropy), 40 wt% PEG200 with 100 mM NaCl.
 columns. The first, ΔH°/ΔS°\[cation\], is the no-cosolute reference at
 100 mM NaCl (identical to Table S3). The second,
 ΔH°/ΔS°\[40 wt% PEG 200\], is the **crowding increment, not an absolute
-value** — several entries are positive, which is impossible for a stacking
-term. The values below are the sum of the two columns.
+value**. The values below are the sum of the two columns; the sign of
+a fitted individual term alone does not establish whether it is an increment.
+The 2026-09-28 audit verified the article identity but could not reopen the
+original SI; these S7/S8 transcriptions remain pending independent verification.
 
 | Package key | ΔH\[cation\] | ΔH increment | **ΔH used** | ΔS\[cation\] | ΔS increment | **ΔS used** |
 |---|---|---|---|---|---|---|

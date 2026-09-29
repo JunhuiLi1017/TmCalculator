@@ -13,11 +13,11 @@
 #' 
 #' @param dmso_factor Coefficient of melting temperature (Tm) decrease per percent DMSO.
 #'   Default: 0.75 (von Ahsen N, 2001, PMID:11673362)
-#'   Other published values: 0.5, 0.6, 0.675
+#'   Other accepted empirical coefficients: 0.5, 0.6, 0.65, 0.675
 #' 
 #' @param formamide_factor Coefficient of melting temperature (Tm) decrease per percent formamide.
-#'   Default: 0.65
-#'   Literature reports values ranging from 0.6 to 0.72
+#'   Default: 0.65 (empirical convention); accepted alternatives: 0.6, 0.72.
+#'   Hutton (1977) reports 0.60, not the default 0.65.
 #' 
 #' @param pt_gc Percentage of GC content in the sequence (0-100%)
 #'   This is used in molar formamide corrections.
@@ -28,14 +28,20 @@
 #' Correction = - factor * percentage_of_formamide
 #' 
 #' When formamide_unit$unit = "molar":
-#' Correction = (0.453 * GC/100 - 2.88) * formamide
+#' Correction = (0.453 * GC/100 - 2.88) * formamide, from Blake & Delcourt (1996).
 #' 
 #' @references 
 #' 
-#' von Ahsen N, Wittwer CT, Schutz E, et al. Oligonucleotide melting temperatures under PCR conditions: 
-#' deoxynucleotide Triphosphate and Dimethyl sulfoxide concentrations with comparison to alternative 
+#' von Ahsen N, Wittwer CT, Schutz E. Oligonucleotide melting temperatures under PCR conditions: nearest-neighbor corrections for Mg2+,
+#' deoxynucleotide triphosphate, and dimethyl sulfoxide concentrations with comparison to alternative
 #' empirical formulas. Clin Chem 2001, 47:1956-1961.
 #' 
+#' Blake RD, Delcourt SG (1996). Thermodynamic effects of formamide on DNA
+#' stability. NAR 24:2095-2103. <doi:10.1093/nar/24.11.2095>
+#'
+#' Hutton JR (1977). Renaturation kinetics and thermal stability of DNA in
+#' aqueous solutions of formamide and urea. <doi:10.1093/nar/4.10.3537>
+#'
 #' @author Junhui Li
 #' 
 #' @examples

@@ -68,6 +68,16 @@ res$options[["Parameter set fitted at [Na+] (mM)"]]         # 100
 Pick the set whose fitted salt is closest to your experimental condition rather
 than correcting a distant one. See `?tm_nn` for the full list and citations.
 
+### Known parameter limitations
+
+Three parameter sets have unresolved limitations: an internally inconsistent
+`GG/CG` terminal-mismatch entry in the original patent used for
+`DNA_TMM_Bommarito_2000`, an initiation-term application discrepancy in
+`RNA_DNA_NN_Banerjee_2020`, and a Watson–Crick/GU parameter combination issue in
+`RNA_NN_Chen_2012`. These limitations affect calculations using the corresponding
+parameters. See the [parameter reference audit](inst/extdata/tm_nn_reference_audit.md)
+for details and verification status.
+
 ## 4. launch an R shiny application
 
 using R function

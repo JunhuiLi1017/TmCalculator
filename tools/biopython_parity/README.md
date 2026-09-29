@@ -46,10 +46,40 @@ handled and removed and we can look at the initiation", but the code that
 follows reads `seq`, not the trimmed duplex. TmCalculator indexes them on what
 is left, because SantaLucia & Hicks (2004) define the terminal penalty as a
 property of the closing base pair, and a mismatch is not a base pair. The
-divergence reaches roughly 0.3–0.5 °C for one mismatched end on a 16-mer, and
-about 4 °C with `DNA_NN_Breslauer_1986`, whose `init_allA/T` row is the only
-one in the package that differs from `init_oneG/C`. Block 15 of
-`tests/testthat/test_regressions_1_1_2.R` pins this convention.
+divergence reaches roughly 0.3–0.5 °C for one mismatched end on a 16-mer.
+
+It is larger for `DNA_NN_Breslauer_1986`, the only shipped set whose
+`init_allA/T` row differs from `init_oneG/C`, and which therefore also
+disagrees about whether the duplex contains a G·C pair at all. To see it the
+single G or C has to be the mismatched terminal base itself, so that trimming
+removes it: for `"GATATATATATATATA"` against `"ATATATATATATATAT"`, Biopython
+reads the untrimmed sequence, takes `init_oneG/C`, and returns 35.77 where
+this package takes `init_allA/T` and returns 32.78 — **3.0 °C**. The gap grows
+as the duplex shortens, since the fixed 3.3 cal/(mol·K) offset falls on a
+smaller total entropy: 3.7 °C at 12 nt, 4.9 °C at 8 nt. Past about 10 nt those
+duplexes melt below 0 °C, so the large end of that range is not a temperature
+anyone measures.
+
+Block 15 of `tests/testthat/test_regressions_1_1_2.R` pins this convention.
+
+The sharpest form of the argument is the dangling-end case, which is
+[@haraldn](https://github.com/haraldn)'s (issue #8). At a terminal mismatch
+two bases still face each other, so which pair closes the duplex is at least
+arguable. At a dangling end there is nothing to argue about: the outermost
+residue has no partner at all, and a residue that is in no base pair cannot
+carry the penalty for a terminal base pair under any reading of SantaLucia &
+Hicks (2004). `seq = "GCATGCATGA"` against `c_seq = "CGTACGTAC"` takes the
+`.C/AG` dangling-end term, trims, and Biopython then charges a full
+`init_A/T` on the unpaired A purely because it is `seq[-1]`. TmCalculator
+returns 44.2801 there, Biopython 44.2344.
+
+Two things worth knowing when reading suite B's magnitudes. First, `init_A/T`
+is (2.2 kcal/mol, 6.9 e.u.), a ratio of 318.8 K, so its contribution to Tm
+passes through zero near 45.7 °C and changes sign either side — a duplex
+melting near there will show almost no divergence however wrong the
+convention is, which is why the dangling-end example above is worth only
+0.05 °C. Second, `DNA_NN_Breslauer_1986` escapes that cancellation, because
+the row that diverges for it is `init_allA/T`, not `init_A/T`.
 
 **Suite D (uncovered stack): both sides refusing is agreement.** Biopython
 raises under `strict=True`; TmCalculator returns `NA` with a warning. One

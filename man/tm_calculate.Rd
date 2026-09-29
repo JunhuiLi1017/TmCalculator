@@ -178,7 +178,7 @@ Usersets override value sets. Default: NULL}
   Available options:
   - "none": Disables salt correction. Also selected automatically when the
     chosen \code{nn_table} was fitted at the requested \code{Na}.
-  - "Schildkraut2010": Updated salt correction method
+  - "Schildkraut2010": Schildkraut & Lifson (1965); historical identifier
   - "Wetmur1991": Classic salt correction method
   - "SantaLucia1996": DNA-specific salt correction
   - "SantaLucia1998-1": Improved DNA salt correction, applied to Tm

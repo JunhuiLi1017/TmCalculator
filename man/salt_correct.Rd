@@ -29,7 +29,7 @@ salt_correct(
 
 \item{method}{Method for calculating salt concentration corrections to the melting temperature.
 Available options:
-- "Schildkraut2010": Updated salt correction method
+- "Schildkraut2010": Schildkraut & Lifson (1965); historical identifier
 - "Wetmur1991": Classic salt correction method
 - "SantaLucia1996": DNA-specific salt correction
 - "SantaLucia1998-1": Improved DNA salt correction
@@ -54,13 +54,17 @@ Different correction methods are available for various experimental conditions.
 \details{
 Different correction methods are available for various experimental conditions:
 
-- Schildkraut2010: Updated salt correction method that accounts for monovalent and divalent cations
+- Schildkraut2010: Schildkraut & Lifson (1965) monovalent correction; the name is historical
 - Wetmur1991: Classic salt correction method for monovalent cations
 - SantaLucia1996: DNA-specific salt correction
 - SantaLucia1998-1: Improved DNA salt correction
 - SantaLucia1998-2: Alternative DNA salt correction (requires sequence information)
-- Owczarzy2004: Comprehensive salt correction including effects of divalent cations (requires sequence information)
+- Owczarzy2004: Sodium correction from Owczarzy et al. (2004) (requires sequence information)
 - Owczarzy2008: Updated comprehensive salt correction (requires sequence information)
+
+For methods other than Owczarzy2008, the sodium-equivalent magnesium
+adjustment follows von Ahsen et al. (2001); it is separate from the
+original monovalent formulas.
 
 Owczarzy2008 is piecewise. Which of its three forms applies is decided by
 the ratio \eqn{R = \sqrt{[Mg^{2+}]_{free}} / [Mon]}, where \eqn{[Mon]} is
@@ -91,6 +95,15 @@ thermodynamics. Proceedings of the National Academy of Sciences. 1998;95(4):1460
 
 Owczarzy R, Moreira BG, Manthey JA, et al. Predicting stability of DNA duplexes in solutions
 containing magnesium and monovalent cations. Biochemistry. 2008;47(19):5336-5353.
+
+SantaLucia J Jr, Allawi HT, Seneviratne PA (1996). Improved nearest-neighbor
+parameters for predicting DNA duplex stability. <doi:10.1021/bi951907q>
+
+Owczarzy R et al. (2004). Effects of sodium ions on DNA duplex oligomers:
+improved predictions of melting temperatures. <doi:10.1021/bi034621r>
+
+von Ahsen N, Wittwer CT, Schutz E (2001). Oligonucleotide melting
+temperatures under PCR conditions. <doi:10.1093/clinchem/47.11.1956>
 }
 \author{
 Junhui Li

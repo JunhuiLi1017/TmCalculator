@@ -15,16 +15,16 @@ right = \eqn{\Delta S}). Rownames are dinucleotide step keys such as
 \describe{
   \item{DNA_NN_Breslauer_1986}{DNA/DNA NN, Breslauer et al. (1986)}
   \item{DNA_NN_Sugimoto_1996}{DNA/DNA NN, Sugimoto et al. (1996)}
-  \item{DNA_NN_Allawi_1998}{DNA/DNA NN, Allawi (1998)}
+  \item{DNA_NN_Allawi_1998}{DNA/DNA Watson-Crick NN, Allawi & SantaLucia (1997), Table 1; legacy identifier}
   \item{DNA_NN_SantaLucia_2004}{DNA/DNA NN, SantaLucia & Hicks (2004)}
   \item{RNA_NN_Freier_1986}{RNA/RNA NN, Freier (1986)}
   \item{RNA_NN_Xia_1998}{RNA/RNA NN, Xia (1998)}
   \item{RNA_NN_Chen_2012}{RNA/RNA NN with GU, Chen / Serra (2012)}
   \item{RNA_DNA_NN_Sugimoto_1995}{RNA/DNA hybrid NN, Sugimoto (1995)}
-  \item{DNA_IMM_Peyret_1999}{DNA single internal mismatch, Peyret (1999)}
-  \item{DNA_TMM_Bommarito_2000}{DNA terminal mismatch, Bommarito (2000)}
+  \item{DNA_IMM_Peyret_1999}{DNA internal mismatches, six sources (1997-2005); see tm_nn}
+  \item{DNA_TMM_Bommarito_2000}{DNA terminal mismatch, SantaLucia & Peyret (2001), WO2001094611A2, Tables 2-3; legacy identifier}
   \item{DNA_DE_Bommarito_2000}{DNA single dangling end, Bommarito (2000)}
-  \item{RNA_DE_Turner_2010}{RNA single dangling end, Turner (2010)}
+  \item{RNA_DE_Turner_2010}{RNA single dangling end, NNDB Turner 2004 compilation; database described in 2010}
 }
 
 \strong{Registered placeholders (values TBD - populate from primary literature)}
@@ -79,7 +79,8 @@ thermodynamic_nn_params$DNA_CNG_Broda_2005 <- new_table
 }
 }
 \source{
-Various publications as cited above.
+Various publications as cited above. See the installed
+\code{extdata/tm_nn_reference_audit.md} for the audit of runtime tables.
 }
 \usage{
 thermodynamic_nn_params
@@ -112,7 +113,7 @@ names(Filter(is.null, thermodynamic_nn_params))
 \references{
 Breslauer K J (1986) <doi:10.1073/pnas.83.11.3746>
 Sugimoto N (1996) <doi:10.1093/nar/24.22.4501>
-Allawi H (1998) <doi:10.1093/nar/26.11.2694>
+Allawi H T & SantaLucia J Jr (1997), Table 1 <doi:10.1021/bi962590c>; also SantaLucia (1998), Table 2 <doi:10.1073/pnas.95.4.1460>
 SantaLucia J (2004) <doi:10.1146/annurev.biophys.32.110601.141800>
 Freier S (1986) <doi:10.1073/pnas.83.24.9373>
 Xia T (1998) <doi:10.1021/bi9809425>
@@ -121,8 +122,13 @@ Sugimoto N (1995) <doi:10.1021/bi00035a029>
 Bommarito S (2000) <doi:10.1093/nar/28.9.1929>
 Peyret N (1999) <doi:10.1021/bi9825091>
 Allawi H T & SantaLucia J (1997) <doi:10.1021/bi962590c>
-SantaLucia J (2005) <doi:10.1093/nar/gki918>
-Turner D H (2010) <doi:10.1093/nar/gkp892>
+Watkins N E Jr & SantaLucia J Jr (2005) <doi:10.1093/nar/gki918>
+Allawi H T & SantaLucia J Jr (1998, G.A) <doi:10.1021/bi9724873>
+Allawi H T & SantaLucia J Jr (1998, A.C) <doi:10.1021/bi9803729>
+Allawi H T & SantaLucia J Jr (1998, C.T) <doi:10.1093/nar/26.11.2694>
+SantaLucia J Jr & Peyret N (2001), WO2001094611A2, Tables 2-3.
+\url{https://patents.google.com/patent/WO2001094611A2/en}
+Turner D H & Mathews D H (2010) <doi:10.1093/nar/gkp892>
 Tanaka F (2004) Biochemistry 43:7143
 Kierzek E (2006) Biochemistry 45:581
 Watkins N E (2011) Nucleic Acids Res 39:1894

@@ -1,5 +1,11 @@
 # TmCalculator 1.1.2
 
+- Audited built-in NN, mismatch and dangling-end citations. Corrected the
+  Allawi WC source, terminal-mismatch patent, six-paper internal-mismatch
+  attribution, and NNDB compilation date. Added a row-level source inventory
+  and documented unresolved source/model discrepancies; no parameter values
+  or numerical calculations were changed by this citation audit.
+
 ## Which releases returned wrong melting temperatures, and who needs to act
 
 `tm_nn()` scored **duplexes that are not perfectly paired** incorrectly in
@@ -199,6 +205,59 @@ was wrong in both the old and the new form.
   The test is now over base *pairs*, so a G or C appearing only in a mismatch
   does not make the duplex a G/C-containing one, and for a perfect duplex it
   agrees with Biopython.
+
+## What the initiation terms are charged on
+
+Not a change in 1.1.2, but it is now stated in `?tm_nn` rather than left
+implicit, because it is the one place where this package deliberately parts
+company with Biopython.
+
+A dangling end or terminal mismatch is covered by its own parameter and the
+position is then consumed; the initiation terms are charged on what remains.
+Biopython consumes the position for the stacking sum but still indexes all
+four initiation terms on the sequence as supplied. The consequence is that its
+answer depends on which strand you hand over:
+
+```r
+# the same duplex, written from either strand, with one terminal A-C mismatch
+tm_calculate("AGCGCGCGCA", complement_seq = "CCGCGCGCGT",
+             nn_table = "DNA_NN_SantaLucia_2004",
+             dnac_high = 250, dnac_low = 0, salt_method = "none")   # 63.6925
+tm_calculate("TGCGCGCGCC", complement_seq = "ACGCGCGCGA",
+             nn_table = "DNA_NN_SantaLucia_2004",
+             dnac_high = 250, dnac_low = 0, salt_method = "none")   # 63.6925
+```
+
+Biopython returns 64.2325 and 63.6925 for those two. Every other term is
+identical — the terminal-mismatch parameter is `CC/GA` either way and the
+eight stacks sum to the same value. The whole difference is one `init_A/T`
+traded for one `init_G/C`, 2.2 kcal/mol and 6.9 e.u.
+
+The sharpest form of the argument is the dangling-end case, which is
+[@haraldn](https://github.com/haraldn)'s (#8). At a terminal mismatch two
+bases still face each other, so which pair closes the duplex is at least
+arguable. At a dangling end the outermost residue has no partner at all, and a
+residue that is in no base pair cannot carry the penalty for a terminal base
+pair under any reading of SantaLucia & Hicks (2004). `"GCATGCATGA"` against
+`"CGTACGTAC"` takes the `.C/AG` dangling-end term, trims, and Biopython then
+charges a full `init_A/T` on the unpaired A purely because it is `seq[-1]`;
+this package returns 44.2801 where Biopython returns 44.2344.
+
+How large the divergence is depends on where the duplex melts. `init_A/T` is
+(2.2 kcal/mol, 6.9 e.u.), so its ratio is 318.8 K: its effect on Tm passes
+through zero near 45.7 °C and changes sign either side. That is why the same
+disagreement is worth 0.05 °C on the duplex above, which melts at 44.3 °C, and
+0.37 °C on a 16-mer melting further away.
+
+`DNA_NN_Breslauer_1986` is not bound by that cancellation, because the row
+that diverges for it is `init_allA/T` rather than `init_A/T` — the two
+conventions can disagree about whether the duplex contains a G·C pair at all.
+That needs the single G or C to be the mismatched terminal base itself, so
+that trimming removes it: for `"GATATATATATATATA"` against
+`"ATATATATATATATAT"` the gap is 3.0 °C, and it widens to 4.9 °C at 8 nt,
+where the duplex no longer melts above 0 °C. This is a different thing from
+the `gc_ends` defect described in the previous section, which was our own and
+needed no mismatch at all.
 
 ## Smaller things
 

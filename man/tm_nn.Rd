@@ -81,7 +81,8 @@ your own, build the object explicitly:
   DNA/DNA hybridizations, reference salt:
   - "DNA_NN_Breslauer_1986": Original DNA/DNA parameters
   - "DNA_NN_Sugimoto_1996": Improved DNA/DNA parameters
-  - "DNA_NN_Allawi_1998": DNA/DNA parameters with internal mismatch corrections
+  - "DNA_NN_Allawi_1998": Watson-Crick parameters from Allawi & SantaLucia
+    (1997), Table 1; the historical identifier is retained for compatibility
   - "DNA_NN_SantaLucia_2004": Unified DNA/DNA parameters (default)
 
   DNA/DNA hybridizations, melting-temperature optimized (Weber 2015):
@@ -163,15 +164,21 @@ your own, build the object explicitly:
   companion penultimate-pair end-effect table.}
 
 \item{tmm_table}{Thermodynamic parameters for terminal mismatches. Default: "DNA_TMM_Bommarito_2000"
-These parameters account for mismatches at the ends of the duplex.}
+These 48 parameters come from SantaLucia & Peyret (2001), patent
+WO2001094611A2, Tables 2-3. The historical identifier is retained;
+Bommarito (2000) is the source of DNA dangling ends, not this table.}
 
 \item{imm_table}{Thermodynamic parameters for internal mismatches. Default: "DNA_IMM_Peyret_1999"
-These parameters account for mismatches within the duplex, including inosine mismatches.}
+This is a composite of six publications (1997-2005), not a single
+Peyret (1999) table: 11 G.T, 8 G.A, 8 A.C, 8 C.T, 16 like-with-like
+mismatches and 36 inosine entries. The A.C parameters are for pH 7.}
 
 \item{de_table}{Thermodynamic parameters for dangling ends. Default: "DNA_DE_Bommarito_2000"
 Available options:
 - "DNA_DE_Bommarito_2000": Parameters for DNA dangling ends
-- "RNA_DE_Turner_2010": Parameters for RNA dangling ends}
+- "RNA_DE_Turner_2010": NNDB Turner 2004 RNA dangling-end compilation;
+  2010 is the database publication year. Entropies are derived from
+  tabulated enthalpies and free energies at 37 degrees C}
 
 \item{dnac_high}{Concentration of the higher concentrated strand in nM. Default: 25
 Typically this is the primer (for PCR) or the probe concentration.}
@@ -195,7 +202,7 @@ This is typically the template concentration.}
 
 \item{salt_method}{Salt correction method. Options are:
 Available options:
-- "Schildkraut2010": Updated salt correction method
+- "Schildkraut2010": Schildkraut & Lifson (1965); historical identifier
 - "Wetmur1991": Classic salt correction method
 - "SantaLucia1996": DNA-specific salt correction
 - "SantaLucia1998-1": Improved DNA salt correction, applied to Tm
@@ -222,11 +229,12 @@ Default: list(value=0, unit="percent")}
 
 \item{dmso_factor}{Coefficient of melting temperature (Tm) decrease per percent DMSO.
 Default: 0.75 (von Ahsen N, 2001, PMID:11673362)
-Other published values: 0.5, 0.6, 0.675}
+Other accepted empirical coefficients: 0.5, 0.6, 0.65, 0.675}
 
 \item{formamide_factor}{Coefficient of melting temperature (Tm) decrease per percent formamide.
-Default: 0.65
-Literature reports values ranging from 0.6 to 0.72}
+Default: 0.65, an empirical convention. Accepted alternatives are 0.6
+and 0.72; these are not all estimates from the same publication.
+The molar formula instead follows Blake & Delcourt (1996).}
 }
 \value{
 A \code{TmCalculator} list with:
@@ -254,7 +262,7 @@ DNA_NN_Breslauer_1986: Breslauer K J (1986) <doi:10.1073/pnas.83.11.3746>
  
  DNA_NN_Sugimoto_1996: Sugimoto N (1996) <doi:10.1093/nar/24.22.4501>
  
- DNA_NN_Allawi_1998: Allawi H (1998) <doi:10.1093/nar/26.11.2694>
+ DNA_NN_Allawi_1998: Allawi H T & SantaLucia J Jr (1997), Table 1 <doi:10.1021/bi962590c>; also SantaLucia (1998), Table 2 <doi:10.1073/pnas.95.4.1460>
  
  DNA_NN_SantaLucia_2004: SantaLucia J (2004) <doi:10.1146/annurev.biophys.32.110601.141800>
  
@@ -297,13 +305,13 @@ DNA_NN_Breslauer_1986: Breslauer K J (1986) <doi:10.1073/pnas.83.11.3746>
 
  DNA_NN_Ghosh_2020_PEG200 (100 mM, 40 wt% PEG200): Ghosh S (2020) <doi:10.1073/pnas.1920886117>
 
- DNA_TMM_Bommarito_2000: Bommarito S (2000)  <doi:10.1093/nar/28.9.1929>
+ DNA_TMM_Bommarito_2000: SantaLucia J Jr & Peyret N (2001), WO2001094611A2, Tables 2-3 (https://patents.google.com/patent/WO2001094611A2/en)
  
- DNA_IMM_Peyret_1999: Peyret N (1999) <doi:10.1021/bi9825091> & Allawi H T (1997) <doi:10.1021/bi962590c> & Santalucia N (2005) <doi:10.1093/nar/gki918>
+ DNA_IMM_Peyret_1999: Allawi H T & SantaLucia J Jr (1997, G.T) <doi:10.1021/bi962590c>; (1998, G.A) <doi:10.1021/bi9724873>; (1998, A.C) <doi:10.1021/bi9803729>; (1998, C.T) <doi:10.1093/nar/26.11.2694>; Peyret N et al. (1999, A.A/C.C/G.G/T.T) <doi:10.1021/bi9825091>; Watkins N E Jr & SantaLucia J Jr (2005, inosine) <doi:10.1093/nar/gki918>
  
  DNA_DE_Bommarito_2000: Bommarito S (2000) <doi:10.1093/nar/28.9.1929>
  
- RNA_DE_Turner_2010: Turner D H (2010) <doi:10.1093/nar/gkp892>
+ RNA_DE_Turner_2010: NNDB Turner 2004 dangling-end compilation; Turner D H & Mathews D H (2010, database description) <doi:10.1093/nar/gkp892>
 }
 \section{Choosing a parameter set}{
 
@@ -313,7 +321,7 @@ The two families are distinguished by one mechanical criterion: a set is
 condition-specific if and only if it carries a \code{salt_mM} attribute.
 
 \strong{Reference-salt sets} (no \code{salt_mM}; Breslauer 1986,
-Sugimoto 1996, Allawi 1998, SantaLucia 2004, Freier 1986, Xia 1998,
+Sugimoto 1996, Allawi 1997 (legacy name: Allawi_1998), SantaLucia 2004, Freier 1986, Xia 1998,
 Chen 2012, Zuber 2022, Sugimoto 1995) were fitted at a single reference
 sodium concentration, and other conditions are reached by applying one of
 the \code{salt_method} correction formulas.
@@ -330,6 +338,50 @@ was applied is recorded in the returned \code{options}.
 
 As a rule of thumb, pick the set whose fitted salt is closest to your
 experimental condition rather than correcting a distant one.
+}
+
+\section{What the initiation terms are charged on}{
+
+
+A dangling end or a terminal mismatch is accounted for by its own parameter,
+from \code{de_table} or \code{tmm_table}, and the position it covers is then
+consumed. The initiation terms -- \code{init}, \code{init_A/T},
+\code{init_G/C}, \code{init_5T/A} and the \code{init_allA/T} /
+\code{init_oneG/C} pair -- are charged on what remains, that is, on the
+duplex that actually closes.
+
+This matters because the terminal AT penalty is a property of the closing
+base pair. SantaLucia and Hicks (2004) define it as applied for each end of
+a duplex that has a terminal AT, so the question it asks is whether the pair
+holding that end shut is AT or GC. A mismatched terminus is neither an AT
+nor a GC pair, and a dangling residue is not in a base pair at all, so
+neither one can carry the penalty. Charging it there would also double-count
+the end, since the terminal-mismatch and dangling-end parameters were
+measured as terminal and already carry that end's contribution.
+
+Some implementations index these terms on the sequence as supplied rather
+than on the trimmed duplex. That makes the melting temperature depend on
+which of the two strands is handed over as \code{gr_seq}: the same duplex,
+written from the other strand, can then come back with a different answer.
+The convention here is invariant under that swap by construction. See the
+1.1.2 entry in NEWS for a worked example.
+}
+
+\section{Parameter provenance and limitations}{
+
+Table identifiers are retained for compatibility and are not always literal
+author-year citations. The installed files
+\code{extdata/tm_nn_reference_audit.md} and
+\code{extdata/tm_nn_parameter_sources.tsv} record the source and verification
+status of every built-in parameter row.
+
+The audit identified unresolved numerical/model issues: the patent's
+\code{GG/CG} terminal-mismatch enthalpy is inconsistent with its printed
+free energy; \code{RNA_NN_Chen_2012} combines refitted Watson-Crick terms
+with GU terms fitted against Xia (1998); and Banerjee (2020) initiation
+conditions in Table 2 footnotes are not reproduced by the current per-end
+application. The audit corrects citations without changing these numerical
+results. Consult the audit before using these affected models.
 }
 
 \examples{
@@ -385,59 +437,55 @@ out_ls$options[["Parameter set fitted at [Na+] (mM)"]]
 
 }
 \references{
-Breslauer K J , Frank R , Blocker H , et al. Predicting DNA duplex stability from the base sequence.[J]. Proceedings of the National Academy of Sciences, 1986, 83(11):3746-3750.
+Breslauer KJ, Frank R, Blocker H, Marky LA (1986). Predicting DNA duplex stability from the base sequence. PNAS 83:3746-3750. <doi:10.1073/pnas.83.11.3746>
 
-Sugimoto N , Nakano S , Yoneyama M , et al. Improved Thermodynamic Parameters and Helix Initiation Factor to Predict Stability of DNA Duplexes[J]. Nucleic Acids Research, 1996, 24(22):4501-5.
+Sugimoto N, Nakano S, Yoneyama M, Honda K (1996). Improved thermodynamic parameters and helix initiation factor to predict stability of DNA duplexes. NAR 24:4501-4505. <doi:10.1093/nar/24.22.4501>
 
-Allawi, H. Thermodynamics of internal C.T mismatches in DNA[J]. Nucleic Acids Research, 1998, 26(11):2694-2701.
+Allawi HT, SantaLucia J Jr (1997). Thermodynamics and NMR of internal G.T mismatches in DNA. Biochemistry 36:10581-10594. Table 1: Watson-Crick parameters; Table 5: G.T mismatches. <doi:10.1021/bi962590c>
 
-Hicks L D , Santalucia J . The thermodynamics of DNA structural motifs.[J]. Annual Review of Biophysics & Biomolecular Structure, 2004, 33(1):415-440.
+SantaLucia J Jr (1998). A unified view of polymer, dumbbell, and oligonucleotide DNA nearest-neighbor thermodynamics. PNAS 95:1460-1465. <doi:10.1073/pnas.95.4.1460>
 
-Freier S M , Kierzek R , Jaeger J A , et al. Improved free-energy parameters for predictions of RNA duplex stability.[J]. Proceedings of the National Academy of Sciences, 1986, 83(24):9373-9377.
+SantaLucia J Jr, Hicks D (2004). The thermodynamics of DNA structural motifs. Annual Review of Biophysics and Biomolecular Structure 33:415-440. <doi:10.1146/annurev.biophys.32.110601.141800>
 
-Xia T , Santalucia , J , Burkard M E , et al. Thermodynamic Parameters for an Expanded Nearest-Neighbor Model for Formation of RNA Duplexes with Watson-Crick Base Pairs,[J]. Biochemistry, 1998, 37(42):14719-14735.
+Freier SM et al. (1986). Improved free-energy parameters for predictions of RNA duplex stability. PNAS 83:9373-9377. <doi:10.1073/pnas.83.24.9373>
 
-Chen J L , Dishler A L , Kennedy S D , et al. Testing the Nearest Neighbor Model for Canonical RNA Base Pairs: Revision of GU Parameters[J]. Biochemistry, 2012, 51(16):3508-3522.
+Xia T et al. (1998). Thermodynamic parameters for an expanded nearest-neighbor model for formation of RNA duplexes with Watson-Crick base pairs. Biochemistry 37:14719-14735. <doi:10.1021/bi9809425>
 
-Bommarito S, Peyret N, Jr S L. Thermodynamic parameters for DNA sequences with dangling ends[J]. Nucleic Acids Research, 2000, 28(9):1929-1934.
+Chen JL et al. (2012). Testing the nearest neighbor model for canonical RNA base pairs: revision of GU parameters. Biochemistry 51:3508-3522. <doi:10.1021/bi3002709>
 
-Turner D H , Mathews D H . NNDB: the nearest neighbor parameter database for predicting stability of nucleic acid secondary structure[J]. Nucleic Acids Research, 2010, 38(Database issue):D280-D282.
+Sugimoto N et al. (1995). Thermodynamic parameters to predict stability of RNA/DNA hybrid duplexes. Biochemistry 34:11211-11216. <doi:10.1021/bi00035a029>
 
-Sugimoto N , Nakano S I , Katoh M , et al. Thermodynamic Parameters To Predict Stability of RNA/DNA Hybrid Duplexes[J]. Biochemistry, 1995, 34(35):11211-11216.
+Allawi HT, SantaLucia J Jr (1998). Nearest-neighbor thermodynamics of internal A.C mismatches in DNA: sequence dependence and pH effects. Biochemistry 37:9435-9444. <doi:10.1021/bi9803729>
 
-Allawi H, SantaLucia J: Thermodynamics and NMR of internal G-T mismatches in DNA. Biochemistry 1997, 36:10581-10594.
+Allawi HT, SantaLucia J Jr (1998). Nearest neighbor thermodynamic parameters for internal G.A mismatches in DNA. Biochemistry 37:2170-2179. <doi:10.1021/bi9724873>
 
-Weber G. Optimization method for obtaining nearest-neighbour DNA entropies and enthalpies directly from melting temperatures. Bioinformatics, 2015, 31(6):871-877.
+Allawi HT, SantaLucia J Jr (1998). Thermodynamics of internal C.T mismatches in DNA. NAR 26:2694-2701. <doi:10.1093/nar/26.11.2694>
 
-Ferreira I, Jolley E A, Znosko B M, Weber G. Replacing salt correction factors with optimized RNA nearest-neighbour enthalpy and entropy parameters. Chemical Physics, 2019, 521:69-76.
+Peyret N, Seneviratne PA, Allawi HT, SantaLucia J Jr (1999). Nearest-neighbor thermodynamics and NMR of DNA sequences with internal A.A, C.C, G.G, and T.T mismatches. Biochemistry 38:3468-3477. <doi:10.1021/bi9825091>
 
-Basilio Barbosa V, de Oliveira Martins E, Weber G. Nearest-neighbour parameters optimized for melting temperature prediction of DNA/RNA hybrids at high and low salt concentrations. Biophysical Chemistry, 2019, 251:106189.
+Watkins NE Jr, SantaLucia J Jr (2005). Nearest-neighbor thermodynamics of deoxyinosine pairs in DNA duplexes. NAR 33:6258-6267. <doi:10.1093/nar/gki918>
 
-Banerjee D, Tateishi-Karimata H, Ohyama T, et al. Improved nearest-neighbor parameters for the stability of RNA/DNA hybrids under a physiological condition. Nucleic Acids Research, 2020, 48(21):12042-12054.
+SantaLucia J Jr, Peyret N (2001). Method and system for predicting nucleic acid hybridization thermodynamics and computer-readable storage medium for use therein. Patent WO2001094611A2, published December 13, 2001, Tables 2-3. \url{https://patents.google.com/patent/WO2001094611A2/en}
 
-Zuber J, Schroeder S J, Sun H, Turner D H, Mathews D H. Nearest neighbor rules for RNA helix folding thermodynamics: improved end effects. Nucleic Acids Research, 2022, 50(9):5251-5262.
+Bommarito S, Peyret N, SantaLucia J Jr (2000). Thermodynamic parameters for DNA sequences with dangling ends. NAR 28:1929-1934. <doi:10.1093/nar/28.9.1929>
 
-Ghosh S, Takahashi S, Ohyama T, et al. Nearest-neighbor parameters for predicting DNA duplex stability in diverse molecular crowding conditions. Proceedings of the National Academy of Sciences, 2020, 117(25):14194-14201.
+Turner DH, Mathews DH (2010). NNDB: the nearest neighbor parameter database for predicting stability of nucleic acid secondary structure. NAR 38:D280-D282. <doi:10.1093/nar/gkp892> The RNA dangling-end values are the Turner 2004 compilation: \url{https://rna.urmc.rochester.edu/NNDB/rna_2004/rna_2004_dangling_ends.html}
 
-Ghosh S, Takahashi S, Banerjee D, et al. Nearest-neighbor parameters for the prediction of RNA duplex stability in diverse in vitro and cellular-like crowding conditions. Nucleic Acids Research, 2023, 51(9):4101-4111.
+Weber G (2015). Optimization method for obtaining nearest-neighbour DNA entropies and enthalpies directly from melting temperatures. Bioinformatics 31:871-877. <doi:10.1093/bioinformatics/btu751>
 
-Santalucia N E W J . Nearest-neighbor thermodynamics of deoxyinosine pairs in DNA duplexes[J]. Nucleic Acids Research, 2005, 33(19):6258-67.
+Ferreira I, Jolley EA, Znosko BM, Weber G (2019). Replacing salt correction factors with optimized RNA nearest-neighbour enthalpy and entropy parameters. Chemical Physics 521:69-76. <doi:10.1016/j.chemphys.2019.01.016>
 
-Peyret N , Seneviratne P A , Allawi H T , et al. Nearest-Neighbor Thermodynamics and NMR of DNA Sequences with Internal A-A, C-C, G-G, and T-T Mismatches, [J]. Biochemistry, 1999, 38(12):3468-3477.
+Basilio Barbosa V, de Oliveira Martins E, Weber G (2019). Nearest-neighbour parameters optimized for melting temperature prediction of DNA/RNA hybrids at high and low salt concentrations. Biophysical Chemistry 251:106189. <doi:10.1016/j.bpc.2019.106189>
 
-Weber G. Optimization method for obtaining nearest-neighbour DNA entropies and enthalpies directly from melting temperatures[J]. Bioinformatics, 2015, 31(6):871-877.
+Banerjee D et al. (2020). Improved nearest-neighbor parameters for the stability of RNA/DNA hybrids under a physiological condition. NAR 48:12042-12054. <doi:10.1093/nar/gkaa572>
 
-Ferreira I, Jolley E A, Znosko B M, et al. Replacing salt correction factors with optimized RNA nearest-neighbour enthalpy and entropy parameters[J]. Chemical Physics, 2019, 521:69-76.
+Zuber J, Schroeder SJ, Sun H, Turner DH, Mathews DH (2022). Nearest neighbor rules for RNA helix folding thermodynamics: improved end effects. NAR 50:5251-5262. <doi:10.1093/nar/gkac261>
 
-Basilio Barbosa V, de Oliveira Martins E, Weber G. Nearest-neighbour parameters optimized for melting temperature prediction of DNA/RNA hybrids at high and low salt concentrations[J]. Biophysical Chemistry, 2019, 251:106189.
+Ghosh S et al. (2020). Nearest-neighbor parameters for predicting DNA duplex stability in diverse molecular crowding conditions. PNAS 117:14194-14201. <doi:10.1073/pnas.1920886117>
 
-Banerjee D, Tateishi-Karimata H, Ohyama T, Ghosh S, Endoh T, Takahashi S, Sugimoto N. Improved nearest-neighbor parameters for the stability of RNA/DNA hybrids under a physiological condition[J]. Nucleic Acids Research, 2020, 48(21):12042-12054.
+Ghosh S et al. (2023). Nearest-neighbor parameters for the prediction of RNA duplex stability in diverse in vitro and cellular-like crowding conditions. NAR 51:4101-4111. <doi:10.1093/nar/gkad020>
 
-Zuber J, Schroeder S J, Sun H, Turner D H, Mathews D H. Nearest neighbor rules for RNA helix folding thermodynamics: improved end effects[J]. Nucleic Acids Research, 2022, 50(9):5251-5262.
-
-Ghosh S, Takahashi S, Banerjee D, Ohyama T, Endoh T, Tateishi-Karimata H, Sugimoto N. Nearest-neighbor parameters for the prediction of RNA duplex stability in diverse in vitro and cellular-like crowding conditions[J]. Nucleic Acids Research, 2023, 51(9):4101-4111.
-
-Ghosh S, Takahashi S, Ohyama T, Endoh T, Tateishi-Karimata H, Sugimoto N. Nearest-neighbor parameters for predicting DNA duplex stability in diverse molecular crowding conditions[J]. Proceedings of the National Academy of Sciences, 2020, 117(25):14194-14201.
+Blake RD, Delcourt SG (1996). Thermodynamic effects of formamide on DNA stability. NAR 24:2095-2103. <doi:10.1093/nar/24.11.2095>
 }
 \seealso{
 \code{\link{tm_calculate}} for a single entry point to the
